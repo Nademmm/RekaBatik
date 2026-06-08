@@ -3,8 +3,15 @@ import {
   Palette, Sparkles, Clock, Award, Star, ChevronRight,
   Users, Package, MapPin, TrendingUp, ShoppingBag, ArrowRight, Heart, Grid3x3
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BatikBackground, BatikDivider } from "../components/BatikBackground";
+import { supabase, handleSupabaseError } from "../../lib/supabase";
+import { BatikItem, Review } from "../../types/database";
+import { Skeleton } from "../components/ui/skeleton";
+
+interface PopularPatternMapped extends BatikItem {
+  tag: string;
+}
 
 // Image imports via Unsplash
 const heroImg = "https://images.unsplash.com/photo-1761516659902-2994696b362e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXRpayUyMGZhYnJpYyUyMHRleHRpbGUlMjBJbmRvbmVzaWFuJTIwdHJhZGl0aW9uYWx8ZW58MXx8fHwxNzc3NTIwMjI2fDA&ixlib=rb-4.1.0&q=80&w=1080";
@@ -106,6 +113,68 @@ export function HomePage() {
   const [activeReview, setActiveReview] = useState(0);
   const [likedPatterns, setLikedPatterns] = useState<number[]>([]);
 
+  const toggleLikePattern = (id: number) => {
+    setLikedPatterns((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const [popularPatterns, setPopularPatterns] = useState<PopularPatternMapped[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [trendingItems, setTrendingItems] = useState<{ name: string; sold: number; growth: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        // Fetch popular patterns
+        const { data: patternsData, error: pError } = await supabase
+          .from("batik_items")
+          .select("*")
+          .order("sold", { ascending: false })
+          .limit(6);
+        
+        if (pError) throw pError;
+        if (patternsData && patternsData.length > 0) {
+          setPopularPatterns(patternsData.map((p: any) => ({
+            ...p,
+            tag: p.sold > 200 ? "Terlaris" : "Populer"
+          })));
+        } else {
+          setPopularPatterns([]);
+        }
+
+        // Fetch reviews
+        const { data: reviewsData, error: rError } = await supabase
+          .from("reviews")
+          .select("*")
+          .limit(4);
+        
+        if (rError) throw rError;
+        if (reviewsData && reviewsData.length > 0) {
+          setReviews(reviewsData);
+        } else {
+          setReviews([]);
+        }
+
+        // Trending items (mocking growth for now)
+        if (patternsData) {
+          setTrendingItems(patternsData.slice(0, 5).map((p: any) => ({
+            name: p.name,
+            sold: p.sold,
+            growth: `+${Math.floor(Math.random() * 30) + 10}%`
+          })));
+        }
+
+      } catch (err: any) {
+        handleSupabaseError(err, "HomePage.fetchData");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
   const stats = [
     { icon: Users, value: "12.500+", label: "Pelanggan Puas", color: "#C9960C" },
     { icon: Package, value: "48.200+", label: "Pesanan Selesai", color: "#8B4513" },
@@ -138,66 +207,6 @@ export function HomePage() {
       description: "Material premium, pewarna alami ramah lingkungan, dan garansi kepuasan pelanggan",
       color: "#8B4513",
     },
-  ];
-
-  const popularPatterns = [
-    { id: 1, name: "Parang Rusak", origin: "Solo, Jawa Tengah", price: "Rp 250.000", type: "parang", primary: "#8B4513", secondary: "#D2691E", bg: "#FFF8DC", tag: "Terlaris" },
-    { id: 2, name: "Kawung Sido", origin: "Yogyakarta", price: "Rp 280.000", type: "kawung", primary: "#8B6914", secondary: "#C9A227", bg: "#FEFDF5", tag: "Populer" },
-    { id: 3, name: "Megamendung", origin: "Cirebon, Jawa Barat", price: "Rp 300.000", type: "mega", primary: "#1E4A8C", secondary: "#4A90C2", bg: "#EEF4FF", tag: "Eksklusif" },
-    { id: 4, name: "Truntum Klasik", origin: "Solo, Jawa Tengah", price: "Rp 270.000", type: "truntum", primary: "#8B4513", secondary: "#C9960C", bg: "#FFFAF0", tag: "Klasik" },
-    { id: 5, name: "Sekar Jagad", origin: "Yogyakarta", price: "Rp 320.000", type: "sekar", primary: "#2D6B1C", secondary: "#7CB342", bg: "#F4FBF0", tag: "Premium" },
-    { id: 6, name: "Sido Mukti", origin: "Desa Jetis, Sidoarjo", price: "Rp 350.000", type: "sidomukti", primary: "#6B1FAA", secondary: "#C68AE0", bg: "#FAF0FF", tag: "Pernikahan" },
-  ];
-
-  const reviews = [
-    {
-      id: 0,
-      name: "Siti Rahayu",
-      role: "Pelanggan dari Jakarta",
-      image: reviewImg1,
-      rating: 5,
-      comment: "Luar biasa! Kualitas batik yang saya pesan melebihi ekspektasi. Fitur kustomisasinya sangat mudah digunakan dan hasilnya persis seperti yang saya bayangkan. Akan pesan lagi!",
-      date: "April 2026",
-      product: "Batik Parang Custom",
-    },
-    {
-      id: 1,
-      name: "Budi Santoso",
-      role: "Desainer dari Surabaya",
-      image: reviewImg2,
-      rating: 5,
-      comment: "Sebagai desainer, saya sangat mengapresiasi fitur kustomisasi yang detail. Bisa atur warna, skala, bahkan tambah sentuhan kuas sendiri. Pengrajin dari Desa Jetis benar-benar profesional.",
-      date: "Maret 2026",
-      product: "Batik Kawung Premium",
-    },
-    {
-      id: 2,
-      name: "Dewi Puspita",
-      role: "Ibu Rumah Tangga, Malang",
-      image: reviewImg1,
-      rating: 5,
-      comment: "Pesan batik untuk pernikahan anak saya dan hasilnya sangat indah! Tim RekaBatik sangat responsif dan membantu dari awal hingga batik sampai di tangan saya. Sangat rekomendasikan!",
-      date: "Februari 2026",
-      product: "Batik Sido Mukti",
-    },
-    {
-      id: 3,
-      name: "Ahmad Fauzi",
-      role: "Pengusaha, Semarang",
-      image: reviewImg2,
-      rating: 4,
-      comment: "Pesan seragam batik untuk tim kantor. Proses mudah, kualitas bagus, dan pengiriman tepat waktu. Harga juga sangat kompetitif untuk kualitas segini.",
-      date: "Januari 2026",
-      product: "Batik Truntum Custom",
-    },
-  ];
-
-  const trendingItems = [
-    { name: "Batik Jetis Tulis", sold: 234, growth: "+24%" },
-    { name: "Batik Parang Premium", sold: 189, growth: "+18%" },
-    { name: "Batik Kawung Wedding", sold: 156, growth: "+31%" },
-    { name: "Batik Custom Digital", sold: 143, growth: "+45%" },
-    { name: "Batik Megamendung", sold: 128, growth: "+12%" },
   ];
 
   return (
@@ -386,59 +395,63 @@ export function HomePage() {
             </Link>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {popularPatterns.map((p) => (
+            {loading ? (
+              [...Array(6)].map((_, i) => (
+                <div key={i} className="rounded-2xl overflow-hidden bg-white border border-amber-100 p-0">
+                  <Skeleton className="h-40 w-full rounded-none" />
+                  <div className="p-4 space-y-3">
+                    <Skeleton className="h-5 w-1/2" />
+                    <Skeleton className="h-4 w-1/3" />
+                    <div className="flex justify-between items-center pt-2">
+                      <Skeleton className="h-6 w-20" />
+                      <Skeleton className="h-8 w-16 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : popularPatterns.map((p) => (
               <div
                 key={p.id}
                 className="group rounded-2xl overflow-hidden cursor-pointer transition-all hover:shadow-2xl hover:-translate-y-1"
                 style={{ background: "white", boxShadow: "0 4px 20px rgba(61, 28, 2, 0.1)" }}
               >
                 {/* Pattern preview */}
-                <div className="h-48 relative overflow-hidden" style={{ background: p.bg }}>
-                  <BatikPatternPreview type={p.type} primary={p.primary} secondary={p.secondary} bg={p.bg} />
-                  {/* Badges */}
-                  <div className="absolute top-3 left-3 z-10">
+                <div className="h-40 relative overflow-hidden" style={{ background: p.bg_color }}>
+                  <BatikPatternPreview type={p.type || "parang"} primary={p.primary_color} secondary={p.secondary_color} bg={p.bg_color} />
+                  <div className="absolute top-3 right-3 flex flex-col gap-2">
+                    <button
+                      onClick={() => toggleLikePattern(p.id)}
+                      className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                      style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
+                    >
+                      <Heart
+                        className="w-4 h-4"
+                        fill={likedPatterns.includes(p.id) ? "#C9960C" : "none"}
+                        color={likedPatterns.includes(p.id) ? "#C9960C" : "#6B4226"}
+                      />
+                    </button>
+                  </div>
+                  <div className="absolute top-3 left-3">
                     <span
-                      className="px-3 py-1 rounded-full text-xs"
-                      style={{ background: "rgba(61, 28, 2, 0.85)", color: "#D4AF37" }}
+                      className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                      style={{ background: "rgba(255,255,255,0.95)", color: "#7C3D12" }}
                     >
                       {p.tag}
                     </span>
                   </div>
-                  <button
-                    className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full flex items-center justify-center transition-all"
-                    style={{ background: "rgba(255,255,255,0.9)" }}
-                    onClick={() => setLikedPatterns(prev =>
-                      prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id]
-                    )}
-                  >
-                    <Heart
-                      className="w-4 h-4"
-                      fill={likedPatterns.includes(p.id) ? "#C9960C" : "none"}
-                      color={likedPatterns.includes(p.id) ? "#C9960C" : "#6B4226"}
-                    />
-                  </button>
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center" style={{ background: "rgba(61, 28, 2, 0.5)" }}>
-                    <Link
-                      to="/custom"
-                      className="px-5 py-2.5 rounded-xl transition-all"
-                      style={{ background: "linear-gradient(135deg, #C9960C, #D4AF37)", color: "#3D1C02" }}
-                    >
-                      Kustomisasi
-                    </Link>
-                  </div>
                 </div>
-                <div className="p-5">
-                  <h3 className="mb-1" style={{ color: "#3D1C02", fontFamily: "'Playfair Display', serif" }}>
-                    {p.name}
-                  </h3>
-                  <p className="mb-3" style={{ color: "#9A6B4B", fontSize: "0.8rem" }}>
-                    <MapPin className="w-3 h-3 inline mr-1" />
-                    {p.origin}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span style={{ color: "#7C3D12", fontSize: "1.1rem", fontFamily: "'Playfair Display', serif" }}>
-                      {p.price}
+                <div className="p-4 flex-1 flex flex-col">
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 style={{ color: "#3D1C02", fontFamily: "'Playfair Display', serif", fontSize: "1.05rem" }}>
+                      {p.name}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-1.5 mb-3" style={{ color: "#9A6B4B", fontSize: "0.75rem" }}>
+                    <MapPin className="w-3 h-3" /> {p.origin}
+                  </div>
+                  <div className="mt-auto flex items-center justify-between">
+                    <span style={{ color: "#7C3D12", fontWeight: "600", fontSize: "1rem" }}>
+                      Rp {p.price.toLocaleString("id-ID")}
                     </span>
                     <button
                       className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm transition-all"
@@ -552,7 +565,13 @@ export function HomePage() {
               </Link>
             </div>
             <div className="lg:col-span-3 space-y-3">
-              {trendingItems.map((item, i) => (
+              {loading ? (
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : trendingItems.map((item, i) => (
                 <div
                   key={i}
                   className="flex items-center gap-4 p-4 rounded-xl transition-all hover:shadow-lg cursor-pointer"
@@ -613,53 +632,67 @@ export function HomePage() {
 
           {/* Featured Review */}
           <div className="max-w-4xl mx-auto mb-8">
-            <div
-              className="p-8 rounded-2xl relative overflow-hidden transition-all"
-              style={{
-                background: "white",
-                boxShadow: "0 8px 40px rgba(61, 28, 2, 0.12)",
-                border: "1px solid rgba(201, 150, 12, 0.2)",
-              }}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 opacity-5">
-                <svg viewBox="0 0 100 100" className="w-full h-full">
-                  <text x="0" y="90" style={{ fontSize: "120px", fill: "#7C3D12", fontFamily: "serif" }}>"</text>
-                </svg>
-              </div>
-              <div className="flex flex-col md:flex-row gap-6 items-start">
-                <div className="flex-shrink-0">
-                  <img
-                    src={reviews[activeReview].image}
-                    alt={reviews[activeReview].name}
-                    className="w-16 h-16 rounded-full object-cover"
-                    style={{ border: "3px solid #C9960C" }}
-                  />
+            {loading ? (
+              <div className="p-8 rounded-2xl bg-white border border-amber-100 flex gap-6 items-start">
+                <Skeleton className="w-16 h-16 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-4">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-20 w-full" />
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-8 w-24 rounded-lg" />
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <StarRating rating={reviews[activeReview].rating} />
-                  <p
-                    className="mt-3 mb-5"
-                    style={{ color: "#4A2A0A", lineHeight: "1.8", fontStyle: "italic", fontSize: "1.05rem" }}
-                  >
-                    "{reviews[activeReview].comment}"
-                  </p>
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                      <div style={{ color: "#3D1C02", fontFamily: "'Playfair Display', serif" }}>
-                        {reviews[activeReview].name}
-                      </div>
-                      <div style={{ color: "#9A6B4B", fontSize: "0.8rem" }}>{reviews[activeReview].role}</div>
-                    </div>
-                    <div
-                      className="px-3 py-1.5 rounded-lg text-sm"
-                      style={{ background: "rgba(201, 150, 12, 0.1)", color: "#9A6B0A" }}
+              </div>
+            ) : reviews.length > 0 && (
+              <div
+                className="p-8 rounded-2xl relative overflow-hidden transition-all"
+                style={{
+                  background: "white",
+                  boxShadow: "0 8px 40px rgba(61, 28, 2, 0.12)",
+                  border: "1px solid rgba(201, 150, 12, 0.2)",
+                }}
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 opacity-5">
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <text x="0" y="90" style={{ fontSize: "120px", fill: "#7C3D12", fontFamily: "serif" }}>"</text>
+                  </svg>
+                </div>
+                <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <div className="flex-shrink-0">
+                    <img
+                      src={reviews[activeReview]?.image}
+                      alt={reviews[activeReview]?.name}
+                      className="w-16 h-16 rounded-full object-cover"
+                      style={{ border: "3px solid #C9960C" }}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <StarRating rating={reviews[activeReview]?.rating} />
+                    <p
+                      className="mt-3 mb-5"
+                      style={{ color: "#4A2A0A", lineHeight: "1.8", fontStyle: "italic", fontSize: "1.05rem" }}
                     >
-                      {reviews[activeReview].product}
+                      "{reviews[activeReview]?.comment}"
+                    </p>
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div>
+                        <div style={{ color: "#3D1C02", fontFamily: "'Playfair Display', serif" }}>
+                          {reviews[activeReview]?.name}
+                        </div>
+                        <div style={{ color: "#9A6B4B", fontSize: "0.8rem" }}>{reviews[activeReview]?.role}</div>
+                      </div>
+                      <div
+                        className="px-3 py-1.5 rounded-lg text-sm"
+                        style={{ background: "rgba(201, 150, 12, 0.1)", color: "#9A6B0A" }}
+                      >
+                        {reviews[activeReview]?.product}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Review navigation dots */}

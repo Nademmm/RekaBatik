@@ -54,9 +54,11 @@ Dashboard pesanan yang informatif, memungkinkan pengguna melihat progres produks
 - **Interaksi & Animasi**: [Framer Motion](https://www.framer.com/motion/) untuk pengalaman pengguna yang interaktif.
 - **Grafis**: HTML5 Canvas API untuk implementasi alat lukis digital kustom.
 
-### Backend & Data (Status Prototype)
-- **Architecture**: Client-side state management menggunakan React Hooks (`useState`, `useRef`, `useCallback`).
-- **Data Model**: Simulasi data menggunakan objek terstruktur untuk Katalog, Pesanan, dan Review untuk mendemonstrasikan fungsionalitas penuh aplikasi.
+### Backend & Database (Production Ready)
+- **Platform**: [Supabase](https://supabase.com/) untuk Database, Autentikasi, dan Storage.
+- **Database**: PostgreSQL dengan Row Level Security (RLS) untuk keamanan data.
+- **Auth**: Supabase Auth terintegrasi untuk manajemen pengguna.
+- **State Management**: React Hooks & Supabase Realtime untuk sinkronisasi data.
 
 ---
 
@@ -80,7 +82,10 @@ RekaBatik dirancang sebagai solusi *Business-to-Consumer* (B2C) dan *Business-to
    ```bash
    npm install
    ```
-2. **Mode Pengembangan**:
+2. **Konfigurasi Environment**:
+   - Salin file `.env.example` menjadi `.env`.
+   - Isi `VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY` dengan kredensial dari dashboard Supabase Anda.
+3. **Mode Pengembangan**:
    ```bash
    npm run dev
    ```
@@ -93,7 +98,8 @@ RekaBatik dirancang sebagai solusi *Business-to-Consumer* (B2C) dan *Business-to
 
 ## 🚀 Rencana Pengembangan (Roadmap)
 - [ ] **Integrasi AI**: Implementasi AI untuk memberikan saran motif berdasarkan deskripsi teks pengguna.
-- [ ] **Sistem Autentikasi**: Integrasi Firebase Auth untuk akun pengguna yang lebih aman.
+- [x] **Infrastruktur Backend**: Migrasi ke Supabase untuk Database dan Autentikasi.
+- [ ] **Sistem Autentikasi**: Implementasi Login/Register menggunakan Supabase Auth.
 - [ ] **Payment Gateway**: Integrasi Midtrans atau Xendit untuk pembayaran otomatis.
 - [ ] **Export to SVG**: Fitur untuk mengunduh hasil desain digital untuk keperluan lain.
 

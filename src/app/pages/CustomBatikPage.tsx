@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Palette, Download, Save, RotateCcw, Layers, Brush,
-  Eraser, Minus, Plus, Trash2, ZoomIn, ZoomOut
+  Eraser, Minus, Plus, Trash2, ZoomIn, ZoomOut, Loader2
 } from "lucide-react";
 import { Slider } from "../components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { BatikBackground } from "../components/BatikBackground";
+import { supabase, handleSupabaseError } from "../../lib/supabase";
+import { toast } from "sonner";
 
 type Tool = "select" | "brush" | "eraser";
 
@@ -25,6 +27,7 @@ export function CustomBatikPage() {
   const [brushOpacity, setBrushOpacity] = useState([80]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [canvasHistory, setCanvasHistory] = useState<ImageData[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
@@ -162,6 +165,33 @@ export function CustomBatikPage() {
     if (!ctx) return;
     saveToHistory();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const saveDesign = async () => {
+    setIsSaving(true);
+    try {
+      const canvas = canvasRef.current;
+      const drawingData = canvas ? canvas.toDataURL("image/png") : null;
+      
+      const { error } = await supabase
+        .from("custom_designs")
+        .insert([{
+          pattern_id: selectedPattern,
+          colors: selectedColors,
+          scale: scale[0],
+          rotation: rotation[0],
+          drawing_data: drawingData,
+          created_at: new Date().toISOString()
+        }]);
+
+      if (error) throw error;
+      toast.success("Desain berhasil disimpan ke database!");
+    } catch (err: any) {
+      handleSupabaseError(err, "CustomBatikPage.saveDesign");
+      toast.error("Gagal menyimpan desain. Pastikan tabel 'custom_designs' sudah dibuat.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderPatternSVG = () => {
@@ -347,11 +377,13 @@ export function CustomBatikPage() {
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    className="flex items-center gap-1.5 px-3 h-8 rounded-lg transition-all text-sm"
+                    onClick={saveDesign}
+                    disabled={isSaving}
+                    className="flex items-center gap-1.5 px-3 h-8 rounded-lg transition-all text-sm disabled:opacity-50"
                     style={{ background: "rgba(201, 150, 12, 0.2)", color: "#D4AF37" }}
                   >
-                    <Save className="w-3.5 h-3.5" />
-                    Simpan
+                    {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    {isSaving ? "Menyimpan..." : "Simpan"}
                   </button>
                   <button
                     className="flex items-center gap-1.5 px-3 h-8 rounded-lg transition-all text-sm"

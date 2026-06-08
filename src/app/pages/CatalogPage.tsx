@@ -1,21 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Filter, Heart, ShoppingCart, Star, MapPin, SlidersHorizontal, X } from "lucide-react";
 import { BatikBackground } from "../components/BatikBackground";
-
-const batikItems = [
-  { id: 1, name: "Batik Parang Rusak", category: "traditional", price: 250000, description: "Motif klasik diagonal dengan makna kekuatan dan keberanian hidup", origin: "Solo, Jawa Tengah", primary: "#8B4513", secondary: "#D2691E", bg: "#FFF8DC", rating: 5, sold: 234 },
-  { id: 2, name: "Batik Kawung Premium", category: "traditional", price: 280000, description: "Simbol kesucian dan keadilan, motif empat kelopak melingkar", origin: "Yogyakarta", primary: "#8B6914", secondary: "#C9A227", bg: "#FEFDF5", rating: 5, sold: 189 },
-  { id: 3, name: "Batik Megamendung Cirebon", category: "regional", price: 300000, description: "Motif awan berlapis yang melambangkan kesabaran hati", origin: "Cirebon, Jawa Barat", primary: "#1E4A8C", secondary: "#4A90C2", bg: "#EEF4FF", rating: 4, sold: 128 },
-  { id: 4, name: "Batik Truntum Solo", category: "traditional", price: 270000, description: "Melambangkan cinta yang tumbuh kembali, motif bintang kecil", origin: "Solo, Jawa Tengah", primary: "#8B4513", secondary: "#C9960C", bg: "#FFFAF0", rating: 5, sold: 156 },
-  { id: 5, name: "Batik Sekar Jagad", category: "traditional", price: 320000, description: "Motif peta dunia dalam kain batik, penuh filosofi alam semesta", origin: "Yogyakarta", primary: "#2D6B1C", secondary: "#7CB342", bg: "#F4FBF0", rating: 4, sold: 97 },
-  { id: 6, name: "Batik Sido Mukti", category: "wedding", price: 350000, description: "Batik pernikahan penuh makna kebahagiaan dan kemakmuran", origin: "Solo, Jawa Tengah", primary: "#6B1FAA", secondary: "#C68AE0", bg: "#FAF0FF", rating: 5, sold: 203 },
-  { id: 7, name: "Batik Modern Geometris", category: "modern", price: 240000, description: "Desain kontemporer memadukan motif tradisional dan estetika modern", origin: "Jakarta", primary: "#3A3A5C", secondary: "#6B6BCC", bg: "#F5F5FF", rating: 4, sold: 143 },
-  { id: 8, name: "Batik Lasem Tulis", category: "regional", price: 450000, description: "Perpaduan budaya Tionghoa dan Jawa dengan warna merah khas", origin: "Lasem, Rembang", primary: "#8B0000", secondary: "#DC3545", bg: "#FFF5F5", rating: 5, sold: 88 },
-  { id: 9, name: "Batik Jetis Beras Utah", category: "regional", price: 380000, description: "Motif khas Sidoarjo — butiran beras berserakan penuh makna kelimpahan", origin: "Desa Jetis, Sidoarjo", primary: "#8B4513", secondary: "#C9960C", bg: "#FFF8DC", rating: 5, sold: 312 },
-  { id: 10, name: "Batik Pekalongan Pesisir", category: "regional", price: 290000, description: "Motif pesisir yang cerah dengan warna-warna berani khas pantura", origin: "Pekalongan", primary: "#C03A1A", secondary: "#F08C30", bg: "#FFF5EE", rating: 4, sold: 74 },
-  { id: 11, name: "Batik Parang Kusumo", category: "wedding", price: 420000, description: "Batik sakral untuk upacara adat, simbol keteguhan hati dan kebijaksanaan", origin: "Yogyakarta", primary: "#2C1B47", secondary: "#7B5EA7", bg: "#F8F5FF", rating: 5, sold: 67 },
-  { id: 12, name: "Batik Semen Romo", category: "traditional", price: 360000, description: "Motif flora-fauna alam semesta, penuh dengan simbolisme kehidupan", origin: "Solo, Jawa Tengah", primary: "#1A5C1A", secondary: "#4CAF50", bg: "#F2FBF2", rating: 4, sold: 92 },
-];
+import { supabase, handleSupabaseError } from "../../lib/supabase";
+import { BatikItem } from "../../types/database";
+import { Skeleton } from "../components/ui/skeleton";
+import { toast } from "sonner";
 
 const categories = [
   { value: "all", label: "Semua" },
@@ -105,12 +94,36 @@ function getPatternType(category: string, id: number): string {
 }
 
 export function CatalogPage() {
+  const [batikItems, setBatikItems] = useState<BatikItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [likedItems, setLikedItems] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState("popular");
   const [showFilters, setShowFilters] = useState(false);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000000]);
+
+  useEffect(() => {
+    async function fetchItems() {
+      try {
+        const { data, error } = await supabase
+          .from("batik_items")
+          .select("*");
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setBatikItems(data);
+        } else {
+          setBatikItems([]);
+        }
+      } catch (err: any) {
+        handleSupabaseError(err, "CatalogPage.fetchItems");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchItems();
+  }, []);
 
   const toggleLike = (id: number) => setLikedItems(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
@@ -228,7 +241,24 @@ export function CatalogPage() {
         </div>
 
         {/* Product Grid */}
-        {filtered.length > 0 ? (
+        {loading ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="rounded-2xl overflow-hidden bg-white border border-amber-100 p-0">
+                <Skeleton className="h-44 w-full rounded-none" />
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-12 w-full" />
+                  <div className="flex justify-between items-center pt-2">
+                    <Skeleton className="h-6 w-20" />
+                    <Skeleton className="h-8 w-16 rounded-lg" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtered.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {filtered.map((item) => (
               <div
@@ -237,8 +267,8 @@ export function CatalogPage() {
                 style={{ background: "white", boxShadow: "0 4px 16px rgba(61, 28, 2, 0.08)", border: "1px solid rgba(201, 150, 12, 0.1)" }}
               >
                 {/* Pattern Preview */}
-                <div className="h-44 relative overflow-hidden" style={{ background: item.bg }}>
-                  <PatternMini primary={item.primary} secondary={item.secondary} bg={item.bg} type={getPatternType(item.category, item.id)} />
+                <div className="h-44 relative overflow-hidden" style={{ background: item.bg_color }}>
+                  <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={getPatternType(item.category, item.id)} />
                   <button
                     className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110 z-10"
                     style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 2px 8px rgba(61,28,2,0.15)" }}
@@ -295,6 +325,9 @@ export function CatalogPage() {
                       Rp {item.price.toLocaleString("id-ID")}
                     </span>
                     <button
+                      onClick={() => {
+                        toast.success(`${item.name} telah ditambahkan ke keranjang!`);
+                      }}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all"
                       style={{
                         background: "linear-gradient(135deg, #C9960C, #D4AF37)",

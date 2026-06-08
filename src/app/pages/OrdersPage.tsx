@@ -1,74 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, Clock, CheckCircle, Truck, Plus, Search, Filter, ChevronDown, Star, RotateCcw } from "lucide-react";
 import { Link } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
-
-const orders = [
-  {
-    id: "ORD-2026-001",
-    item: "Batik Parang Rusak Custom",
-    description: "Pola Parang, Warna Sogan, Ukuran 2.5m × 1.15m",
-    date: "25 April 2026",
-    deliveredDate: "29 April 2026",
-    status: "delivered",
-    total: 250000,
-    type: "parang",
-    primary: "#8B4513",
-    secondary: "#D2691E",
-    bg: "#FFF8DC",
-    artisan: "Batik Amri Jetis",
-    canReview: true,
-    reviewed: false,
-  },
-  {
-    id: "ORD-2026-002",
-    item: "Batik Kawung Premium",
-    description: "Pola Kawung Sido, Warna Emas Kerajaan, Ukuran 2m × 1.15m",
-    date: "28 April 2026",
-    estimatedDate: "5 Mei 2026",
-    status: "shipping",
-    total: 280000,
-    type: "kawung",
-    primary: "#8B6914",
-    secondary: "#C9A227",
-    bg: "#FEFDF5",
-    artisan: "Batik Kenongo Indah",
-    canReview: false,
-    reviewed: false,
-  },
-  {
-    id: "ORD-2026-003",
-    item: "Batik Megamendung Custom",
-    description: "Pola Megamendung, Warna Biru Nusantara, dengan Kuas Personal",
-    date: "30 April 2026",
-    estimatedDate: "7 Mei 2026",
-    status: "processing",
-    total: 300000,
-    type: "mega",
-    primary: "#1E4A8C",
-    secondary: "#4A90C2",
-    bg: "#EEF4FF",
-    artisan: "Sanggar Batik Jetis Asri",
-    canReview: false,
-    reviewed: false,
-  },
-  {
-    id: "ORD-2026-004",
-    item: "Batik Sido Mukti Pengantin",
-    description: "Batik pernikahan premium dengan motif Sido Mukti, warna ungu keemasan",
-    date: "10 April 2026",
-    deliveredDate: "18 April 2026",
-    status: "delivered",
-    total: 650000,
-    type: "sidomukti",
-    primary: "#6B1FAA",
-    secondary: "#C68AE0",
-    bg: "#FAF0FF",
-    artisan: "Rumah Batik Sido Rahayu",
-    canReview: true,
-    reviewed: true,
-  },
-];
+import { supabase, handleSupabaseError } from "../../lib/supabase";
+import { Order } from "../../types/database";
+import { Skeleton } from "../components/ui/skeleton";
 
 type OrderStatus = "all" | "delivered" | "shipping" | "processing";
 
@@ -134,8 +70,31 @@ const statusConfig = {
 const stepLabels = ["Pesanan Diterima", "Pengrajin Membatik", "Siap Kirim", "Terkirim"];
 
 export function OrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<OrderStatus>("all");
   const [searchId, setSearchId] = useState("");
+
+  useEffect(() => {
+    async function fetchOrders() {
+      try {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .order("date", { ascending: false });
+
+        if (error) throw error;
+        if (data) {
+          setOrders(data);
+        }
+      } catch (err: any) {
+        handleSupabaseError(err, "OrdersPage.fetchOrders");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchOrders();
+  }, []);
 
   const filtered = orders.filter(o => {
     const matchStatus = filterStatus === "all" || o.status === filterStatus;
@@ -248,7 +207,33 @@ export function OrdersPage() {
         </div>
 
         {/* Orders List */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="p-6 rounded-2xl bg-white border border-amber-100 space-y-4">
+                <div className="flex gap-5">
+                  <Skeleton className="w-28 h-28 rounded-xl" />
+                  <div className="flex-1 space-y-3">
+                    <div className="flex justify-between">
+                      <Skeleton className="h-6 w-1/3" />
+                      <Skeleton className="h-8 w-24 rounded-full" />
+                    </div>
+                    <Skeleton className="h-4 w-1/2" />
+                    <div className="flex gap-4">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  </div>
+                </div>
+                <Skeleton className="h-1 w-full" />
+                <div className="flex justify-between">
+                  <Skeleton className="h-6 w-24" />
+                  <Skeleton className="h-10 w-32 rounded-xl" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="py-20 text-center rounded-2xl" style={{ background: "white", border: "1px solid rgba(201, 150, 12, 0.15)" }}>
             <Package className="w-14 h-14 mx-auto mb-4" style={{ color: "#C9960C", opacity: 0.5 }} />
             <h2 className="mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D1C02", fontSize: "1.4rem" }}>
@@ -264,7 +249,7 @@ export function OrdersPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {filtered.map((order) => {
               const config = statusConfig[order.status as keyof typeof statusConfig];
               const StatusIcon = config.icon;
@@ -275,8 +260,8 @@ export function OrdersPage() {
                     <div className="flex flex-col lg:flex-row gap-5">
                       {/* Pattern preview */}
                       <div className="w-full lg:w-28 h-24 lg:h-28 rounded-xl overflow-hidden flex-shrink-0"
-                        style={{ background: order.bg }}>
-                        <PatternMini primary={order.primary} secondary={order.secondary} bg={order.bg} type={order.type} />
+                        style={{ background: order.bg_color }}>
+                        <PatternMini primary={order.primary_color} secondary={order.secondary_color} bg={order.bg_color} type={order.type} />
                       </div>
 
                       {/* Order info */}
@@ -310,12 +295,12 @@ export function OrdersPage() {
                           </div>
                           {order.status === "delivered" && (
                             <div style={{ color: "#16A34A", fontSize: "0.8rem" }}>
-                              ✓ Diterima: {(order as any).deliveredDate}
+                              ✓ Diterima: {(order as any).delivered_date}
                             </div>
                           )}
                           {order.status !== "delivered" && (
                             <div style={{ color: "#9A6B4B", fontSize: "0.8rem" }}>
-                              <span style={{ color: "#6B4226" }}>Estimasi:</span> {(order as any).estimatedDate}
+                              <span style={{ color: "#6B4226" }}>Estimasi:</span> {(order as any).estimated_date}
                             </div>
                           )}
                         </div>
@@ -372,23 +357,16 @@ export function OrdersPage() {
                             {order.status === "delivered" && !order.reviewed && (
                               <button
                                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm transition-all"
-                                style={{ background: "rgba(201, 150, 12, 0.1)", color: "#9A6B0A", border: "1px solid rgba(201, 150, 12, 0.25)" }}
+                                style={{ background: "linear-gradient(135deg, #C9960C, #D4AF37)", color: "#3D1C02" }}
                               >
                                 <Star className="w-3.5 h-3.5" />
                                 Beri Ulasan
                               </button>
                             )}
                             {order.status === "delivered" && order.reviewed && (
-                              <span className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm"
-                                style={{ background: "rgba(22, 163, 74, 0.08)", color: "#16A34A" }}>
-                                <Star className="w-3.5 h-3.5" fill="#16A34A" />
-                                Sudah Diulas
-                              </span>
-                            )}
-                            {order.status === "delivered" && (
                               <button
                                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm transition-all"
-                                style={{ background: "linear-gradient(135deg, #C9960C, #D4AF37)", color: "#3D1C02" }}
+                                style={{ background: "rgba(201, 150, 12, 0.08)", color: "#7C3D12", border: "1px solid rgba(201, 150, 12, 0.2)" }}
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 Pesan Lagi

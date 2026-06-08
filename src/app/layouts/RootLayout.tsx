@@ -4,6 +4,7 @@ import { Palette, Home, ShoppingBag, Grid3x3, MapPin, Menu, X, Instagram, Facebo
 import { useState, useEffect } from "react";
 import { BatikBackground } from "../components/BatikBackground";
 import logoImg from "../../imports/rekabatik-logo.png";
+import { Toaster } from "sonner";
 
 export function RootLayout() {
   const location = useLocation();
@@ -37,6 +38,7 @@ export function RootLayout() {
         fontFamily: "'Inter', sans-serif",
       }}
     >
+      <Toaster position="top-right" richColors />
       {/* Header */}
       <motion.header
         className="sticky top-0 z-50"

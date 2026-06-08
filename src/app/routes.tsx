@@ -5,11 +5,13 @@ import { CatalogPage } from "./pages/CatalogPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { DesaJetisPage } from "./pages/DesaJetisPage";
 import { RootLayout } from "./layouts/RootLayout";
+import { ErrorPage } from "./components/ErrorPage";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: RootLayout,
+    errorElement: <ErrorPage />,
     children: [
       { index: true, Component: HomePage },
       { path: "custom", Component: CustomBatikPage },
