@@ -417,7 +417,7 @@ export function HomePage() {
               >
                 {/* Pattern preview */}
                 <div className="h-40 relative overflow-hidden" style={{ background: p.bg_color }}>
-                  <BatikPatternPreview type={p.type || "parang"} primary={p.primary_color} secondary={p.secondary_color} bg={p.bg_color} />
+                  <BatikPatternPreview type={p.tag || "parang"} primary={p.primary_color} secondary={p.secondary_color} bg={p.bg_color} />
                   <div className="absolute top-3 right-3 flex flex-col gap-2">
                     <button
                       onClick={() => toggleLikePattern(p.id)}

@@ -10,6 +10,7 @@ export interface BatikItem {
   bg_color: string;
   rating: number;
   sold: number;
+  style_type?: string;
   created_at?: string;
 }
 

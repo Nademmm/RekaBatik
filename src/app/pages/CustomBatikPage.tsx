@@ -7,12 +7,16 @@ import { Slider } from "../components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
+import { BatikItem } from "../../types/database";
 import { toast } from "sonner";
+import { Skeleton } from "../components/ui/skeleton";
 
 type Tool = "select" | "brush" | "eraser";
 
 export function CustomBatikPage() {
-  const [selectedPattern, setSelectedPattern] = useState(0);
+  const [patterns, setPatterns] = useState<BatikItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPatternIndex, setSelectedPatternIndex] = useState(0);
   const [selectedColors, setSelectedColors] = useState({
     primary: "#8B4513",
     secondary: "#D2691E",
@@ -33,14 +37,26 @@ export function CustomBatikPage() {
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  const patterns = [
-    { id: 0, name: "Parang", desc: "Diagonal kuat", style: "diagonal-lines" },
-    { id: 1, name: "Kawung", desc: "Empat kelopak", style: "circles" },
-    { id: 2, name: "Megamendung", desc: "Awan berlapis", style: "clouds" },
-    { id: 3, name: "Truntum", desc: "Bintang cinta", style: "stars" },
-    { id: 4, name: "Sekar Jagad", desc: "Peta dunia", style: "flowers" },
-    { id: 5, name: "Sido Mukti", desc: "Geometris sakral", style: "geometric" },
-  ];
+  useEffect(() => {
+    async function fetchPatterns() {
+      try {
+        const { data, error } = await supabase
+          .from("batik_items")
+          .select("*")
+          .order("id", { ascending: true });
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setPatterns(data);
+        }
+      } catch (err: any) {
+        handleSupabaseError(err, "CustomBatikPage.fetchPatterns");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPatterns();
+  }, []);
 
   const colorPresets = [
     { name: "Klasik Sogan", colors: { primary: "#8B4513", secondary: "#D2691E", accent: "#C9960C", background: "#FFF8DC" } },
@@ -176,7 +192,7 @@ export function CustomBatikPage() {
       const { error } = await supabase
         .from("custom_designs")
         .insert([{
-          pattern_id: selectedPattern,
+          pattern_id: patterns[selectedPatternIndex]?.id,
           colors: selectedColors,
           scale: scale[0],
           rotation: rotation[0],
@@ -195,124 +211,80 @@ export function CustomBatikPage() {
   };
 
   const renderPatternSVG = () => {
-    const pattern = patterns[selectedPattern];
+    const pattern = patterns[selectedPatternIndex];
+    if (!pattern) return null;
+
     const style: React.CSSProperties = {
       transform: `scale(${scale[0] / 100}) rotate(${rotation[0]}deg)`,
-      transition: "transform 0.3s ease",
-      position: "absolute",
-      inset: 0,
+      transformOrigin: "center",
+      transition: "transform 0.3s ease-out",
     };
 
-    switch (pattern.style) {
-      case "diagonal-lines":
-        return (
-          <div style={style}>
-            <svg width="100%" height="100%">
-              <defs>
-                <pattern id="parang-p" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
-                  <rect fill={selectedColors.background} width="60" height="60" />
-                  <path d="M0,30 Q15,15 30,30 Q45,45 60,30 M0,0 Q15,-15 30,0 M30,60 Q45,45 60,60" stroke={selectedColors.primary} strokeWidth="3" fill="none" />
-                  <path d="M0,30 Q15,15 30,30 Q45,45 60,30" stroke={selectedColors.secondary} strokeWidth="1.5" fill="none" transform="translate(0,-10)" />
-                  <circle cx="30" cy="30" r="3" fill={selectedColors.accent} opacity="0.6" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#parang-p)" />
-            </svg>
-          </div>
-        );
-      case "circles":
-        return (
-          <div style={style}>
-            <svg width="100%" height="100%">
-              <defs>
-                <pattern id="kawung-p" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
-                  <rect fill={selectedColors.background} width="80" height="80" />
-                  <ellipse cx="40" cy="24" rx="10" ry="16" fill="none" stroke={selectedColors.primary} strokeWidth="2" />
-                  <ellipse cx="40" cy="56" rx="10" ry="16" fill="none" stroke={selectedColors.primary} strokeWidth="2" />
-                  <ellipse cx="24" cy="40" rx="16" ry="10" fill="none" stroke={selectedColors.primary} strokeWidth="2" />
-                  <ellipse cx="56" cy="40" rx="16" ry="10" fill="none" stroke={selectedColors.primary} strokeWidth="2" />
-                  <circle cx="40" cy="40" r="6" fill="none" stroke={selectedColors.secondary} strokeWidth="2" />
-                  <circle cx="40" cy="40" r="2.5" fill={selectedColors.accent} />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#kawung-p)" />
-            </svg>
-          </div>
-        );
-      case "clouds":
-        return (
-          <div style={style}>
-            <svg width="100%" height="100%">
-              <defs>
-                <pattern id="mega-p" x="0" y="0" width="120" height="60" patternUnits="userSpaceOnUse">
-                  <rect fill={selectedColors.background} width="120" height="60" />
-                  <path d="M0,30 Q20,10 40,30 Q60,50 80,30 Q100,10 120,30" fill="none" stroke={selectedColors.primary} strokeWidth="4" />
-                  <path d="M0,30 Q20,10 40,30 Q60,50 80,30 Q100,10 120,30" fill="none" stroke={selectedColors.secondary} strokeWidth="2.5" transform="translate(0,10)" />
-                  <path d="M0,30 Q20,10 40,30 Q60,50 80,30 Q100,10 120,30" fill="none" stroke={selectedColors.accent} strokeWidth="1.5" transform="translate(0,20)" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#mega-p)" />
-            </svg>
-          </div>
-        );
-      case "stars":
-        return (
-          <div style={style}>
-            <svg width="100%" height="100%">
-              <defs>
-                <pattern id="truntum-p" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
-                  <rect fill={selectedColors.background} width="60" height="60" />
-                  <polygon points="30,8 34,22 48,22 37,31 41,45 30,36 19,45 23,31 12,22 26,22" fill={selectedColors.primary} stroke={selectedColors.secondary} strokeWidth="1.5" />
-                  <circle cx="30" cy="30" r="3" fill={selectedColors.accent} />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#truntum-p)" />
-            </svg>
-          </div>
-        );
-      case "flowers":
-        return (
-          <div style={style}>
-            <svg width="100%" height="100%">
-              <defs>
-                <pattern id="sekar-p" x="0" y="0" width="90" height="90" patternUnits="userSpaceOnUse">
-                  <rect fill={selectedColors.background} width="90" height="90" />
-                  <circle cx="45" cy="45" r="7" fill={selectedColors.accent} />
-                  <circle cx="45" cy="25" r="11" fill={selectedColors.primary} opacity="0.8" />
-                  <circle cx="65" cy="45" r="11" fill={selectedColors.primary} opacity="0.8" />
-                  <circle cx="45" cy="65" r="11" fill={selectedColors.primary} opacity="0.8" />
-                  <circle cx="25" cy="45" r="11" fill={selectedColors.primary} opacity="0.8" />
-                  <circle cx="29" cy="29" r="7" fill={selectedColors.secondary} opacity="0.65" />
-                  <circle cx="61" cy="29" r="7" fill={selectedColors.secondary} opacity="0.65" />
-                  <circle cx="29" cy="61" r="7" fill={selectedColors.secondary} opacity="0.65" />
-                  <circle cx="61" cy="61" r="7" fill={selectedColors.secondary} opacity="0.65" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#sekar-p)" />
-            </svg>
-          </div>
-        );
-      default:
-        return (
-          <div style={style}>
-            <svg width="100%" height="100%">
-              <defs>
-                <pattern id="sidomukti-p" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
-                  <rect fill={selectedColors.background} width="60" height="60" />
-                  <rect x="12" y="12" width="36" height="36" fill="none" stroke={selectedColors.primary} strokeWidth="2.5" />
-                  <rect x="20" y="20" width="20" height="20" fill="none" stroke={selectedColors.secondary} strokeWidth="2" />
-                  <rect x="25" y="25" width="10" height="10" fill={selectedColors.accent} opacity="0.6" />
-                  <line x1="12" y1="12" x2="20" y2="20" stroke={selectedColors.primary} strokeWidth="1.5" />
-                  <line x1="48" y1="12" x2="40" y2="20" stroke={selectedColors.primary} strokeWidth="1.5" />
-                  <line x1="12" y1="48" x2="20" y2="40" stroke={selectedColors.primary} strokeWidth="1.5" />
-                  <line x1="48" y1="48" x2="40" y2="40" stroke={selectedColors.primary} strokeWidth="1.5" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#sidomukti-p)" />
-            </svg>
-          </div>
-        );
-    }
+    const id = `pattern-${pattern.id}`;
+    const primary = selectedColors.primary;
+    const secondary = selectedColors.secondary;
+    const bg = selectedColors.background;
+
+    const type = pattern.style_type || pattern.category;
+
+    const renderPat = () => {
+      if (type === "diagonal-lines" || type === "traditional" || type === "parang") return (
+        <pattern id={id} x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+          <rect fill={bg} width="100" height="100" />
+          <path d="M0,50 Q25,25 50,50 Q75,75 100,50" stroke={primary} strokeWidth="6" fill="none" />
+          <path d="M0,80 Q25,55 50,80 Q75,105 100,80" stroke={secondary} strokeWidth="3" fill="none" />
+          <path d="M0,20 Q25,-5 50,20 Q75,45 100,20" stroke={secondary} strokeWidth="3" fill="none" />
+        </pattern>
+      );
+      if (type === "circles" || type === "kawung") return (
+        <pattern id={id} x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+          <rect fill={bg} width="80" height="80" />
+          <ellipse cx="40" cy="22" rx="10" ry="18" fill="none" stroke={primary} strokeWidth="2.5" />
+          <ellipse cx="40" cy="58" rx="10" ry="18" fill="none" stroke={primary} strokeWidth="2.5" />
+          <ellipse cx="22" cy="40" rx="18" ry="10" fill="none" stroke={primary} strokeWidth="2.5" />
+          <ellipse cx="58" cy="40" rx="18" ry="10" fill="none" stroke={primary} strokeWidth="2.5" />
+          <circle cx="40" cy="40" r="5" fill={secondary} />
+        </pattern>
+      );
+      if (type === "clouds" || type === "regional" || type === "mega") return (
+        <pattern id={id} x="0" y="0" width="120" height="60" patternUnits="userSpaceOnUse">
+          <rect fill={bg} width="120" height="60" />
+          <path d="M0,30 Q15,10 30,30 Q45,50 60,30 Q75,10 90,30 Q105,50 120,30" stroke={primary} strokeWidth="5" fill="none" />
+          <path d="M0,30 Q15,10 30,30 Q45,50 60,30 Q75,10 90,30 Q105,50 120,30" stroke={secondary} strokeWidth="2.5" fill="none" transform="translate(0,-10)" />
+        </pattern>
+      );
+      if (type === "stars" || type === "truntum") return (
+        <pattern id={id} x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+          <rect fill={bg} width="60" height="60" />
+          <polygon points="30,10 34,22 46,22 36,30 40,42 30,34 20,42 24,30 14,22 26,22" fill={primary} stroke={secondary} strokeWidth="1" />
+          <circle cx="30" cy="30" r="4" fill={secondary} />
+        </pattern>
+      );
+      if (type === "flowers" || type === "sekar") return (
+        <pattern id={id} x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+          <rect fill={bg} width="80" height="80" />
+          <circle cx="40" cy="40" r="7" fill={secondary} />
+          <circle cx="40" cy="20" r="10" fill={primary} opacity="0.8" />
+          <circle cx="60" cy="40" r="10" fill={primary} opacity="0.8" />
+          <circle cx="40" cy="60" r="10" fill={primary} opacity="0.8" />
+          <circle cx="20" cy="40" r="10" fill={primary} opacity="0.8" />
+        </pattern>
+      );
+      return (
+        <pattern id={id} x="0" y="0" width="50" height="50" patternUnits="userSpaceOnUse">
+          <rect fill={bg} width="50" height="50" />
+          <rect x="10" y="10" width="30" height="30" fill="none" stroke={primary} strokeWidth="2" />
+          <rect x="18" y="18" width="14" height="14" fill="none" stroke={secondary} strokeWidth="1.5" />
+        </pattern>
+      );
+    };
+
+    return (
+      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>{renderPat()}</defs>
+        <rect width="100%" height="100%" fill={`url(#${id})`} style={style} />
+      </svg>
+    );
   };
 
   const toolConfig = {
@@ -619,12 +591,16 @@ export function CustomBatikPage() {
                     Pilih motif batik sebagai dasar desain Anda
                   </p>
                   <div className="grid grid-cols-2 gap-2">
-                    {patterns.map((pattern) => {
-                      const isSelected = selectedPattern === pattern.id;
+                    {loading ? (
+                      [...Array(6)].map((_, i) => (
+                        <Skeleton key={i} className="h-32 rounded-xl" />
+                      ))
+                    ) : patterns.map((pattern, i) => {
+                      const isSelected = selectedPatternIndex === i;
                       return (
                         <button
                           key={pattern.id}
-                          onClick={() => setSelectedPattern(pattern.id)}
+                          onClick={() => setSelectedPatternIndex(i)}
                           className="p-3 rounded-xl border-2 transition-all text-left hover:shadow-md"
                           style={{
                             borderColor: isSelected ? "#C9960C" : "rgba(201, 150, 12, 0.15)",
@@ -640,22 +616,22 @@ export function CustomBatikPage() {
                               <defs>
                                 <pattern id={`mini-${pattern.id}`} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
                                   <rect fill={selectedColors.background} width="20" height="20" />
-                                  {pattern.style === "diagonal-lines" && (
+                                  {(pattern.style_type === "parang" || pattern.style_type === "traditional" || pattern.style_type === "diagonal-lines") && (
                                     <path d="M0,10 Q5,5 10,10 Q15,15 20,10" stroke={selectedColors.primary} strokeWidth="1.5" fill="none" />
                                   )}
-                                  {pattern.style === "circles" && (
+                                  {(pattern.style_type === "kawung" || pattern.style_type === "circles") && (
                                     <>
                                       <circle cx="10" cy="6" r="4" fill="none" stroke={selectedColors.primary} strokeWidth="1" />
                                       <circle cx="10" cy="14" r="4" fill="none" stroke={selectedColors.primary} strokeWidth="1" />
                                     </>
                                   )}
-                                  {pattern.style === "clouds" && (
+                                  {(pattern.style_type === "mega" || pattern.style_type === "clouds" || pattern.style_type === "regional") && (
                                     <path d="M0,10 Q5,4 10,10 Q15,16 20,10" stroke={selectedColors.primary} strokeWidth="2" fill="none" />
                                   )}
-                                  {pattern.style === "stars" && (
+                                  {(pattern.style_type === "truntum" || pattern.style_type === "stars") && (
                                     <polygon points="10,3 12,8 17,8 13,11 15,16 10,13 5,16 7,11 3,8 8,8" fill={selectedColors.primary} />
                                   )}
-                                  {pattern.style === "flowers" && (
+                                  {(pattern.style_type === "sekar" || pattern.style_type === "flowers") && (
                                     <>
                                       <circle cx="10" cy="10" r="2.5" fill={selectedColors.accent} />
                                       <circle cx="10" cy="4" r="3" fill={selectedColors.primary} opacity="0.8" />
@@ -664,7 +640,7 @@ export function CustomBatikPage() {
                                       <circle cx="4" cy="10" r="3" fill={selectedColors.primary} opacity="0.8" />
                                     </>
                                   )}
-                                  {pattern.style === "geometric" && (
+                                  {(pattern.style_type === "sidomukti" || pattern.style_type === "geometric" || pattern.category === "wedding") && (
                                     <>
                                       <rect x="4" y="4" width="12" height="12" fill="none" stroke={selectedColors.primary} strokeWidth="1.5" />
                                       <rect x="7" y="7" width="6" height="6" fill={selectedColors.secondary} opacity="0.5" />
@@ -676,7 +652,7 @@ export function CustomBatikPage() {
                             </svg>
                           </div>
                           <div style={{ color: "#3D1C02", fontSize: "0.8rem" }}>{pattern.name}</div>
-                          <div style={{ color: "#9A6B4B", fontSize: "0.7rem" }}>{pattern.desc}</div>
+                          <div style={{ color: "#9A6B4B", fontSize: "0.7rem" }}>{pattern.description}</div>
                           {isSelected && (
                             <div className="mt-1 text-xs" style={{ color: "#C9960C" }}>✓ Dipilih</div>
                           )}

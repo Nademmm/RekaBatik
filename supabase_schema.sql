@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS batik_items (
   bg_color TEXT,
   rating INT DEFAULT 5,
   sold INT DEFAULT 0,
+  style_type TEXT, -- Kolom baru untuk mapping visual SVG
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -84,13 +85,15 @@ CREATE TABLE IF NOT EXISTS custom_designs (
 -- SEED DATA (INITIAL DATA)
 -- ==========================================
 
--- Seed Batik Items
-INSERT INTO batik_items (name, category, price, description, origin, primary_color, secondary_color, bg_color, rating, sold)
+-- Seed Batik Items dengan style_type
+INSERT INTO batik_items (name, category, price, description, origin, primary_color, secondary_color, bg_color, rating, sold, style_type)
 VALUES 
-('Batik Parang Rusak', 'traditional', 250000, 'Motif klasik diagonal dengan makna kekuatan dan keberanian hidup', 'Solo, Jawa Tengah', '#8B4513', '#D2691E', '#FFF8DC', 5, 234),
-('Batik Kawung Premium', 'traditional', 280000, 'Simbol kesucian dan keadilan, motif empat kelopak melingkar', 'Yogyakarta', '#8B6914', '#C9A227', '#FEFDF5', 5, 189),
-('Batik Megamendung', 'regional', 300000, 'Motif awan berlapis yang melambangkan kesabaran hati', 'Cirebon, Jawa Barat', '#1E4A8C', '#4A90C2', '#EEF4FF', 4, 128),
-('Batik Jetis Beras Utah', 'regional', 380000, 'Motif khas Sidoarjo — butiran beras berserakan penuh makna kelimpahan', 'Desa Jetis, Sidoarjo', '#8B4513', '#C9960C', '#FFF8DC', 5, 312);
+('Batik Parang Rusak', 'traditional', 250000, 'Motif klasik diagonal.', 'Solo, Jawa Tengah', '#8B4513', '#D2691E', '#FFF8DC', 5, 234, 'parang'),
+('Batik Kawung Premium', 'traditional', 280000, 'Simbol kesucian.', 'Yogyakarta', '#8B6914', '#C9A227', '#FEFDF5', 5, 189, 'kawung'),
+('Batik Megamendung', 'regional', 300000, 'Motif awan Cirebon.', 'Cirebon, Jawa Barat', '#1E4A8C', '#4A90C2', '#EEF4FF', 4, 128, 'mega'),
+('Batik Jetis Beras Utah', 'regional', 380000, 'Motif khas Sidoarjo.', 'Desa Jetis, Sidoarjo', '#8B4513', '#C9960C', '#FFF8DC', 5, 312, 'diagonal-lines'),
+('Batik Sekar Jagad', 'traditional', 320000, 'Motif bunga dunia.', 'Yogyakarta', '#2D6B1C', '#7CB342', '#F4FBF0', 5, 97, 'sekar'),
+('Batik Sido Mukti', 'wedding', 350000, 'Batik pernikahan sakral.', 'Solo', '#6B1FAA', '#C68AE0', '#FAF0FF', 5, 203, 'sidomukti');
 
 -- Seed Stores
 INSERT INTO stores (name, owner, established, specialty, address, phone, hours, rating, review_count, price_range, tags, featured, description, motifs)
