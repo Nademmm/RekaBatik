@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Heart, ShoppingCart, Star, MapPin, SlidersHorizontal, X } from "lucide-react";
+import { Search, Filter, Heart, ShoppingBag, Star, MapPin, SlidersHorizontal, X } from "lucide-react";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
 import { BatikItem } from "../../types/database";
@@ -18,9 +18,12 @@ function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map((s) => (
-        <Star key={s} className="w-3 h-3"
-          fill={s <= rating ? "#C9960C" : "none"}
-          color={s <= rating ? "#C9960C" : "#D1A860"} />
+        <Star
+          key={s}
+          className="w-3 h-3"
+          fill={s <= rating ? "#D4B88B" : "none"}
+          color={s <= rating ? "#D4B88B" : "#E8E1DA"}
+        />
       ))}
     </div>
   );
@@ -144,20 +147,19 @@ export function CatalogPage() {
     });
 
   return (
-    <div className="min-h-screen relative" style={{ background: "linear-gradient(135deg, #FBF5E6, #F5E6C0)" }}>
-      <BatikBackground opacity={0.04} patternType="kawung" />
+    <div className="min-h-screen relative" style={{ background: "#FAF8F5" }}>
+      <BatikBackground opacity={0.02} patternType="kawung" />
 
       <div className="container mx-auto px-4 py-10 relative z-10">
         {/* Header */}
         <div className="mb-8">
-          <div className="inline-block px-4 py-1.5 rounded-full mb-3"
-            style={{ background: "rgba(201, 150, 12, 0.15)", color: "#9A6B0A" }}>
+          <div className="inline-block px-4 py-1.5 rounded-full mb-3" style={{ background: "rgba(212,184,139,0.12)", color: "#8B6F47" }}>
             <span style={{ fontSize: "0.8rem", letterSpacing: "0.12em" }}>KOLEKSI LENGKAP</span>
           </div>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", color: "#3D1C02", fontSize: "2rem" }}>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "2rem" }}>
             Katalog Batik
           </h1>
-          <p style={{ color: "#6B4226", fontSize: "0.9rem" }}>
+          <p style={{ color: "#7A6B5E", fontSize: "0.9rem" }}>
             {filtered.length} produk batik pilihan dari pengrajin terbaik Indonesia
           </p>
         </div>
@@ -166,7 +168,7 @@ export function CatalogPage() {
         <div className="mb-6 flex flex-col lg:flex-row gap-3">
           {/* Search */}
           <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#9A6B4B" }} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#7A6B5E" }} />
             <input
               type="text"
               placeholder="Cari batik, motif, atau asal daerah..."
@@ -174,15 +176,14 @@ export function CatalogPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-11 pr-4 py-3 rounded-xl outline-none transition-all"
               style={{
-                background: "white",
-                border: "1px solid rgba(201, 150, 12, 0.25)",
-                color: "#3D1C02",
+                background: "#FFFFFF",
+                border: "1px solid #E8E1DA",
+                color: "#3D2B1F",
                 fontSize: "0.9rem",
-                boxShadow: "0 2px 12px rgba(61, 28, 2, 0.06)",
               }}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: "#9A6B4B" }}>
+              <button onClick={() => setSearchQuery("")} className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: "#7A6B5E" }}>
                 <X className="w-4 h-4" />
               </button>
             )}
@@ -194,9 +195,9 @@ export function CatalogPage() {
             onChange={(e) => setSortBy(e.target.value)}
             className="px-4 py-3 rounded-xl outline-none"
             style={{
-              background: "white",
-              border: "1px solid rgba(201, 150, 12, 0.25)",
-              color: "#3D1C02",
+              background: "#FFFFFF",
+              border: "1px solid #E8E1DA",
+              color: "#3D2B1F",
               fontSize: "0.875rem",
               minWidth: "160px",
             }}
@@ -211,9 +212,9 @@ export function CatalogPage() {
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center gap-2 px-5 py-3 rounded-xl transition-all"
             style={{
-              background: showFilters ? "linear-gradient(135deg, #C9960C, #D4AF37)" : "white",
-              border: "1px solid rgba(201, 150, 12, 0.25)",
-              color: showFilters ? "#3D1C02" : "#6B4226",
+              background: showFilters ? "#8B6F47" : "#FFFFFF",
+              border: "1px solid #E8E1DA",
+              color: showFilters ? "#FFFFFF" : "#8B6F47",
             }}
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -227,12 +228,11 @@ export function CatalogPage() {
             <button
               key={cat.value}
               onClick={() => setSelectedCategory(cat.value)}
-              className="px-4 py-2 rounded-xl text-sm transition-all"
+              className="px-4 py-2 rounded-full text-sm transition-all"
               style={{
-                background: selectedCategory === cat.value ? "linear-gradient(135deg, #C9960C, #D4AF37)" : "white",
-                color: selectedCategory === cat.value ? "#3D1C02" : "#6B4226",
-                border: `1px solid ${selectedCategory === cat.value ? "#C9960C" : "rgba(201, 150, 12, 0.2)"}`,
-                boxShadow: selectedCategory === cat.value ? "0 4px 12px rgba(201, 150, 12, 0.25)" : "none",
+                background: selectedCategory === cat.value ? "#8B6F47" : "#FFFFFF",
+                color: selectedCategory === cat.value ? "#FFFFFF" : "#7A6B5E",
+                border: `1px solid ${selectedCategory === cat.value ? "#8B6F47" : "#E8E1DA"}`,
               }}
             >
               {cat.label}
@@ -244,11 +244,11 @@ export function CatalogPage() {
         {loading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="rounded-2xl overflow-hidden bg-white border border-amber-100 p-0">
+              <div key={i} className="rounded-2xl overflow-hidden bg-white border border-gray-100 p-0">
                 <Skeleton className="h-44 w-full rounded-none" />
                 <div className="p-4 space-y-3">
                   <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-4 w-1/3" />
                   <Skeleton className="h-12 w-full" />
                   <div className="flex justify-between items-center pt-2">
                     <Skeleton className="h-6 w-20" />
@@ -263,42 +263,40 @@ export function CatalogPage() {
             {filtered.map((item) => (
               <div
                 key={item.id}
-                className="group rounded-2xl overflow-hidden transition-all hover:shadow-2xl hover:-translate-y-1"
-                style={{ background: "white", boxShadow: "0 4px 16px rgba(61, 28, 2, 0.08)", border: "1px solid rgba(201, 150, 12, 0.1)" }}
+                className="group rounded-2xl overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1"
+                style={{ background: "#FFFFFF", boxShadow: "0 4px 16px rgba(61,43,31,0.04)", border: "1px solid #E8E1DA" }}
               >
                 {/* Pattern Preview */}
                 <div className="h-44 relative overflow-hidden" style={{ background: item.bg_color }}>
                   <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={getPatternType(item.category, item.id)} />
                   <button
                     className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110 z-10"
-                    style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 2px 8px rgba(61,28,2,0.15)" }}
+                    style={{ background: "rgba(255,255,255,0.95)", boxShadow: "0 2px 8px rgba(61,43,31,0.08)" }}
                     onClick={() => toggleLike(item.id)}
                   >
-                    <Heart className="w-4 h-4"
-                      fill={likedItems.includes(item.id) ? "#C9960C" : "none"}
-                      color={likedItems.includes(item.id) ? "#C9960C" : "#6B4226"} />
+                    <Heart
+                      className="w-4 h-4"
+                      fill={likedItems.includes(item.id) ? "#8B6F47" : "none"}
+                      color={likedItems.includes(item.id) ? "#8B6F47" : "#7A6B5E"}
+                    />
                   </button>
                   {item.category === "wedding" && (
                     <div className="absolute top-3 left-3">
-                      <span className="px-2.5 py-1 rounded-full text-xs"
-                        style={{ background: "rgba(61, 28, 2, 0.8)", color: "#D4AF37" }}>
+                      <span className="px-2.5 py-1 rounded-full text-xs" style={{ background: "rgba(61,43,31,0.85)", color: "#FAF8F5" }}>
                         Pernikahan
                       </span>
                     </div>
                   )}
                   {item.id === 9 && (
                     <div className="absolute top-3 left-3">
-                      <span className="px-2.5 py-1 rounded-full text-xs"
-                        style={{ background: "linear-gradient(135deg, #C9960C, #D4AF37)", color: "#3D1C02" }}>
+                      <span className="px-2.5 py-1 rounded-full text-xs" style={{ background: "#8B6F47", color: "#FFFFFF" }}>
                         Jetis Asli
                       </span>
                     </div>
                   )}
                   {/* Hover overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                    style={{ background: "rgba(61, 28, 2, 0.45)" }}>
-                    <button className="px-4 py-2 rounded-xl text-sm transition-all"
-                      style={{ background: "white", color: "#7C3D12" }}>
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" style={{ background: "rgba(61,43,31,0.4)" }}>
+                    <button className="px-4 py-2 rounded-full text-sm transition-all" style={{ background: "#FFFFFF", color: "#8B6F47" }}>
                       Lihat Detail
                     </button>
                   </div>
@@ -306,36 +304,35 @@ export function CatalogPage() {
 
                 {/* Info */}
                 <div className="p-4">
-                  <h3 className="mb-1 line-clamp-1" style={{ color: "#3D1C02", fontFamily: "'Playfair Display', serif" }}>
+                  <h3 className="mb-1 line-clamp-1" style={{ color: "#3D2B1F", fontFamily: "'Playfair Display', serif", fontSize: "1.05rem" }}>
                     {item.name}
                   </h3>
                   <div className="flex items-center gap-1.5 mb-2">
-                    <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: "#C9960C" }} />
-                    <span style={{ color: "#9A6B4B", fontSize: "0.75rem" }}>{item.origin}</span>
+                    <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: "#D4B88B" }} />
+                    <span style={{ color: "#A89B8F", fontSize: "0.75rem" }}>{item.origin}</span>
                   </div>
-                  <p className="mb-3 line-clamp-2" style={{ color: "#6B4226", fontSize: "0.8rem", lineHeight: "1.6" }}>
+                  <p className="mb-3 line-clamp-2" style={{ color: "#7A6B5E", fontSize: "0.8rem", lineHeight: "1.6" }}>
                     {item.description}
                   </p>
                   <div className="flex items-center gap-2 mb-3">
                     <StarRating rating={item.rating} />
-                    <span style={{ color: "#9A6B4B", fontSize: "0.7rem" }}>{item.sold} terjual</span>
+                    <span style={{ color: "#A89B8F", fontSize: "0.7rem" }}>{item.sold} terjual</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span style={{ color: "#7C3D12", fontFamily: "'Playfair Display', serif", fontSize: "1.05rem" }}>
+                    <span style={{ color: "#8B6F47", fontFamily: "'Playfair Display', serif", fontSize: "1.05rem" }}>
                       Rp {item.price.toLocaleString("id-ID")}
                     </span>
                     <button
                       onClick={() => {
                         toast.success(`${item.name} telah ditambahkan ke keranjang!`);
                       }}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs transition-all"
                       style={{
-                        background: "linear-gradient(135deg, #C9960C, #D4AF37)",
-                        color: "#3D1C02",
-                        boxShadow: "0 2px 8px rgba(201, 150, 12, 0.3)",
+                        background: "#8B6F47",
+                        color: "#FFFFFF",
                       }}
                     >
-                      <ShoppingCart className="w-3.5 h-3.5" />
+                      <ShoppingBag className="w-3.5 h-3.5" />
                       Beli
                     </button>
                   </div>
@@ -345,20 +342,19 @@ export function CatalogPage() {
           </div>
         ) : (
           <div className="py-20 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(201, 150, 12, 0.1)" }}>
-              <Search className="w-8 h-8" style={{ color: "#C9960C" }} />
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "rgba(212,184,139,0.12)" }}>
+              <Search className="w-8 h-8" style={{ color: "#D4B88B" }} />
             </div>
-            <p style={{ color: "#3D1C02", fontSize: "1.1rem", fontFamily: "'Playfair Display', serif" }}>
+            <p style={{ color: "#3D2B1F", fontSize: "1.1rem", fontFamily: "'Playfair Display', serif" }}>
               Tidak ada batik ditemukan
             </p>
-            <p style={{ color: "#9A6B4B", fontSize: "0.875rem" }}>
+            <p style={{ color: "#7A6B5E", fontSize: "0.875rem" }}>
               Coba kata kunci atau kategori lain
             </p>
             <button
               onClick={() => { setSearchQuery(""); setSelectedCategory("all"); }}
-              className="mt-4 px-5 py-2.5 rounded-xl text-sm transition-all"
-              style={{ background: "linear-gradient(135deg, #C9960C, #D4AF37)", color: "#3D1C02" }}
+              className="mt-4 px-5 py-2.5 rounded-full text-sm transition-all"
+              style={{ background: "#8B6F47", color: "#FFFFFF" }}
             >
               Reset Filter
             </button>
