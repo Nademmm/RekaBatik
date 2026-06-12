@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Heart, ShoppingBag, Star, MapPin, SlidersHorizontal, X } from "lucide-react";
+import { motion } from "motion/react";
+import { Search, Filter, Heart, ShoppingBag, Star, MapPin, SlidersHorizontal, X, ChevronRight } from "lucide-react";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
 import { BatikItem } from "../../types/database";
@@ -20,7 +21,7 @@ function StarRating({ rating }: { rating: number }) {
       {[1, 2, 3, 4, 5].map((s) => (
         <Star
           key={s}
-          className="w-3 h-3"
+          className="w-3.5 h-3.5"
           fill={s <= rating ? "#D4B88B" : "none"}
           color={s <= rating ? "#D4B88B" : "#E8E1DA"}
         />
@@ -104,7 +105,126 @@ export function CatalogPage() {
   const [likedItems, setLikedItems] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState("popular");
   const [showFilters, setShowFilters] = useState(false);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000000]);
+  const [minPriceStr, setMinPriceStr] = useState("0");
+  const [maxPriceStr, setMaxPriceStr] = useState("5.000.000");
+
+  // Format number to Indonesian thousand separator
+  const formatNumber = (num: number): string => {
+    return num.toLocaleString("id-ID");
+  };
+
+  // Parse formatted string back to number
+  const parseNumber = (str: string): number => {
+    return Number(str.replace(/\./g, ""));
+  };
+
+  // Handle min price change
+  const handleMinPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\./g, "");
+    if (/^\d*$/.test(value)) {
+      const num = value ? Number(value) : 0;
+      setMinPriceStr(formatNumber(num));
+      setPriceRange([num, priceRange[1]]);
+    }
+  };
+
+  // Handle max price change
+  const handleMaxPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\./g, "");
+    if (/^\d*$/.test(value)) {
+      const num = value ? Number(value) : 0;
+      setMaxPriceStr(formatNumber(num));
+      setPriceRange([priceRange[0], num]);
+    }
+  };
+
+  // Reset filter
+  const resetPriceFilter = () => {
+    setPriceRange([0, 5000000]);
+    setMinPriceStr("0");
+    setMaxPriceStr("5.000.000");
+  };
+
+  // Fuzzy search helper - Levenshtein distance
+  const levenshteinDistance = (a: string, b: string): number => {
+    const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+
+    for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+
+    for (let j = 1; j <= b.length; j++) {
+      for (let i = 1; i <= a.length; i++) {
+        const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i] + 1,
+          matrix[j - 1][i - 1] + indicator
+        );
+      }
+    }
+    return matrix[b.length][a.length];
+  };
+
+  // Check if string matches with fuzzy logic
+  const fuzzyMatch = (itemStr: string, queryStr: string): boolean => {
+    const item = itemStr.toLowerCase();
+    const query = queryStr.toLowerCase().trim();
+    
+    if (!query) return true;
+    
+    // Exact match - highest priority
+    if (item.includes(query)) return true;
+    
+    // Query is contained within any word of the item
+    const itemWords = item.split(/\s+/);
+    const queryWords = query.split(/\s+/);
+    
+    for (const qWord of queryWords) {
+      let foundMatch = false;
+      for (const iWord of itemWords) {
+        // Check if query word is contained in item word
+        if (iWord.includes(qWord)) {
+          foundMatch = true;
+          break;
+        }
+        // Check fuzzy match for short words (typo tolerance)
+        const maxDistance = Math.max(1, Math.floor(qWord.length * 0.3));
+        const distance = levenshteinDistance(qWord, iWord);
+        if (distance <= maxDistance && qWord.length >= 3) {
+          foundMatch = true;
+          break;
+        }
+      }
+      if (!foundMatch) return false;
+    }
+    return true;
+  };
+
+  // Get similarity score for sorting
+  const getSimilarityScore = (item: BatikItem, queryStr: string): number => {
+    const query = queryStr.toLowerCase().trim();
+    if (!query) return 0;
+    
+    let score = 0;
+    const name = item.name.toLowerCase();
+    const origin = item.origin.toLowerCase();
+    const desc = item.description?.toLowerCase() || "";
+    
+    // Exact matches get highest score
+    if (name.includes(query)) score += 100;
+    if (origin.includes(query)) score += 50;
+    if (desc.includes(query)) score += 25;
+    
+    // Word matches
+    const queryWords = query.split(/\s+/);
+    for (const qWord of queryWords) {
+      if (name.includes(qWord)) score += 20;
+      if (origin.includes(qWord)) score += 10;
+    }
+    
+    return score;
+  };
 
   useEffect(() => {
     async function fetchItems() {
@@ -132,13 +252,21 @@ export function CatalogPage() {
 
   const filtered = batikItems
     .filter(item => {
-      const matchSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.origin.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = fuzzyMatch(item.name, searchQuery) || 
+        fuzzyMatch(item.origin, searchQuery) ||
+        (item.description && fuzzyMatch(item.description, searchQuery));
       const matchCat = selectedCategory === "all" || item.category === selectedCategory;
       const matchPrice = item.price >= priceRange[0] && item.price <= priceRange[1];
       return matchSearch && matchCat && matchPrice;
     })
     .sort((a, b) => {
+      // Jika ada search query, urutkan berdasarkan similarity score terlebih dahulu
+      if (searchQuery.trim()) {
+        const scoreA = getSimilarityScore(a, searchQuery);
+        const scoreB = getSimilarityScore(b, searchQuery);
+        if (scoreB !== scoreA) return scoreB - scoreA;
+      }
+      
       if (sortBy === "popular") return b.sold - a.sold;
       if (sortBy === "price-low") return a.price - b.price;
       if (sortBy === "price-high") return b.price - a.price;
@@ -148,217 +276,331 @@ export function CatalogPage() {
 
   return (
     <div className="min-h-screen relative" style={{ background: "#FAF8F5" }}>
-      <BatikBackground opacity={0.02} patternType="kawung" />
+      <BatikBackground opacity={0.03} patternType="mega" />
+      
+      {/* Decorative elements */}
+      <div className="absolute top-20 right-0 w-96 h-96 rounded-full opacity-3" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
+      <div className="absolute bottom-20 left-0 w-80 h-80 rounded-full opacity-2" style={{ background: "radial-gradient(circle, #8B6F47 0%, transparent 70%)" }} />
 
-      <div className="container mx-auto px-4 py-10 relative z-10">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="inline-block px-4 py-1.5 rounded-full mb-3" style={{ background: "rgba(212,184,139,0.12)", color: "#8B6F47" }}>
-            <span style={{ fontSize: "0.8rem", letterSpacing: "0.12em" }}>KOLEKSI LENGKAP</span>
-          </div>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "2rem" }}>
+      <div className="container mx-auto px-6 py-12 relative z-10 max-w-7xl">
+        {/* Header Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-10 text-center"
+        >
+          <h1 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2.5rem, 4vw, 3.5rem)", fontWeight: 700, marginBottom: "0.5rem" }}>
             Katalog Batik
           </h1>
-          <p style={{ color: "#7A6B5E", fontSize: "0.9rem" }}>
-            {filtered.length} produk batik pilihan dari pengrajin terbaik Indonesia
+          <p style={{ color: "#7A6B5E", fontSize: "1.05rem", maxWidth: "600px", margin: "0 auto" }}>
+            {filtered.length} produk batik pilihan dari pengrajin terbaik Desa Jetis & seluruh Indonesia
           </p>
-        </div>
+        </motion.div>
 
         {/* Search & Filter Bar */}
-        <div className="mb-6 flex flex-col lg:flex-row gap-3">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#7A6B5E" }} />
-            <input
-              type="text"
-              placeholder="Cari batik, motif, atau asal daerah..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 rounded-xl outline-none transition-all"
-              style={{
-                background: "#FFFFFF",
-                border: "1px solid #E8E1DA",
-                color: "#3D2B1F",
-                fontSize: "0.9rem",
-              }}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-4 top-1/2 -translate-y-1/2" style={{ color: "#7A6B5E" }}>
-                <X className="w-4 h-4" />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="mb-8"
+        >
+          <div className="flex flex-col lg:flex-row gap-4 items-end">
+            {/* Search */}
+            <div className="flex-1 relative w-full">
+              <div className="relative">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: "#A89B8F" }} />
+                <input
+                  type="text"
+                  placeholder="Cari batik, motif, atau asal daerah..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-14 pr-12 py-4 rounded-2xl outline-none transition-all focus:ring-2"
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid rgba(212, 184, 139, 0.3)",
+                    color: "#3D2B1F",
+                    fontSize: "0.95rem",
+                    boxShadow: "0 2px 12px rgba(61, 43, 31, 0.04)"
+                  }}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="absolute right-5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-gray-100" style={{ color: "#7A6B5E" }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 w-full lg:w-auto">
+              {/* Sort */}
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-5 py-4 rounded-2xl outline-none appearance-none pr-12 cursor-pointer"
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid rgba(212, 184, 139, 0.3)",
+                    color: "#3D2B1F",
+                    fontSize: "0.9rem",
+                    minWidth: "180px",
+                    boxShadow: "0 2px 12px rgba(61, 43, 31, 0.04)"
+                  }}
+                >
+                  <option value="popular">Terpopuler</option>
+                  <option value="rating">Rating Tertinggi</option>
+                  <option value="price-low">Harga ↑</option>
+                  <option value="price-high">Harga ↓</option>
+                </select>
+                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "#8B6F47" }} />
+              </div>
+
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-6 py-4 rounded-2xl transition-all"
+                style={{
+                  background: showFilters ? "linear-gradient(135deg, #8B6F47, #A88967)" : "#FFFFFF",
+                  border: showFilters ? "none" : "1px solid rgba(212, 184, 139, 0.3)",
+                  color: showFilters ? "#FFFFFF" : "#8B6F47",
+                  boxShadow: showFilters ? "0 4px 16px rgba(139, 111, 71, 0.25)" : "0 2px 12px rgba(61, 43, 31, 0.04)"
+                }}
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                <span className="font-medium">Filter</span>
               </button>
-            )}
+            </div>
           </div>
 
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-3 rounded-xl outline-none"
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #E8E1DA",
-              color: "#3D2B1F",
-              fontSize: "0.875rem",
-              minWidth: "160px",
-            }}
-          >
-            <option value="popular">Terpopuler</option>
-            <option value="rating">Rating Tertinggi</option>
-            <option value="price-low">Harga Terendah</option>
-            <option value="price-high">Harga Tertinggi</option>
-          </select>
-
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl transition-all"
-            style={{
-              background: showFilters ? "#8B6F47" : "#FFFFFF",
-              border: "1px solid #E8E1DA",
-              color: showFilters ? "#FFFFFF" : "#8B6F47",
-            }}
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            Filter
-          </button>
-        </div>
+          {/* Filter Panel */}
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -20 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="mt-4 overflow-hidden"
+            >
+              <div className="p-6 rounded-2xl bg-white border border-[rgba(212,184,139,0.3)]" style={{ boxShadow: "0 2px 12px rgba(61, 43, 31, 0.04)" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-semibold text-[#3D2B1F]" style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.1rem" }}>
+                    Filter Harga
+                  </h4>
+                  <button
+                    onClick={resetPriceFilter}
+                    className="text-sm text-[#8B6F47] hover:underline"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-[#7A6B5E] mb-2">Harga Minimum</label>
+                      <input
+                        type="text"
+                        value={minPriceStr}
+                        onChange={handleMinPriceChange}
+                        className="w-full px-4 py-3 rounded-xl outline-none"
+                        style={{
+                          background: "#FAF8F5",
+                          border: "1px solid rgba(212, 184, 139, 0.3)",
+                          color: "#3D2B1F",
+                          fontSize: "0.9rem"
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-[#7A6B5E] mb-2">Harga Maximum</label>
+                      <input
+                        type="text"
+                        value={maxPriceStr}
+                        onChange={handleMaxPriceChange}
+                        className="w-full px-4 py-3 rounded-xl outline-none"
+                        style={{
+                          background: "#FAF8F5",
+                          border: "1px solid rgba(212, 184, 139, 0.3)",
+                          color: "#3D2B1F",
+                          fontSize: "0.9rem"
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#A89B8F] text-center">
+                    Rentang harga: Rp {priceRange[0].toLocaleString("id-ID")} - Rp {priceRange[1].toLocaleString("id-ID")}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
 
         {/* Category Filter Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {categories.map((cat) => (
-            <button
-              key={cat.value}
-              onClick={() => setSelectedCategory(cat.value)}
-              className="px-4 py-2 rounded-full text-sm transition-all"
-              style={{
-                background: selectedCategory === cat.value ? "#8B6F47" : "#FFFFFF",
-                color: selectedCategory === cat.value ? "#FFFFFF" : "#7A6B5E",
-                border: `1px solid ${selectedCategory === cat.value ? "#8B6F47" : "#E8E1DA"}`,
-              }}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="mb-10"
+        >
+          <div className="flex flex-wrap gap-3 justify-center">
+            {categories.map((cat, index) => (
+              <motion.button
+                key={cat.value}
+                onClick={() => setSelectedCategory(cat.value)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.97 }}
+                className="px-6 py-3 rounded-full text-sm transition-all font-medium"
+                style={{
+                  background: selectedCategory === cat.value ? "linear-gradient(135deg, #8B6F47, #A88967)" : "#FFFFFF",
+                  color: selectedCategory === cat.value ? "#FFFFFF" : "#7A6B5E",
+                  border: selectedCategory === cat.value ? "none" : "1px solid rgba(212, 184, 139, 0.3)",
+                  boxShadow: selectedCategory === cat.value ? "0 4px 16px rgba(139, 111, 71, 0.25)" : "none"
+                }}
+              >
+                {cat.label}
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
 
         {/* Product Grid */}
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="rounded-2xl overflow-hidden bg-white border border-gray-100 p-0">
-                <Skeleton className="h-44 w-full rounded-none" />
-                <div className="p-4 space-y-3">
-                  <Skeleton className="h-5 w-3/4" />
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: i * 0.05 }}
+                className="rounded-3xl overflow-hidden bg-white border border-gray-100"
+                style={{ borderColor: "rgba(212, 184, 139, 0.2)" }}
+              >
+                <Skeleton className="h-52 w-full rounded-none" />
+                <div className="p-5 space-y-4">
+                  <Skeleton className="h-6 w-3/4" />
                   <Skeleton className="h-4 w-1/3" />
-                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-10 w-full" />
                   <div className="flex justify-between items-center pt-2">
-                    <Skeleton className="h-6 w-20" />
-                    <Skeleton className="h-8 w-16 rounded-lg" />
+                    <Skeleton className="h-7 w-24" />
+                    <Skeleton className="h-9 w-20 rounded-xl" />
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         ) : filtered.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filtered.map((item) => (
-              <div
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filtered.map((item, index) => (
+              <motion.div
                 key={item.id}
-                className="group rounded-2xl overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1"
-                style={{ background: "#FFFFFF", boxShadow: "0 4px 16px rgba(61,43,31,0.04)", border: "1px solid #E8E1DA" }}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.05 }}
+                whileHover={{ y: -8 }}
+                className="group rounded-3xl overflow-hidden transition-all"
+                style={{ background: "#FFFFFF", boxShadow: "0 4px 20px rgba(61,43,31,0.05)", border: "1px solid rgba(212,184,139,0.2)" }}
               >
                 {/* Pattern Preview */}
-                <div className="h-44 relative overflow-hidden" style={{ background: item.bg_color }}>
+                <div className="h-52 relative overflow-hidden" style={{ background: item.bg_color }}>
                   <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={getPatternType(item.category, item.id)} />
                   <button
-                    className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110 z-10"
-                    style={{ background: "rgba(255,255,255,0.95)", boxShadow: "0 2px 8px rgba(61,43,31,0.08)" }}
+                    className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 z-10"
+                    style={{ background: "rgba(255,255,255,0.98)", boxShadow: "0 4px 12px rgba(61,43,31,0.12)" }}
                     onClick={() => toggleLike(item.id)}
                   >
                     <Heart
-                      className="w-4 h-4"
+                      className="w-5 h-5"
                       fill={likedItems.includes(item.id) ? "#8B6F47" : "none"}
                       color={likedItems.includes(item.id) ? "#8B6F47" : "#7A6B5E"}
                     />
                   </button>
-                  {item.category === "wedding" && (
-                    <div className="absolute top-3 left-3">
-                      <span className="px-2.5 py-1 rounded-full text-xs" style={{ background: "rgba(61,43,31,0.85)", color: "#FAF8F5" }}>
-                        Pernikahan
-                      </span>
-                    </div>
-                  )}
                   {item.id === 9 && (
-                    <div className="absolute top-3 left-3">
-                      <span className="px-2.5 py-1 rounded-full text-xs" style={{ background: "#8B6F47", color: "#FFFFFF" }}>
-                        Jetis Asli
+                    <div className="absolute top-4 left-4">
+                      <span className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(139,111,71,0.3)" }}>
+                        🏠 Jetis Asli
                       </span>
                     </div>
                   )}
                   {/* Hover overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" style={{ background: "rgba(61,43,31,0.4)" }}>
-                    <button className="px-4 py-2 rounded-full text-sm transition-all" style={{ background: "#FFFFFF", color: "#8B6F47" }}>
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300" style={{ background: "rgba(61,43,31,0.5)" }}>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="px-6 py-3 rounded-full text-sm font-semibold transition-all"
+                      style={{ background: "#FFFFFF", color: "#8B6F47", boxShadow: "0 4px 16px rgba(255,255,255,0.3)" }}
+                    >
                       Lihat Detail
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
 
                 {/* Info */}
-                <div className="p-4">
-                  <h3 className="mb-1 line-clamp-1" style={{ color: "#3D2B1F", fontFamily: "'Playfair Display', serif", fontSize: "1.05rem" }}>
+                <div className="p-5">
+                  <h3 className="mb-2 line-clamp-1" style={{ color: "#3D2B1F", fontFamily: "'Playfair Display', serif", fontSize: "1.15rem", fontWeight: 600 }}>
                     {item.name}
                   </h3>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: "#D4B88B" }} />
-                    <span style={{ color: "#A89B8F", fontSize: "0.75rem" }}>{item.origin}</span>
+                  <div className="flex items-center gap-2 mb-3">
+                    <MapPin className="w-4 h-4 flex-shrink-0" style={{ color: "#D4B88B" }} />
+                    <span style={{ color: "#A89B8F", fontSize: "0.8rem" }}>{item.origin}</span>
                   </div>
-                  <p className="mb-3 line-clamp-2" style={{ color: "#7A6B5E", fontSize: "0.8rem", lineHeight: "1.6" }}>
+                  <p className="mb-4 line-clamp-2" style={{ color: "#7A6B5E", fontSize: "0.85rem", lineHeight: "1.6" }}>
                     {item.description}
                   </p>
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-4">
                     <StarRating rating={item.rating} />
-                    <span style={{ color: "#A89B8F", fontSize: "0.7rem" }}>{item.sold} terjual</span>
+                    <span style={{ color: "#A89B8F", fontSize: "0.75rem" }}>({item.sold} terjual)</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span style={{ color: "#8B6F47", fontFamily: "'Playfair Display', serif", fontSize: "1.05rem" }}>
+                  <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: "rgba(212,184,139,0.15)" }}>
+                    <span style={{ color: "#8B6F47", fontFamily: "'Playfair Display', serif", fontSize: "1.2rem", fontWeight: 700 }}>
                       Rp {item.price.toLocaleString("id-ID")}
                     </span>
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={() => {
                         toast.success(`${item.name} telah ditambahkan ke keranjang!`);
                       }}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs transition-all"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
                       style={{
-                        background: "#8B6F47",
+                        background: "linear-gradient(135deg, #8B6F47, #A88967)",
                         color: "#FFFFFF",
+                        boxShadow: "0 2px 8px rgba(139,111,71,0.25)"
                       }}
                     >
-                      <ShoppingBag className="w-3.5 h-3.5" />
+                      <ShoppingBag className="w-4 h-4" />
                       Beli
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         ) : (
-          <div className="py-20 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "rgba(212,184,139,0.12)" }}>
-              <Search className="w-8 h-8" style={{ color: "#D4B88B" }} />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="py-24 text-center"
+          >
+            <div className="w-24 h-24 mx-auto mb-6 rounded-3xl flex items-center justify-center" style={{ background: "rgba(212,184,139,0.15)" }}>
+              <Search className="w-10 h-10" style={{ color: "#D4B88B" }} />
             </div>
-            <p style={{ color: "#3D2B1F", fontSize: "1.1rem", fontFamily: "'Playfair Display', serif" }}>
+            <p style={{ color: "#3D2B1F", fontSize: "1.3rem", fontFamily: "'Playfair Display', serif", fontWeight: 600, marginBottom: "0.5rem" }}>
               Tidak ada batik ditemukan
             </p>
-            <p style={{ color: "#7A6B5E", fontSize: "0.875rem" }}>
+            <p style={{ color: "#7A6B5E", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
               Coba kata kunci atau kategori lain
             </p>
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => { setSearchQuery(""); setSelectedCategory("all"); }}
-              className="mt-4 px-5 py-2.5 rounded-full text-sm transition-all"
-              style={{ background: "#8B6F47", color: "#FFFFFF" }}
+              className="px-8 py-3 rounded-full text-sm font-semibold transition-all"
+              style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "#FFFFFF", boxShadow: "0 4px 16px rgba(139,111,71,0.25)" }}
             >
               Reset Filter
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         )}
       </div>
     </div>
