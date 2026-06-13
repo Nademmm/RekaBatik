@@ -325,9 +325,15 @@ export function CatalogPage() {
                   }}
                 />
                 {searchQuery && (
-                  <button onClick={() => setSearchQuery("")} className="absolute right-5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-gray-100" style={{ color: "#7A6B5E" }}>
+                  <motion.button
+                    onClick={() => setSearchQuery("")}
+                    whileHover={{ scale: 1.1, background: "rgba(212, 184, 139, 0.15)" }}
+                    whileTap={{ scale: 0.95 }}
+                    className="absolute right-5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center"
+                    style={{ color: "#7A6B5E" }}
+                  >
                     <X className="w-4 h-4" />
-                  </button>
+                  </motion.button>
                 )}
               </div>
             </div>
@@ -356,9 +362,11 @@ export function CatalogPage() {
                 <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "#8B6F47" }} />
               </div>
 
-              <button
+              <motion.button
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2 px-6 py-4 rounded-2xl transition-all"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                className="flex items-center gap-2 px-6 py-4 rounded-2xl"
                 style={{
                   background: showFilters ? "linear-gradient(135deg, #8B6F47, #A88967)" : "#FFFFFF",
                   border: showFilters ? "none" : "1px solid rgba(212, 184, 139, 0.3)",
@@ -368,7 +376,7 @@ export function CatalogPage() {
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 <span className="font-medium">Filter</span>
-              </button>
+              </motion.button>
             </div>
           </div>
 
@@ -447,15 +455,18 @@ export function CatalogPage() {
               <motion.button
                 key={cat.value}
                 onClick={() => setSelectedCategory(cat.value)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.97 }}
-                className="px-6 py-3 rounded-full text-sm transition-all font-medium"
-                style={{
+                animate={{
                   background: selectedCategory === cat.value ? "linear-gradient(135deg, #8B6F47, #A88967)" : "#FFFFFF",
                   color: selectedCategory === cat.value ? "#FFFFFF" : "#7A6B5E",
-                  border: selectedCategory === cat.value ? "none" : "1px solid rgba(212, 184, 139, 0.3)",
-                  boxShadow: selectedCategory === cat.value ? "0 4px 16px rgba(139, 111, 71, 0.25)" : "none"
+                  borderWidth: selectedCategory === cat.value ? 0 : 1,
+                  borderColor: selectedCategory === cat.value ? "transparent" : "rgba(212, 184, 139, 0.3)",
+                  boxShadow: selectedCategory === cat.value ? "0 4px 16px rgba(139, 111, 71, 0.25)" : "none",
+                  scale: selectedCategory === cat.value ? 1.02 : 1
                 }}
+                whileHover={{ scale: selectedCategory === cat.value ? 1.02 : 1.05 }}
+                whileTap={{ scale: 0.97 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="px-6 py-3 rounded-full text-sm font-medium"
               >
                 {cat.label}
               </motion.button>
@@ -503,8 +514,10 @@ export function CatalogPage() {
                 {/* Pattern Preview */}
                 <div className="h-52 relative overflow-hidden" style={{ background: item.bg_color }}>
                   <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={getPatternType(item.category, item.id)} />
-                  <button
-                    className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 z-10"
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center z-10"
                     style={{ background: "rgba(255,255,255,0.98)", boxShadow: "0 4px 12px rgba(61,43,31,0.12)" }}
                     onClick={() => toggleLike(item.id)}
                   >
@@ -513,7 +526,7 @@ export function CatalogPage() {
                       fill={likedItems.includes(item.id) ? "#8B6F47" : "none"}
                       color={likedItems.includes(item.id) ? "#8B6F47" : "#7A6B5E"}
                     />
-                  </button>
+                  </motion.button>
                   {item.id === 9 && (
                     <div className="absolute top-4 left-4">
                       <span className="px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "#FFFFFF", boxShadow: "0 2px 8px rgba(139,111,71,0.3)" }}>
@@ -526,7 +539,7 @@ export function CatalogPage() {
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.97 }}
-                      className="px-6 py-3 rounded-full text-sm font-semibold transition-all"
+                      className="px-6 py-3 rounded-full text-sm font-semibold"
                       style={{ background: "#FFFFFF", color: "#8B6F47", boxShadow: "0 4px 16px rgba(255,255,255,0.3)" }}
                     >
                       Lihat Detail
@@ -560,7 +573,7 @@ export function CatalogPage() {
                       onClick={() => {
                         toast.success(`${item.name} telah ditambahkan ke keranjang!`);
                       }}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
                       style={{
                         background: "linear-gradient(135deg, #8B6F47, #A88967)",
                         color: "#FFFFFF",
@@ -595,7 +608,7 @@ export function CatalogPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => { setSearchQuery(""); setSelectedCategory("all"); }}
-              className="px-8 py-3 rounded-full text-sm font-semibold transition-all"
+              className="px-8 py-3 rounded-full text-sm font-semibold"
               style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "#FFFFFF", boxShadow: "0 4px 16px rgba(139,111,71,0.25)" }}
             >
               Reset Filter

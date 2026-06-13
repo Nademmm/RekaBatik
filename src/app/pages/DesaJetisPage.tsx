@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   MapPin, Phone, Clock, Star, ChevronRight, Users, Award,
-  ShoppingBag, Heart, ExternalLink, Camera, Info
+  ShoppingBag, Heart, ExternalLink, Camera, Info, Car, Bus, Bike, Watch, Wallet, Sparkles
 } from "lucide-react";
 import { Link } from "react-router";
+
+const MotionLink = motion(Link);
 import { BatikBackground, BatikDivider } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
 import { Store } from "../../types/database";
@@ -47,7 +49,6 @@ const timeline = [
 export function DesaJetisPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStore, setSelectedStore] = useState<number | null>(null);
   const [filterTag, setFilterTag] = useState<string>("all");
 
   useEffect(() => {
@@ -221,22 +222,26 @@ export function DesaJetisPage() {
               transition={{ duration: 0.6, delay: 0.5 }}
               className="flex flex-wrap gap-4"
             >
-              <a
+              <motion.a
                 href="#toko"
-                className="flex items-center gap-2.5 px-8 py-4 rounded-2xl transition-all hover:scale-105"
+                className="flex items-center gap-2.5 px-8 py-4 rounded-2xl"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
                 style={{ background: "linear-gradient(135deg, #D4B88B, #C9AB7F)", color: "#3D2B1F", fontWeight: 600 }}
               >
                 <ShoppingBag className="w-5 h-5" />
                 Jelajahi Toko
-              </a>
-              <a
+              </motion.a>
+              <motion.a
                 href="#sejarah"
-                className="flex items-center gap-2.5 px-8 py-4 rounded-2xl transition-all hover:bg-white/10 hover:scale-105"
+                className="flex items-center gap-2.5 px-8 py-4 rounded-2xl"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
                 style={{ color: "#FAF8F5", border: "2px solid rgba(250, 248, 245, 0.4)", fontWeight: 600, background: "transparent" }}
               >
                 <Info className="w-5 h-5" />
                 Sejarah Desa
-              </a>
+              </motion.a>
             </motion.div>
           </div>
         </div>
@@ -438,15 +443,11 @@ export function DesaJetisPage() {
       </section>
 
       {/* ======================== TOKO-TOKO ======================== */}
-      <section id="toko" className="py-20 relative overflow-hidden">
+      <section id="toko" className="py-20 relative overflow-hidden max-w-[185vh] mx-auto">
         <BatikBackground opacity={0.04} patternType="floral" />
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-10">
-            <div className="inline-block px-4 py-1.5 rounded-full mb-4"
-              style={{ background: "rgba(212, 184, 139, 0.2)", color: "#8B6F47" }}>
-              <span style={{ fontSize: "0.75rem", letterSpacing: "0.12em", fontWeight: 500 }}>DIREKTORI TOKO</span>
-            </div>
-            <h2 className="mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "2.25rem", fontWeight: 700 }}>
+            <h2 className="mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "2.55rem", fontWeight: 700 }}>
               Toko Batik di Desa Jetis
             </h2>
             <p style={{ color: "#7A6B5E", fontSize: "0.975rem" }}>
@@ -457,20 +458,24 @@ export function DesaJetisPage() {
           {/* Filter tags */}
           <div className="flex flex-wrap gap-2 justify-center mb-9">
             {allTags.map((tag) => (
-              <button
+              <motion.button
                 key={tag}
                 onClick={() => setFilterTag(tag)}
-                className="px-5 py-2.5 rounded-full text-sm transition-all"
-                style={{
+                className="px-5 py-2.5 rounded-full text-sm"
+                animate={{
                   background: filterTag === tag ? "linear-gradient(135deg, #8B6F47, #A88967)" : "rgba(212, 184, 139, 0.15)",
                   color: filterTag === tag ? "#FFFFFF" : "#7A6B5E",
-                  border: filterTag === tag ? "none" : "1px solid rgba(212, 184, 139, 0.3)",
+                  borderWidth: filterTag === tag ? 0 : 1,
+                  borderColor: filterTag === tag ? "transparent" : "rgba(212, 184, 139, 0.3)",
+                  scale: filterTag === tag ? 1.02 : 1,
+                }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                style={{
                   fontWeight: 600,
-                  boxShadow: filterTag === tag ? "0 4px 16px rgba(139, 111, 71, 0.3)" : "none"
                 }}
               >
                 {tag === "all" ? "Semua Toko" : tag}
-              </button>
+              </motion.button>
             ))}
           </div>
 
@@ -493,24 +498,17 @@ export function DesaJetisPage() {
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredStores.map((store) => (
-                <div
+                <MotionLink
                   key={store.id}
-                  className="rounded-2xl overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1 cursor-pointer"
+                  to={`/desa-jetis/${store.id}`}
+                  className="rounded-2xl overflow-hidden transition-all"
+                  whileHover={{ y: -8, boxShadow: "0 20px 40px rgba(61, 43, 31, 0.15)" }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
                   style={{ background: "white", border: "1px solid #E8E1DA", boxShadow: "0 2px 12px rgba(61, 43, 31, 0.06)" }}
-                  onClick={() => setSelectedStore(selectedStore === store.id ? null : store.id)}
                 >
                   <div className="h-48 relative overflow-hidden">
-                    <img src={store.image} alt={store.name} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
+                    <img src={store.image} alt={store.name} className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(61, 43, 31, 0.9) 0%, rgba(61, 43, 31, 0.4) 60%, transparent 80%)" }} />
-                    {/* Badge untuk featured store */}
-                    {store.featured && (
-                      <div className="absolute top-3 left-3">
-                        <span className="px-3 py-1 rounded-full text-xs flex items-center gap-1"
-                          style={{ background: "linear-gradient(135deg, #D4B88B, #C9AB7F)", color: "#3D2B1F", fontWeight: 600 }}>
-                          ⭐ Unggulan
-                        </span>
-                      </div>
-                    )}
                     <div className="absolute bottom-4 left-4 right-4">
                       <h3 style={{ color: "#FAF8F5", fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700 }}>
                         {store.name}
@@ -544,110 +542,171 @@ export function DesaJetisPage() {
                       <span style={{ color: "#3D2B1F", fontSize: "1.05rem", fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
                         {store.price_range}
                       </span>
+                      <ChevronRight className="w-4 h-4" style={{ color: "#D4B88B" }} />
                     </div>
                   </div>
-
-                  {/* Expandable detail - semua toko punya ini */}
-                  {selectedStore === store.id && (
-                    <div className="px-5 pb-5 pt-0" style={{ borderTop: "1px solid #E8E1DA" }}>
-                      <div className="pt-4 space-y-3">
-                        <div className="flex items-center gap-2" style={{ color: "#7A6B5E", fontSize: "0.875rem" }}>
-                          <MapPin className="w-4 h-4" style={{ color: "#D4B88B" }} />
-                          <span style={{ fontWeight: 500 }}>{store.address}</span>
-                        </div>
-                        <div className="flex items-center gap-2" style={{ color: "#7A6B5E", fontSize: "0.875rem" }}>
-                          <Phone className="w-4 h-4" style={{ color: "#D4B88B" }} />
-                          <span style={{ fontWeight: 500 }}>{store.phone}</span>
-                        </div>
-                        <div className="flex items-center gap-2" style={{ color: "#7A6B5E", fontSize: "0.875rem" }}>
-                          <Award className="w-4 h-4" style={{ color: "#D4B88B" }} />
-                          <span style={{ fontWeight: 500 }}>Est. {store.established}</span>
-                        </div>
-                        <div>
-                          <div className="mb-2" style={{ color: "#A89B8F", fontSize: "0.8rem", fontWeight: 600 }}>Motif Unggulan:</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {store.motifs?.map((m, mi) => (
-                              <span key={mi} className="px-2.5 py-1.5 rounded-xl"
-                                style={{ background: "rgba(61, 43, 31, 0.08)", color: "#3D2B1F", fontSize: "0.775rem", fontWeight: 600 }}>
-                                {m}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="pt-2">
-                          <Link
-                            to="/catalog"
-                            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm w-full transition-all hover:shadow-md hover:scale-105"
-                            style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "#FFFFFF", fontWeight: 700, boxShadow: "0 4px 16px rgba(139, 111, 71, 0.25)" }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ShoppingBag className="w-4 h-4" />
-                            Lihat Produk
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                </MotionLink>
               ))}
             </div>
           )}
         </div>
       </section>
 
+      <div className="h-1.5" style={{ background: "#e19d2eff" }} />
+
       {/* ======================== WISATA INFO ======================== */}
-      <section className="py-20 relative overflow-hidden" style={{ background: "#3D2B1F" }}>
-        <BatikBackground opacity={0.1} patternType="mega" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="grid lg:grid-cols-3 gap-6">
+      <section className="py-24 relative overflow-hidden" style={{ background: "#3D2B1F" }}>
+        <BatikBackground opacity={0.08} patternType="parang" />
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
+        <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
+        
+        <div className="container mx-auto px-6 relative z-10 max-w-7xl">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
+          >
+            <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#FAF8F5", fontSize: "clamp(2rem, 4vw, 2.75rem)", marginBottom: "1rem" }}>
+              Jelajahi Keajaiban Desa Jetis
+            </h2>
+            <p style={{ color: "rgba(250, 248, 245, 0.75)", fontSize: "1.05rem", maxWidth: "600px", margin: "0 auto" }}>
+              Nikmati pengalaman wisata budaya batik yang tak terlupakan
+            </p>
+          </motion.div>
+
+          <div className="grid lg:grid-cols-3 gap-8">
             {/* Cara sampai */}
-            <div className="p-6 rounded-2xl" style={{ background: "rgba(212, 184, 139, 0.12)", border: "1px solid rgba(212, 184, 139, 0.22)" }}>
-              <MapPin className="w-8 h-8 mb-4" style={{ color: "#D4B88B" }} />
-              <h3 className="mb-3" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 600 }}>
-                Cara Menuju Desa Jetis
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              whileHover={{ y: -8 }}
+              className="group p-8 rounded-3xl"
+              style={{
+                background: "linear-gradient(145deg, rgba(212, 184, 139, 0.15), rgba(212, 184, 139, 0.05))",
+                border: "1px solid rgba(212, 184, 139, 0.25)",
+                backdropFilter: "blur(10px)"
+              }}
+            >
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ background: "rgba(212,184,139,0.2)" }}>
+                <MapPin className="w-8 h-8" style={{ color: "#D4B88B" }} />
+              </div>
+              <h3 className="mb-5" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.35rem", fontWeight: 700 }}>
+                Menuju Desa Jetis
               </h3>
-              <ul className="space-y-2.5" style={{ color: "rgba(250, 248, 245, 0.8)", fontSize: "0.9rem", lineHeight: "1.7" }}>
-                <li>🚗 Dari Surabaya: ±30 menit via Tol Waru-Sidoarjo</li>
-                <li>🚌 Bus Surabaya-Sidoarjo, turun Terminal Purabaya lalu naik angkot</li>
-                <li>🛵 Ojek online dari Alun-alun Sidoarjo: ±10 menit</li>
-                <li>📍 Koordinat: -7.4458°S, 112.7168°E</li>
+              <ul className="space-y-4">
+                {[
+                  { icon: Car, text: "Dari Surabaya: ±30 menit via Tol Waru-Sidoarjo" },
+                  { icon: Bus, text: "Bus Surabaya-Sidoarjo, turun Terminal Purabaya" },
+                  { icon: Bike, text: "Ojek online dari Alun-alun: ±10 menit" },
+                  { icon: MapPin, text: "Koordinat: -7.4458°S, 112.7168°E" }
+                ].map((item, i) => (
+                  <motion.li 
+                    key={i} 
+                    className="flex items-start gap-4"
+                    whileHover={{ x: 4 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#D4B88B" }} />
+                    <span style={{ color: "rgba(250, 248, 245, 0.85)", fontSize: "0.95rem", lineHeight: "1.6" }}>
+                      {item.text}
+                    </span>
+                  </motion.li>
+                ))}
               </ul>
-            </div>
+            </motion.div>
 
             {/* Tips berkunjung */}
-            <div className="p-6 rounded-2xl" style={{ background: "rgba(212, 184, 139, 0.12)", border: "1px solid rgba(212, 184, 139, 0.22)" }}>
-              <Camera className="w-8 h-8 mb-4" style={{ color: "#D4B88B" }} />
-              <h3 className="mb-3" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 600 }}>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              whileHover={{ y: -8 }}
+              className="group p-8 rounded-3xl"
+              style={{
+                background: "linear-gradient(145deg, rgba(212, 184, 139, 0.15), rgba(212, 184, 139, 0.05))",
+                border: "1px solid rgba(212, 184, 139, 0.25)",
+                backdropFilter: "blur(10px)"
+              }}
+            >
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ background: "rgba(212,184,139,0.2)" }}>
+                <Camera className="w-8 h-8" style={{ color: "#D4B88B" }} />
+              </div>
+              <h3 className="mb-5" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.35rem", fontWeight: 700 }}>
                 Tips Berkunjung
               </h3>
-              <ul className="space-y-2.5" style={{ color: "rgba(250, 248, 245, 0.8)", fontSize: "0.9rem", lineHeight: "1.7" }}>
-                <li>⏰ Waktu terbaik: Pagi hari (08.00–11.00) saat pengrajin aktif</li>
-                <li>📸 Tanyakan izin sebelum memotret proses membatik</li>
-                <li>🎒 Bawa uang tunai; beberapa toko belum menerima kartu</li>
-                <li>🎓 Tersedia paket workshop batik mulai Rp 75.000/orang</li>
+              <ul className="space-y-4">
+                {[
+                  { icon: Watch, text: "Pagi hari (08.00–11.00) saat pengrajin aktif" },
+                  { icon: Camera, text: "Tanyakan izin sebelum memotret proses" },
+                  { icon: Wallet, text: "Bawa uang tunai untuk transaksi mudah" },
+                  { icon: Sparkles, text: "Workshop batik mulai Rp 75.000/orang" }
+                ].map((item, i) => (
+                  <motion.li 
+                    key={i} 
+                    className="flex items-start gap-4"
+                    whileHover={{ x: 4 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#D4B88B" }} />
+                    <span style={{ color: "rgba(250, 248, 245, 0.85)", fontSize: "0.95rem", lineHeight: "1.6" }}>
+                      {item.text}
+                    </span>
+                  </motion.li>
+                ))}
               </ul>
-            </div>
+            </motion.div>
 
             {/* Pesan via RekaBatik */}
-            <div className="p-6 rounded-2xl relative overflow-hidden"
-              style={{ background: "linear-gradient(135deg, rgba(212, 184, 139, 0.18), rgba(212, 184, 139, 0.08))", border: "1px solid rgba(212, 184, 139, 0.32)" }}>
-              <ExternalLink className="w-8 h-8 mb-4" style={{ color: "#D4B88B" }} />
-              <h3 className="mb-3" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 600 }}>
-                Pesan via RekaBatik
-              </h3>
-              <p className="mb-5" style={{ color: "rgba(250, 248, 245, 0.82)", fontSize: "0.9rem", lineHeight: "1.75" }}>
-                Tidak bisa datang langsung? Kustomisasi batik impian Anda secara online dan kami akan menghubungkan
-                Anda dengan pengrajin terbaik di Desa Jetis.
-              </p>
-              <Link
-                to="/custom"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl transition-all hover:shadow-lg hover:scale-105"
-                style={{ background: "#D4B88B", color: "#3D2B1F", fontWeight: 500 }}
-              >
-                <ChevronRight className="w-4 h-4" />
-                Mulai Kustomisasi
-              </Link>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              whileHover={{ y: -8 }}
+              className="group p-8 rounded-3xl relative overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, rgba(212, 184, 139, 0.25), rgba(139, 111, 71, 0.1))",
+                border: "2px solid rgba(212, 184, 139, 0.4)",
+                backdropFilter: "blur(10px)"
+              }}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 opacity-20" style={{ transform: "translate(30%, -30%)" }}>
+                <div className="w-full h-full rounded-full" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
+              </div>
+              <div className="relative z-10">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ background: "rgba(212,184,139,0.3)" }}>
+                  <ExternalLink className="w-8 h-8" style={{ color: "#D4B88B" }} />
+                </div>
+                <h3 className="mb-4" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.35rem", fontWeight: 700 }}>
+                  Pesan via RekaBatik
+                </h3>
+                <p className="mb-7" style={{ color: "rgba(250, 248, 245, 0.88)", fontSize: "0.98rem", lineHeight: "1.75" }}>
+                  Tidak bisa datang langsung? Kustomisasi batik impian Anda secara online dan kami hubungkan dengan pengrajin terbaik di Desa Jetis.
+                </p>
+                <MotionLink
+                  to="/custom"
+                  className="inline-flex items-center justify-center gap-3 px-7 py-4 rounded-2xl w-full"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  style={{ 
+                    background: "linear-gradient(135deg, #D4B88B, #C9AB7F)",
+                    color: "#3D2B1F",
+                    fontWeight: 700,
+                    boxShadow: "0 8px 24px rgba(212, 184, 139, 0.35)"
+                  }}
+                >
+                  <span>Mulai Kustomisasi</span>
+                  <ChevronRight className="w-5 h-5" />
+                </MotionLink>
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>

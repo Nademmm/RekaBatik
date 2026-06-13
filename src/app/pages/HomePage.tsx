@@ -1,5 +1,7 @@
 import { Link } from "react-router";
 import { motion } from "motion/react";
+
+const MotionLink = motion(Link);
 import {
   Palette, Sparkles, Clock, Award, Star, ChevronRight,
   Users, Package, MapPin, TrendingUp, ShoppingBag, Heart, Grid3x3
@@ -237,9 +239,11 @@ export function HomePage() {
               wujudkan karya unilkmu sekarang!
             </p>
             <div className="flex flex-wrap gap-4">
-              <Link
+              <MotionLink
                 to="/custom"
-                className="flex items-center gap-2 px-8 py-4 rounded-md transition-all hover:scale-105"
+                className="flex items-center gap-2 px-8 py-4 rounded-md"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
                 style={{
                   background: "#3D2B1F ",
                   color: "#FFFFFF",
@@ -248,10 +252,12 @@ export function HomePage() {
               >
                 <Palette className="w-5 h-5" />
                 Mulai Kustomisasi
-              </Link>
-              <Link
+              </MotionLink>
+              <MotionLink
                 to="/catalog"
-                className="flex items-center gap-2 px-8 py-4 rounded-md transition-all hover:scale-105"
+                className="flex items-center gap-2 px-8 py-4 rounded-md"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
                 style={{
                   background: "rgba(255, 255, 255, 0)",
                   color: "#000000ff",
@@ -261,7 +267,7 @@ export function HomePage() {
               >
                 <Grid3x3 className="w-5 h-5" />
                 Lihat Katalog
-              </Link>
+              </MotionLink>
             </div>
           </div>
         </div>
@@ -392,9 +398,11 @@ export function HomePage() {
                 Jelajahi koleksi motif batik pilihan yang sudah dipakai dan dicintai oleh ribuan pelanggan
               </p>
             </div>
-            <Link
+            <MotionLink
               to="/catalog"
-              className="group mb-5 flex items-center gap-2 px-7 py-3 rounded-full transition-all "
+              className="group mb-5 flex items-center gap-2 px-7 py-3 rounded-full"
+              whileHover={{ scale: 1.02 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               style={{ 
                 background: "linear-gradient(135deg, #8B6F47, #A88967)", 
                 color: "#FFFFFF",
@@ -403,7 +411,7 @@ export function HomePage() {
             >
               Lihat Semua Koleksi
               <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
+            </MotionLink>
           </div>
 
           {/* Patterns Grid */}
@@ -456,9 +464,11 @@ export function HomePage() {
                     
                     {/* Like button */}
                     <div className="absolute top-4 right-4">
-                      <button
+                      <motion.button
                         onClick={() => toggleLikePattern(p.id)}
-                        className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-115"
+                        whileHover={{ scale: 1.15 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className="w-10 h-10 rounded-full flex items-center justify-center"
                         style={{ 
                           background: "rgba(255,255,255,0.95)", 
                           boxShadow: "0 4px 12px rgba(61,43,31,0.15)",
@@ -470,7 +480,7 @@ export function HomePage() {
                           fill={likedPatterns.includes(p.id) ? "#8B6F47" : "none"}
                           color={likedPatterns.includes(p.id) ? "#8B6F47" : "#7A6B5E"}
                         />
-                      </button>
+                      </motion.button>
                     </div>
                     
                     {/* Tag badge */}
@@ -505,8 +515,10 @@ export function HomePage() {
                       <span style={{ color: "#8B6F47", fontWeight: 700, fontSize: "1.25rem", fontFamily: "'Playfair Display', serif" }}>
                         Rp {p.price.toLocaleString("id-ID")}
                       </span>
-                      <button
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 group-hover:scale-105"
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold"
                         style={{ 
                           background: "linear-gradient(135deg, #8B6F47, #A88967)", 
                           color: "#FFFFFF"
@@ -514,7 +526,7 @@ export function HomePage() {
                       >
                         <ShoppingBag className="w-4 h-4" />
                         Pesan
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 </div>
@@ -586,9 +598,11 @@ export function HomePage() {
               
               {/* CTA Buttons */}
               <div className="flex flex-wrap gap-4">
-                <Link
+                <MotionLink
                   to="/desa-jetis"
-                  className="inline-flex items-center gap-2.5 px-8 py-4 rounded-full transition-all"
+                  className="inline-flex items-center gap-2.5 px-8 py-4 rounded-full"
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
                   style={{ 
                     background: "linear-gradient(135deg, #D4B88B, #E8DCC8)", 
                     color: "#3D2B1F", 
@@ -597,7 +611,7 @@ export function HomePage() {
                 >
                   Jelajahi Desa Jetis
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-2 transition-transform " />
-                </Link>
+                </MotionLink>
               </div>
             </motion.div>
 
@@ -681,9 +695,11 @@ export function HomePage() {
                 Temukan koleksi batik yang sedang trending dan diminati oleh ribuan pelanggan dari seluruh Indonesia.
               </p>
               
-              <Link
+              <MotionLink
                 to="/catalog"
-                className="inline-flex items-center gap-3 px-8 py-4 rounded-full transition-all"
+                className="inline-flex items-center gap-3 px-8 py-4 rounded-full"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
                 style={{
                   background: "linear-gradient(135deg, #8B6F47, #A88967)",
                   color: "#FFFFFF",
@@ -694,7 +710,7 @@ export function HomePage() {
               >
                 <span>Jelajahi Katalog</span>
                 <ChevronRight className="w-5 h-5" />
-              </Link>
+              </MotionLink>
             </motion.div>
 
             {/* Right Trending List */}
@@ -1014,7 +1030,7 @@ export function HomePage() {
         <div className="container mx-auto px-4 relative z-10 text-center">
           <h2
             className="mb-6"
-            style={{ fontFamily: "'Playfair Display', serif", color: "#684412ff", fontSize: "2.8rem", lineHeight: "1.3", fontWeight: "bold" }}
+            style={{ fontFamily: "'Playfair Display', serif", color: "#794c0cff", fontSize: "2.8rem", lineHeight: "1.3", fontWeight: "bold" }}
           >
             Siap Membuat Batik
             <span style={{ color: "#4a2d00ff", display: "block" }}>Impian Anda?</span>
@@ -1023,21 +1039,27 @@ export function HomePage() {
             Bergabunglah dengan 12.500+ pelanggan yang telah merasakan pengalaman kustomisasi batik digital terbaik Indonesia.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
-            <Link
+            <MotionLink
               to="/custom"
-              className="flex items-center gap-2 px-8 py-4 rounded-full transition-all"
+              className="flex items-center gap-2 px-8 py-4 rounded-full"
+              whileHover={{ scale: 1.02 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               style={{
-                background: "#9b6b22ff",
-                color: "#eae1dcff",
-                fontWeight: "bold"
+                background: "linear-gradient(135deg, #8B6F47, #ab8051ff)",
+                  color: "#FFFFFF",
+                  fontWeight: 600,
+                  fontSize: "1rem",
+                  boxShadow: "0 10px 30px rgba(139,111,71,0.3)"
               }}
             >
               <Palette className="w-5 h-5" />
               Mulai Kustomisasi Gratis
-            </Link>
-            <Link
+            </MotionLink>
+            <MotionLink
               to="/desa-jetis"
-              className="flex items-center gap-2 px-8 py-4 rounded-full transition-all"
+              className="flex items-center gap-2 px-8 py-4 rounded-full"
+              whileHover={{ scale: 1.02 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               style={{
                 color: "#3D2B1F",
                 border: "2px solid #3D2B1F",
@@ -1047,7 +1069,7 @@ export function HomePage() {
             >
               <MapPin className="w-5 h-5" />
               Kunjungi Desa Jetis
-            </Link>
+            </MotionLink>
           </div>
         </div>
       </section>
