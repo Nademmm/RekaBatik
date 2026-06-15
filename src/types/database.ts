@@ -11,6 +11,7 @@ export interface BatikItem {
   rating: number;
   sold: number;
   style_type?: string;
+  svg_url?: string;
   created_at?: string;
 }
 

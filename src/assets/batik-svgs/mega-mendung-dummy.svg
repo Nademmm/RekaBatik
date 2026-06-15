@@ -1,0 +1,10 @@
+<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg">
+  <rect fill="white" width="300" height="300" />
+  
+  <!-- Mega Mendung pattern dummy -->
+  <g fill="none" stroke="#8B6F47" stroke-width="4">
+    <path d="M0,75 Q37.5,37.5 75,75 Q112.5,112.5 150,75 Q187.5,37.5 225,75 Q262.5,112.5 300,75" />
+    <path d="M0,150 Q37.5,112.5 75,150 Q112.5,187.5 150,150 Q187.5,112.5 225,150 Q262.5,187.5 300,150" stroke="#D4B88B" />
+    <path d="M0,225 Q37.5,187.5 75,225 Q112.5,262.5 150,225 Q187.5,187.5 225,225 Q262.5,262.5 300,225" />
+  </g>
+</svg>

@@ -1,0 +1,17 @@
+<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg">
+  <rect fill="white" width="300" height="300" />
+  
+  <!-- Sido Mukti pattern dummy (combination of parang and kawung elements) -->
+  <g>
+    <!-- Parang-like diagonal lines -->
+    <path d="M0,0 L75,75 L0,150 L75,225 L0,300" stroke="#8B6F47" stroke-width="8" fill="none" />
+    <path d="M300,0 L225,75 L300,150 L225,225 L300,300" stroke="#8B6F47" stroke-width="8" fill="none" />
+    
+    <!-- Kawung-like circles in center -->
+    <ellipse cx="150" cy="75" rx="20" ry="35" fill="none" stroke="#8B6F47" stroke-width="3" />
+    <ellipse cx="150" cy="225" rx="20" ry="35" fill="none" stroke="#8B6F47" stroke-width="3" />
+    <ellipse cx="95" cy="150" rx="35" ry="20" fill="none" stroke="#8B6F47" stroke-width="3" />
+    <ellipse cx="205" cy="150" rx="35" ry="20" fill="none" stroke="#8B6F47" stroke-width="3" />
+    <circle cx="150" cy="150" r="15" fill="#D4B88B" />
+  </g>
+</svg>
