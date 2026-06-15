@@ -15,8 +15,18 @@ export interface BatikItem {
   created_at?: string;
 }
 
+export interface ShippingAddress {
+  name: string;
+  phone: string;
+  street: string;
+  city: string;
+  province: string;
+  postal_code: string;
+}
+
 export interface Order {
   id: string;
+  user_id?: string;
   item: string;
   description: string;
   date: string;
@@ -31,6 +41,12 @@ export interface Order {
   artisan: string;
   can_review: boolean;
   reviewed: boolean;
+  // New fields
+  payment_method?: "transfer_bca" | "transfer_mandiri" | "gopay" | "ovo" | "cod";
+  payment_status?: "pending" | "paid" | "failed";
+  shipping_address?: ShippingAddress;
+  quantity?: number;
+  notes?: string;
 }
 
 export interface Store {
@@ -71,4 +87,16 @@ export interface CustomDesign {
   rotation: number;
   drawing_data: string | null;
   created_at: string;
+  user_id?: string;
+}
+
+export interface CartItem {
+  id: string;
+  user_id: string;
+  batik_id?: number;
+  custom_design_id?: number;
+  quantity: number;
+  created_at: string;
+  batik_items?: BatikItem;
+  custom_designs?: CustomDesign;
 }

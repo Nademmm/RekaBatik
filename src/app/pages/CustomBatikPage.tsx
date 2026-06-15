@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Palette,
   Download,
@@ -22,7 +22,12 @@ import {
   Copy,
   ArrowUp,
   ArrowDown,
+  ShoppingCart,
+  X,
+  CheckCircle2,
+  Package,
 } from "lucide-react";
+import { useNavigate } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
@@ -30,6 +35,7 @@ import { BatikItem } from "../../types/database";
 import { toast } from "sonner";
 import { Skeleton } from "../components/ui/skeleton";
 import { fabric } from "fabric";
+import { useAuth } from "../../lib/AuthContext";
 
 // Import dummy SVG batik
 import parangDummySvg from "../../assets/batik-svgs/parang-dummy.svg?raw";
@@ -73,33 +79,33 @@ interface CustomLayer {
 
 // Update colorPresets dengan properti background, light, mid, dark
 const colorPresets = [
-  { 
-    name: "Klasik Sogan", 
+  {
+    name: "Klasik Sogan",
     colors: { primary: "#8B6F47", secondary: "#D4B88B", accent: "#E8E1DA", background: "transparent" },
     batik: { background: "#f3f3f3", light: "#D4B88B", mid: "#8B6F47", dark: "#6B3A1F" }
   },
-  { 
-    name: "Emas Kerajaan", 
+  {
+    name: "Emas Kerajaan",
     colors: { primary: "#6B3A1F", secondary: "#D4B88B", accent: "#E8DCC8", background: "transparent" },
     batik: { background: "#f3f3f3", light: "#D4B88B", mid: "#6B3A1F", dark: "#3D2B1F" }
   },
-  { 
-    name: "Biru Nusantara", 
+  {
+    name: "Biru Nusantara",
     colors: { primary: "#2A4B7C", secondary: "#5A8AC6", accent: "#B8D4F0", background: "transparent" },
     batik: { background: "#f3f3f3", light: "#5A8AC6", mid: "#2A4B7C", dark: "#1A2F4C" }
   },
-  { 
-    name: "Merah Meriah", 
+  {
+    name: "Merah Meriah",
     colors: { primary: "#8B2A2A", secondary: "#C64F4F", accent: "#F0B8B8", background: "transparent" },
     batik: { background: "#f3f3f3", light: "#C64F4F", mid: "#8B2A2A", dark: "#5B1A1A" }
   },
-  { 
-    name: "Hijau Alam", 
+  {
+    name: "Hijau Alam",
     colors: { primary: "#2D5A2D", secondary: "#5A9C5A", accent: "#B8E0B8", background: "transparent" },
     batik: { background: "#f3f3f3", light: "#5A9C5A", mid: "#2D5A2D", dark: "#1D3A1D" }
   },
-  { 
-    name: "Ungu Mewah", 
+  {
+    name: "Ungu Mewah",
     colors: { primary: "#5A2D7C", secondary: "#8B5AB8", accent: "#D4B8E0", background: "transparent" },
     batik: { background: "#f3f3f3", light: "#8B5AB8", mid: "#5A2D7C", dark: "#3A1D5C" }
   },
@@ -123,6 +129,9 @@ const recolorSVG = (svgString: string, preset: typeof colorPresets[0]) => {
 };
 
 export function CustomBatikPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [patterns, setPatterns] = useState<BatikItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [layers, setLayers] = useState<CustomLayer[]>([]);
@@ -133,6 +142,9 @@ export function CustomBatikPage() {
   const [brushOpacity, setBrushOpacity] = useState([80]);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState<"saved" | "cart" | "order" | null>(null);
+  const [savedDesignId, setSavedDesignId] = useState<number | null>(null);
   const [historyIndex, setHistoryIndex] = useState(-1); // For brush
   const [historyLength, setHistoryLength] = useState(0); // For brush
   const [patternHistoryIndex, setPatternHistoryIndex] = useState(-1); // For pattern
@@ -169,10 +181,10 @@ export function CustomBatikPage() {
   const offscreenHistoryIndexRef = useRef<number>(-1);
 
   // Refs for undo/redo functions to avoid stale closures
-  const undoBrushRef = useRef<() => void>(() => {});
-  const redoBrushRef = useRef<() => void>(() => {});
-  const undoPatternRef = useRef<() => void>(() => {});
-  const redoPatternRef = useRef<() => void>(() => {});
+  const undoBrushRef = useRef<() => void>(() => { });
+  const redoBrushRef = useRef<() => void>(() => { });
+  const undoPatternRef = useRef<() => void>(() => { });
+  const redoPatternRef = useRef<() => void>(() => { });
 
   // Unified action stack — track urutan aksi (pattern/brush/bgcolor) untuk undo/redo berurutan
   const actionStackRef = useRef<("pattern" | "brush" | "bgcolor")[]>([]);
@@ -182,8 +194,8 @@ export function CustomBatikPage() {
   const isInitRef = useRef(true);          // mencegah tracking saat init
   const isRecoloringRef = useRef(false);   // mencegah tracking saat recolor
   const recoloringCountRef = useRef(0);    // counter recolor async
-  const undoAllRef = useRef<() => void>(() => {});
-  const redoAllRef = useRef<() => void>(() => {});
+  const undoAllRef = useRef<() => void>(() => { });
+  const redoAllRef = useRef<() => void>(() => { });
   // Refs untuk auto-scroll ke layer terpilih di sidebar
   const layerItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -704,7 +716,7 @@ export function CustomBatikPage() {
         setSelectedLayerId(target.data.layerId);
         // Auto-switch ke tab Layer dan scroll ke layer tersebut
         setActiveTab("layer");
-        
+
         // Auto-sync selection color preset to sidebar
         if (target.data.colorPresetName) {
           const foundPreset = colorPresets.find((p) => p.name === target.data.colorPresetName);
@@ -767,14 +779,14 @@ export function CustomBatikPage() {
 
     saveSnapshot();
     saveOffscreenSnapshot();
-    
+
     // Set initial size & zoom
     if (containerRef.current && displayCanvasRef.current) {
       const containerWidth = containerRef.current.getBoundingClientRect().width;
       canvas.setWidth(containerWidth);
       canvas.setHeight(containerWidth * 0.75);
       canvas.setZoom(containerWidth / 800);
-      
+
       displayCanvasRef.current.style.width = `${containerWidth}px`;
       displayCanvasRef.current.style.height = `${containerWidth * 0.75}px`;
     }
@@ -976,9 +988,9 @@ export function CustomBatikPage() {
     if (pattern.style_type && batikSvgMap[pattern.style_type]) {
       const svgString = recolorSVG(batikSvgMap[pattern.style_type], preset);
       return (
-        <div 
+        <div
           className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full"
-          dangerouslySetInnerHTML={{ __html: svgString }} 
+          dangerouslySetInnerHTML={{ __html: svgString }}
         />
       );
     }
@@ -1261,6 +1273,36 @@ export function CustomBatikPage() {
     });
   }, [layers]);
 
+
+  // ─── Helper: Composite canvas ke PNG DataURL ───────────────────────────────
+  const buildFinalCanvas = async (): Promise<HTMLCanvasElement> => {
+    const fc = fabricCanvasRef.current!;
+    const offscreen = offscreenRef.current!;
+
+    const final = document.createElement("canvas");
+    final.width = 800;
+    final.height = 600;
+    const ctx = final.getContext("2d")!;
+
+    // 1. Background warna user
+    ctx.fillStyle = canvasBackground || "#ffffff";
+    ctx.fillRect(0, 0, 800, 600);
+
+    // 2. Fabric layer (motif/pattern) — toDataURL sudah termasuk background object Fabric
+    const fabricDataUrl = fc.toDataURL({ format: "png", multiplier: 1 });
+    await new Promise<void>((res, rej) => {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0, 800, 600); res(); };
+      img.onerror = rej;
+      img.src = fabricDataUrl;
+    });
+
+    // 3. Brush/Eraser layer (offscreen canvas — pixel-perfect, sudah ada lubang eraser)
+    ctx.drawImage(offscreen, 0, 0, 800, 600);
+
+    return final;
+  };
+
   // ─── Download ──────────────────────────────────────────────────────────────
   const downloadDesign = async () => {
     const fc = fabricCanvasRef.current;
@@ -1269,31 +1311,12 @@ export function CustomBatikPage() {
     try {
       setIsDownloading(true);
       toast.info("Mempersiapkan unduhan...");
-
-      const final = document.createElement("canvas");
-      final.width = 800;
-      final.height = 600;
-      const ctx = final.getContext("2d")!;
-
-      // 1. Background putih
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, 800, 600);
-
-      // 2. Fabric (motif pattern)
-      const fabricImg = new Image();
-      await new Promise<void>((res) => {
-        fabricImg.onload = () => { ctx.drawImage(fabricImg, 0, 0); res(); };
-        fabricImg.src = fc.toDataURL({ format: "png", multiplier: 1 });
-      });
-
-      // 3. Drawing layer — lubang eraser sudah ada di offscreen
-      ctx.drawImage(offscreen, 0, 0);
-
+      const final = await buildFinalCanvas();
       const link = document.createElement("a");
       link.download = `desain-batik-${Date.now()}.png`;
       link.href = final.toDataURL("image/png");
       link.click();
-      toast.success("Desain berhasil diunduh!");
+      toast.success("Desain berhasil diunduh! 🎨");
     } catch {
       toast.error("Gagal mengunduh desain");
     } finally {
@@ -1343,21 +1366,159 @@ export function CustomBatikPage() {
     setHasOffscreenContent(false);
     setCanUndo(false);
     setCanRedo(false);
+    setSavedDesignId(null);
   };
 
-  const saveDesign = async () => {
-    if (!fabricCanvasRef.current) return;
+  // ─── Save Design — simpan design JSON + thumbnail ke custom_designs ────────
+  const saveDesign = async (): Promise<number | null> => {
+    if (!user) {
+      toast.error("Silakan login terlebih dahulu untuk menyimpan desain");
+      navigate("/auth?redirect=/custom");
+      return null;
+    }
+    if (!fabricCanvasRef.current) return null;
     setIsSaving(true);
     try {
-      const json = fabricCanvasRef.current.toJSON();
-      const { error } = await supabase.from("custom_designs").insert([{ design_data: json, created_at: new Date().toISOString() }]);
+      // Bangun canvas final
+      const final = await buildFinalCanvas();
+      const thumbnailDataUrl = final.toDataURL("image/png");
+
+      // Simpan JSON design data + thumbnail preview ke kolom drawing_data (karena design_data tidak ada di schema)
+      const designJson = fabricCanvasRef.current.toJSON(["data"]);
+      const payload = {
+        ...designJson,
+        offscreenDataUrl: offscreenRef.current?.toDataURL("image/png") || null,
+        canvasBackground,
+        canvasThumbnail: thumbnailDataUrl,
+      };
+
+      const { data, error } = await supabase.from("custom_designs").insert([
+        {
+          drawing_data: JSON.stringify(payload),
+          pattern_id: 0,
+          scale: 1,
+          rotation: 0,
+          colors: {},
+          created_at: new Date().toISOString(),
+          user_id: user.id,
+        }
+      ]).select("id").single();
       if (error) throw error;
-      toast.success("Desain berhasil disimpan!");
+      const newId = data?.id ?? null;
+      setSavedDesignId(newId);
+      return newId;
     } catch (err) {
       console.error(err);
       toast.error("Gagal menyimpan desain");
+      return null;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // ─── Save lalu tampilkan modal konfirmasi ─────────────────────────────────
+  const handleSaveAndShowModal = async () => {
+    const id = await saveDesign();
+    if (id !== null) {
+      setShowSuccessModal("saved");
+    }
+  };
+
+  // ─── Tambah ke Keranjang ───────────────────────────────────────────────────
+  const addToCart = async () => {
+    if (!user) {
+      toast.error("Silakan login terlebih dahulu");
+      navigate("/auth?redirect=/custom");
+      return;
+    }
+    if (layers.length === 0 && !hasOffscreenContent) {
+      toast.error("Kanvas masih kosong! Tambahkan motif atau gambar terlebih dahulu.");
+      return;
+    }
+    setIsAddingToCart(true);
+    try {
+      // Simpan design dulu, dapatkan id
+      let designId = savedDesignId;
+      if (!designId) {
+        designId = await saveDesign();
+        if (!designId) { setIsAddingToCart(false); return; }
+      }
+
+      // Cek apakah sudah ada di keranjang
+      const { data: existing } = await supabase
+        .from("cart_items")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("custom_design_id", designId)
+        .single();
+
+      if (existing) {
+        // Sudah di keranjang, increment qty
+        await supabase
+          .from("cart_items")
+          .update({ quantity: 1 })
+          .eq("id", existing.id);
+      } else {
+        // Tambahkan baru
+        const { error } = await supabase.from("cart_items").insert([{
+          user_id: user.id,
+          custom_design_id: designId,
+          quantity: 1,
+        }]);
+        if (error) throw error;
+      }
+
+      setShowSuccessModal("cart");
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal menambahkan ke keranjang");
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
+  // ─── Langsung Pesan ────────────────────────────────────────────────────────
+  const orderNow = async () => {
+    if (!user) {
+      toast.error("Silakan login terlebih dahulu");
+      navigate("/auth?redirect=/custom");
+      return;
+    }
+    if (layers.length === 0 && !hasOffscreenContent) {
+      toast.error("Kanvas masih kosong! Tambahkan motif atau gambar terlebih dahulu.");
+      return;
+    }
+    // Tambah ke keranjang dulu lalu langsung ke halaman keranjang
+    setIsAddingToCart(true);
+    try {
+      let designId = savedDesignId;
+      if (!designId) {
+        designId = await saveDesign();
+        if (!designId) { setIsAddingToCart(false); return; }
+      }
+
+      const { data: existing } = await supabase
+        .from("cart_items")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("custom_design_id", designId)
+        .single();
+
+      if (!existing) {
+        const { error } = await supabase.from("cart_items").insert([{
+          user_id: user.id,
+          custom_design_id: designId,
+          quantity: 1,
+        }]);
+        if (error) throw error;
+      }
+
+      navigate("/cart");
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal memproses pesanan");
+    } finally {
+      setIsAddingToCart(false);
     }
   };
 
@@ -1368,195 +1529,130 @@ export function CustomBatikPage() {
       <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-4 pointer-events-none" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)", transform: "translate(30%, -30%)" }} />
       <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full opacity-4 pointer-events-none" style={{ background: "radial-gradient(circle, #8B6F47 0%, transparent 70%)", transform: "translate(-30%, 30%)" }} />
 
-      <div className="container mx-auto px-4 py-10 relative z-10">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-10">
-          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full mb-5" style={{ background: "linear-gradient(135deg, rgba(212,184,139,0.18), rgba(139,111,71,0.08))", color: "#8B6F47", border: "1px solid rgba(212,184,139,0.3)" }}>
-            <Palette className="w-4 h-4" />
-            <span style={{ fontSize: "0.75rem", letterSpacing: "0.2em", fontWeight: 600 }}>STUDIO KREATIF</span>
+      <div className="container mx-auto px-4 sm:px-6 py-10 relative z-10 max-w-7xl">
+        {/* Header Section */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6"
+        >
+          <div>
+            <h1 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2.25rem, 5vw, 3.25rem)", fontWeight: 800, lineHeight: 1.15, marginBottom: "0.75rem" }}>
+              Wujudkan <span style={{ color: "#8B6F47", position: "relative" }} className="after:absolute after:bottom-1 after:left-0 after:w-full after:h-[6px] after:bg-[#D4B88B]/25 after:rounded-full">Karya Batik</span> Impian
+            </h1>
+            <p style={{ color: "#7A6B5E", fontSize: "0.95rem", maxWidth: "620px", lineHeight: 1.6 }}>
+              Padukan keindahan motif klasik Nusantara dengan kreativitas Anda. Tambahkan motif, coretkan kuas warna-warni, dan unduh hasil karya seni orisinal Anda.
+            </p>
           </div>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700, lineHeight: 1.2, marginBottom: "0.75rem" }}>
-            Wujudkan <span style={{ color: "#8B6F47" }}>Karya Batik</span> Impian Anda
-          </h1>
-          <p style={{ color: "#7A6B5E", fontSize: "1rem", maxWidth: "600px", lineHeight: 1.7 }}>
-            Klik motif untuk menambahkannya ke kanvas, kemudian atur posisi, ukuran, dan warnanya sesuai selera.
-          </p>
+
+          {/* Quick instructions / Info card */}
+          <div className="hidden lg:flex items-center gap-3 p-4 bg-white/60 backdrop-blur-md rounded-2xl border" style={{ borderColor: "rgba(212,184,139,0.25)" }}>
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#A89B8F]">Panduan Cepat</p>
+              <p className="text-xs font-semibold text-[#5A4A3E] mt-0.5">Pilih motif → Atur di Kanvas → Unduh PNG</p>
+            </div>
+          </div>
         </motion.div>
 
-        <div className="grid lg:grid-cols-12 gap-6">
+        <div className="grid lg:grid-cols-12 gap-8 items-stretch">
+          {/* Canvas Section */}
           <div className="lg:col-span-8 space-y-6">
-            <div className="rounded-3xl shadow-xl" style={{ border: "1px solid rgba(232, 225, 218, 0.8)", background: "#FFFFFF" }}>
-              {/* Toolbar */}
-              <div className="px-4 py-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between" style={{ background: "linear-gradient(to bottom, #FDFCFB, #F9F6F2)", borderBottom: "1px solid rgba(139,111,71,0.1)" }}>
-                {/* Top Row on Mobile / Single Row on Desktop */}
-                <div className="flex items-center justify-between gap-3 w-full md:w-auto">
-                  {/* Left: Tool switcher */}
-                  <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(139,111,71,0.07)", border: "1px solid rgba(139,111,71,0.1)" }}>
-                    {([
-                      { tool: "select" as Tool, icon: ZoomOut, label: "Pilih" },
-                      { tool: "brush" as Tool, icon: Brush, label: "Kuas" },
-                      { tool: "eraser" as Tool, icon: Eraser, label: "Hapus" },
-                    ] as const).map(({ tool, icon: Icon, label }) => (
-                      <button key={tool}
-                        onClick={() => setActiveTool(tool)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-xs font-semibold"
-                        style={{
-                          background: activeTool === tool ? "#FFFFFF" : "transparent",
-                          color: activeTool === tool ? "#8B6F47" : "#9E8E82",
-                          boxShadow: activeTool === tool ? "0 1px 4px rgba(61,43,31,0.12)" : "none",
-                        }}
-                        title={label}
-                      >
-                        <Icon className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">{label}</span>
-                      </button>
-                    ))}
-                  </div>
+            <div className="rounded-[32px] overflow-hidden shadow-[0_20px_50px_rgba(61,43,31,0.06)] border bg-white" style={{ borderColor: "rgba(212,184,139,0.3)" }}>
 
-                  {/* Actions for mobile (hidden on desktop) */}
-                  <div className="flex items-center gap-1.5 md:hidden">
-                    {/* Canvas background color picker */}
-                    <div className="relative flex-shrink-0" title="Warna latar belakang kanvas">
-                      <div style={{ padding: "3px", background: "#FFFFFF", border: "1px solid rgba(139,111,71,0.15)", borderRadius: "8px", flexShrink: 0 }}>
-                        <input
-                          type="color"
-                          value={canvasBackground}
-                          onChange={(e) => setCanvasBackground(e.target.value)}
-                          className="w-5 h-5 rounded-md cursor-pointer border-0 p-0 bg-transparent block [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md"
-                          title="Ubah warna latar kanvas"
-                        />
-                      </div>
-                    </div>
+              {/* Responsive Toolbar */}
+              <div className="px-4 py-3.5 flex flex-wrap items-center gap-3.5 justify-between" style={{ background: "#FFFFFF", borderBottom: "1px solid rgba(212,184,139,0.15)" }}>
 
-                    <div className="w-px h-5 flex-shrink-0" style={{ background: "rgba(139,111,71,0.12)" }} />
-
-                    {/* Undo / Redo */}
-                    <div className="flex items-center gap-1 p-1 rounded-xl bg-white/50 border" style={{ borderColor: "rgba(139,111,71,0.1)" }}>
-                      <button
-                        onClick={undoAll}
-                        disabled={!canUndo}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white"
-                        style={{ color: "#8B6F47" }}
-                        title="Undo (Ctrl+Z)"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={redoAll}
-                        disabled={!canRedo}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white"
-                        style={{ color: "#8B6F47" }}
-                        title="Redo (Ctrl+Y)"
-                      >
-                        <RotateCw className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Clear */}
-                    <button
-                      onClick={clearAll}
-                      className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-red-50"
-                      style={{ color: "#dc2626", background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.1)" }}
-                      title="Bersihkan kanvas"
+                {/* Group 1: Edit Mode */}
+                <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(139,111,71,0.04)", border: "1px solid rgba(212,184,139,0.15)" }}>
+                  {([
+                    { tool: "select" as Tool, icon: ZoomOut, label: "Pilih" },
+                    { tool: "brush" as Tool, icon: Brush, label: "Kuas" },
+                    { tool: "eraser" as Tool, icon: Eraser, label: "Hapus" },
+                  ] as const).map(({ tool, icon: Icon, label }) => (
+                    <button key={tool}
+                      onClick={() => setActiveTool(tool)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-xs font-semibold cursor-pointer"
+                      style={{
+                        background: activeTool === tool ? "linear-gradient(135deg, #8B6F47 0%, #A88967 100%)" : "transparent",
+                        color: activeTool === tool ? "#FFFFFF" : "#7A6B5E",
+                        boxShadow: activeTool === tool ? "0 4px 12px rgba(139,111,71,0.2)" : "none",
+                      }}
+                      title={label}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Icon className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{label}</span>
                     </button>
-
-                    {/* Save / Download on mobile */}
-                    {activeTool === "select" && (
-                      <>
-                        <div className="w-px h-5 flex-shrink-0" style={{ background: "rgba(139,111,71,0.12)" }} />
-                        <button onClick={saveDesign} disabled={isSaving}
-                          className="flex items-center justify-center w-8 h-8 rounded-xl transition-colors disabled:opacity-50 hover:bg-[#F5F0EB]"
-                          style={{ color: "#8B6F47", background: "rgba(139,111,71,0.06)", border: "1px solid rgba(139,111,71,0.12)" }}
-                          title="Simpan"
-                        >
-                          {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                        </button>
-                        <button onClick={downloadDesign}
-                          className="flex items-center justify-center w-8 h-8 rounded-xl transition-colors text-white hover:opacity-90"
-                          style={{ background: "linear-gradient(135deg, #8B6F47 0%, #A88967 100%)", boxShadow: "0 2px 8px rgba(139,111,71,0.3)" }}
-                          title="Unduh"
-                        >
-                          {isDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  ))}
                 </div>
 
-                {/* Center: Brush/Eraser controls */}
+                {/* Group 2: Brush/Eraser controls */}
                 {activeTool !== "select" && (
-                  <div className="flex items-center gap-2 flex-1 min-w-0 px-2.5 py-1.5 rounded-xl w-full md:w-auto overflow-hidden" style={{ background: "rgba(139,111,71,0.04)", border: "1px solid rgba(139,111,71,0.08)" }}>
+                  <div className="flex flex-wrap items-center gap-2">
                     {activeTool === "brush" && (
-                      <>
-                        {/* Color picker */}
-                        <div style={{ padding: "3px", background: "#FFFFFF", border: "1px solid rgba(139,111,71,0.15)", borderRadius: "8px", flexShrink: 0 }}>
-                          <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="w-5 h-5 rounded-md cursor-pointer border-0 p-0 bg-transparent block [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md" title="Warna kuas" />
+                      <div className="flex items-center gap-2 px-2.5 py-1 bg-white rounded-xl border border-stone-200/50 shadow-sm flex-shrink-0">
+                        <div className="relative p-0.5 bg-white border border-stone-200 rounded-md cursor-pointer hover:border-[#8B6F47] transition-colors" title="Warna kuas">
+                          <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent block [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md" />
                         </div>
                         {/* Quick swatches */}
-                        <div className="flex gap-0.5 flex-shrink-0">
+                        <div className="flex gap-1 flex-shrink-0">
                           {["#8B6F47", "#D4B88B", "#3D2B1F", "#6B3A1F", "#2A4B7C", "#2D5A2D", "#8B2A2A"].map((c, idx) => (
                             <button key={idx} onClick={() => setBrushColor(c)}
-                              className="w-3.5 h-3.5 rounded-full border-2 flex-shrink-0"
-                              style={{ background: c, borderColor: brushColor === c ? "#3D2B1F" : "transparent" }}
+                              className="w-3.5 h-3.5 rounded-full border flex-shrink-0 transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                              style={{ background: c, borderColor: brushColor === c ? "#3D2B1F" : "rgba(0,0,0,0.1)" }}
                             />
                           ))}
                         </div>
-                        <div className="w-px h-4 flex-shrink-0" style={{ background: "rgba(139,111,71,0.2)" }} />
-                      </>
+                      </div>
                     )}
 
                     {/* Size */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Minus className="w-3 h-3 flex-shrink-0" style={{ color: "#B8A898" }} />
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-xl border border-stone-200/50 shadow-sm flex-shrink-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#A89B8F] select-none">Ukuran</span>
+                      <Minus className="w-3 h-3 text-[#B8A898]" />
                       <input type="range" min="2" max="80" step="2" value={brushSize[0]} onChange={(e) => setBrushSize([Number(e.target.value)])}
-                        className="w-14 sm:w-20 h-1.5 rounded-full appearance-none cursor-pointer flex-shrink-0"
-                        style={{ accentColor: "#8B6F47", background: "rgba(139,111,71,0.2)" }}
+                        className="w-14 sm:w-20 h-1 rounded-full appearance-none cursor-pointer"
+                        style={{ accentColor: "#8B6F47", background: "rgba(139,111,71,0.15)" }}
                         title="Ukuran kuas" />
-                      <Plus className="w-3 h-3 flex-shrink-0" style={{ color: "#B8A898" }} />
-                      <span className="text-xs font-bold w-6 text-right flex-shrink-0" style={{ color: "#3D2B1F" }}>{brushSize[0]}</span>
+                      <Plus className="w-3 h-3 text-[#B8A898]" />
+                      <span className="text-xs font-bold font-mono w-5 text-right text-[#3D2B1F]">{brushSize[0]}</span>
                     </div>
 
                     {/* Opacity */}
                     {activeTool === "brush" && (
-                      <>
-                        <div className="w-px h-4 flex-shrink-0" style={{ background: "rgba(139,111,71,0.2)" }} />
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <span className="text-[9px] font-bold uppercase tracking-wide flex-shrink-0" style={{ color: "#B8A898" }}>Op</span>
-                          <input type="range" min="5" max="100" step="5" value={brushOpacity[0]} onChange={(e) => setBrushOpacity([Number(e.target.value)])}
-                            className="w-10 sm:w-16 h-1.5 rounded-full appearance-none cursor-pointer flex-shrink-0"
-                            style={{ accentColor: "#8B6F47", background: "rgba(139,111,71,0.2)" }}
-                            title="Opasitas" />
-                          <span className="text-xs font-bold w-6 text-right flex-shrink-0" style={{ color: "#3D2B1F" }}>{brushOpacity[0]}</span>
-                        </div>
-                      </>
+                      <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-xl border border-stone-200/50 shadow-sm flex-shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#A89B8F] select-none">Opasitas</span>
+                        <input type="range" min="5" max="100" step="5" value={brushOpacity[0]} onChange={(e) => setBrushOpacity([Number(e.target.value)])}
+                          className="w-10 sm:w-16 h-1 rounded-full appearance-none cursor-pointer"
+                          style={{ accentColor: "#8B6F47", background: "rgba(139,111,71,0.15)" }}
+                          title="Opasitas" />
+                        <span className="text-xs font-bold font-mono w-7 text-right text-[#3D2B1F]">{brushOpacity[0]}%</span>
+                      </div>
                     )}
                   </div>
                 )}
 
-                {/* Right: Actions on Desktop */}
-                <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
-                  {/* Canvas background color picker */}
-                  <div className="relative flex-shrink-0" title="Warna latar belakang kanvas">
-                    <div style={{ padding: "3px", background: "#FFFFFF", border: "1px solid rgba(139,111,71,0.15)", borderRadius: "8px", flexShrink: 0 }}>
+                {/* Group 3: Canvas / Background Settings */}
+                <div className="flex items-center gap-2 ml-auto md:ml-0">
+                  <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-stone-200/50 shadow-sm">
+                    {/* Canvas background picker */}
+                    <div className="relative flex items-center gap-1.5 px-2 py-0.5 border-r border-stone-100" title="Warna latar kanvas">
+                      <div className="w-4 h-4 rounded border" style={{ background: canvasBackground, borderColor: "rgba(0,0,0,0.1)" }} />
                       <input
                         type="color"
                         value={canvasBackground}
                         onChange={(e) => setCanvasBackground(e.target.value)}
-                        className="w-5 h-5 rounded-md cursor-pointer border-0 p-0 bg-transparent block [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md"
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                         title="Ubah warna latar kanvas"
                       />
+                      <span className="text-[10px] font-bold text-[#A89B8F] uppercase select-none">Latar</span>
                     </div>
-                  </div>
 
-                  <div className="w-px h-5 flex-shrink-0" style={{ background: "rgba(139,111,71,0.12)" }} />
-
-                  {/* Undo / Redo */}
-                  <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(139,111,71,0.05)", border: "1px solid rgba(139,111,71,0.08)" }}>
+                    {/* Undo / Redo */}
                     <button
                       onClick={undoAll}
                       disabled={!canUndo}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-stone-50 cursor-pointer"
                       style={{ color: "#8B6F47" }}
                       title="Undo (Ctrl+Z)"
                     >
@@ -1565,86 +1661,118 @@ export function CustomBatikPage() {
                     <button
                       onClick={redoAll}
                       disabled={!canRedo}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-stone-50 cursor-pointer"
                       style={{ color: "#8B6F47" }}
                       title="Redo (Ctrl+Y)"
                     >
                       <RotateCw className="w-3.5 h-3.5" />
                     </button>
+
+                    {/* Clear */}
+                    <div className="border-l border-stone-100 pl-1">
+                      <button
+                        onClick={clearAll}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-50 hover:text-red-600 cursor-pointer"
+                        style={{ color: "#7A6B5E" }}
+                        title="Bersihkan kanvas"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Clear */}
-                  <button
-                    onClick={clearAll}
-                    className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-red-50"
-                    style={{ color: "#dc2626", background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.1)" }}
-                    title="Bersihkan kanvas"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Separator + Save/Download — only in select mode */}
+                  {/* Group 4: Actions */}
                   {activeTool === "select" && (
-                    <>
-                      <div className="w-px h-7 flex-shrink-0" style={{ background: "rgba(139,111,71,0.12)" }} />
-                      <button onClick={saveDesign} disabled={isSaving}
-                        className="flex items-center gap-1.5 px-3 h-8 rounded-xl transition-colors text-xs font-semibold disabled:opacity-50 hover:bg-[#F5F0EB]"
-                        style={{ color: "#8B6F47", background: "rgba(139,111,71,0.06)", border: "1px solid rgba(139,111,71,0.12)" }}
-                      >
-                        {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                        <span className="hidden sm:inline">Simpan</span>
-                      </button>
-                      <button onClick={downloadDesign}
-                        className="flex items-center gap-1.5 px-3 h-8 rounded-xl transition-colors text-xs font-semibold text-white hover:opacity-90"
-                        style={{ background: "linear-gradient(135deg, #8B6F47 0%, #A88967 100%)", boxShadow: "0 2px 8px rgba(139,111,71,0.3)" }}
+                    <div className="flex items-center gap-2">
+                      <button onClick={downloadDesign} disabled={isDownloading}
+                        className="flex items-center gap-1.5 px-3 h-9 rounded-xl transition-all duration-200 text-xs font-bold disabled:opacity-50 hover:bg-[#F5F0EB] border cursor-pointer"
+                        style={{ color: "#8B6F47", background: "rgba(139,111,71,0.04)", borderColor: "rgba(139,111,71,0.15)" }}
+                        title="Unduh gambar PNG"
                       >
                         {isDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                        <span className="hidden sm:inline">Unduh</span>
+                        <span className="hidden lg:inline">Unduh</span>
                       </button>
-                    </>
+
+                      <button onClick={handleSaveAndShowModal} disabled={isSaving}
+                        className="flex items-center gap-1.5 px-3 h-9 rounded-xl transition-all duration-200 text-xs font-bold disabled:opacity-50 hover:bg-[#F5F0EB] border cursor-pointer"
+                        style={{ color: "#8B6F47", background: "rgba(139,111,71,0.04)", borderColor: "rgba(139,111,71,0.15)" }}
+                        title="Simpan desain ke akun Anda"
+                      >
+                        {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        <span className="hidden lg:inline">Simpan</span>
+                      </button>
+
+                      <div className="w-px h-5 mx-1" style={{ background: "rgba(139,111,71,0.2)" }} />
+
+                      <button onClick={addToCart} disabled={isAddingToCart}
+                        className="flex items-center gap-1.5 px-3 h-9 rounded-xl transition-all duration-200 text-xs font-bold disabled:opacity-50 border cursor-pointer"
+                        style={{ color: "#3D2B1F", background: "#FFFFFF", borderColor: "rgba(139,111,71,0.25)" }}
+                        title="Masukkan ke keranjang belanja"
+                      >
+                        {isAddingToCart ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShoppingCart className="w-3.5 h-3.5" />}
+                        <span className="hidden lg:inline">+ Keranjang</span>
+                      </button>
+
+                      <button onClick={orderNow} disabled={isAddingToCart}
+                        className="flex items-center gap-1.5 px-4 h-9 rounded-xl transition-all duration-200 text-xs font-bold text-white hover:opacity-95 cursor-pointer"
+                        style={{ background: "linear-gradient(135deg, #3D2B1F 0%, #5A3D2B 100%)", boxShadow: "0 4px 12px rgba(61,43,31,0.25)" }}
+                        title="Pesan desain ini sekarang"
+                      >
+                        {isAddingToCart ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
+                        <span>Pesan Sekarang</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Canvas area */}
-              <div ref={containerRef} className="aspect-[4/3] relative overflow-hidden select-none" style={{ background: canvasBackground }}>
-                {/* Layer 1: Display canvas untuk brush/eraser */}
-                <canvas
-                  ref={displayCanvasRef}
-                  width={800}
-                  height={600}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    pointerEvents: "none",
-                    zIndex: 0,
-                    width: "100%",
-                    height: "100%",
-                  }}
-                />
+              {/* Canvas Area Wrapped in a Padded Drawing Board */}
+              <div className="p-4 sm:p-6 bg-[#F8F6F2]" style={{ borderTop: "1px solid rgba(212,184,139,0.12)" }}>
+                <div className="relative rounded-2xl overflow-hidden shadow-inner border border-stone-200/50" style={{ boxShadow: "inset 0 4px 20px rgba(61,43,31,0.05)" }}>
 
-                {/* Layer 2: Fabric canvas — di atas saat select, di bawah saat brush */}
-                <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0, zIndex: 1 }} />
+                  {/* Aspect Ratio Canvas Container */}
+                  <div ref={containerRef} className="aspect-[4/3] relative overflow-hidden select-none" style={{ background: canvasBackground }}>
+                    {/* Layer 1: Display canvas untuk brush/eraser */}
+                    <canvas
+                      ref={displayCanvasRef}
+                      width={800}
+                      height={600}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        pointerEvents: "none",
+                        zIndex: 0,
+                        width: "100%",
+                        height: "100%",
+                      }}
+                    />
 
-                {layers.length === 0 && !hasOffscreenContent && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ color: "#A89B8F", zIndex: 3 }}>
-                    <Layers className="w-16 h-16 mb-4 opacity-30" />
-                    <p className="text-lg font-medium">Kanvas Kosong</p>
-                    <p className="text-sm opacity-70">Klik motif di sidebar untuk memulai</p>
+                    {/* Layer 2: Fabric canvas wrapper */}
+                    <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}>
+                      <canvas ref={canvasRef} />
+                    </div>
+
+                    {layers.length === 0 && !hasOffscreenContent && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ color: "#A89B8F", zIndex: 3 }}>
+                        <Layers className="w-14 h-14 mb-3 opacity-20 text-[#8B6F47]" />
+                        <p className="text-base font-semibold text-[#5A4A3E]">Kanvas Karya Kosong</p>
+                        <p className="text-xs opacity-75 mt-0.5">Pilih & klik motif di sidebar kanan untuk memulai membatik</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-4 space-y-6">
-            <div 
-              className="rounded-3xl shadow-lg overflow-hidden border" 
-              style={{ borderColor: "rgba(139,111,71,0.12)", background: "#FFFFFF" }}>
-              
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
+          {/* Sidebar Section */}
+          <div className="lg:col-span-4 h-full">
+            <div
+              className="rounded-[32px] shadow-[0_20px_50px_rgba(61,43,31,0.06)] overflow-hidden border bg-white flex flex-col h-full"
+              style={{ borderColor: "rgba(212,184,139,0.3)" }}>
+
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full flex-1 min-h-0">
                 <div className="p-5 pb-3 border-b" style={{ borderColor: "rgba(139,111,71,0.08)", background: "linear-gradient(to bottom, #FAF8F5, #FFFFFF)" }}>
                   <TabsList className="grid w-full grid-cols-3 p-1 rounded-2xl !h-auto !w-full" style={{ background: "rgba(139,111,71,0.06)" }}>
                     <TabsTrigger value="pattern" className="flex items-center justify-center gap-1.5 rounded-xl !h-auto py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#8B6F47] text-[#7A6B5E]" style={{ fontSize: "0.8rem", fontWeight: 600 }}>
@@ -1659,30 +1787,29 @@ export function CustomBatikPage() {
                   </TabsList>
                 </div>
 
-                {/* Tab: Tambah Motif */}
-                <TabsContent value="pattern" className="p-5 m-0 max-h-[500px] overflow-y-auto" style={{ background: "#FFFFFF" }}>
+                <TabsContent value="pattern" className="p-5 m-0 max-h-[650px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: "#FFFFFF" }}>
                   <div className="flex items-center gap-2 mb-4 px-1">
                     <Palette className="w-4 h-4 text-[#8B6F47]" />
                     <p style={{ color: "#7A6B5E", fontSize: "0.8rem", fontWeight: 500 }}>Pilih motif untuk diletakkan di kanvas:</p>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4 pr-1">
                     {loading ? (
                       [...Array(4)].map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)
                     ) : (
                       patterns.map((pattern) => (
-                        <button 
-                          key={pattern.id + "-" + selectedPreset.name} 
+                        <button
+                          key={pattern.id + "-" + selectedPreset.name}
                           onClick={() => addItemToCanvas(pattern)}
                           className="p-3.5 rounded-2xl border transition-all duration-200 text-left flex flex-col items-stretch cursor-pointer bg-[#FAF8F5] hover:bg-[#FFFFFF] hover:border-[#8B6F47]/40 hover:shadow-sm group"
-                          style={{ 
+                          style={{
                             borderColor: "rgba(139,111,71,0.12)"
                           }}
                         >
-                          <div className="w-full aspect-square rounded-xl mb-3 overflow-hidden flex items-center justify-center p-2 transition-all bg-[#FAF8F5] group-hover:bg-[#FFFFFF] border" 
-                            style={{ 
+                          <div className="w-full aspect-square rounded-xl mb-3 overflow-hidden flex items-center justify-center p-2 transition-all bg-[#FAF8F5] group-hover:bg-[#FFFFFF] border"
+                            style={{
                               borderColor: "rgba(139,111,71,0.06)",
-                              boxShadow: "inset 0 1px 3px rgba(139,111,71,0.02)" 
+                              boxShadow: "inset 0 1px 3px rgba(139,111,71,0.02)"
                             }}>
                             {renderMiniPattern(pattern)}
                           </div>
@@ -1701,25 +1828,23 @@ export function CustomBatikPage() {
                   </div>
                 </TabsContent>
 
-                {/* Tab: Preset Warna */}
-                <TabsContent value="color" className="p-5 m-0 max-h-[500px] overflow-y-auto" style={{ background: "#FFFFFF" }}>
+                <TabsContent value="color" className="p-5 m-0 max-h-[650px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: "#FFFFFF" }}>
                   <div className="flex items-center gap-2 mb-4 px-1">
                     <Palette className="w-4 h-4 text-[#8B6F47]" />
                     <p style={{ color: "#7A6B5E", fontSize: "0.8rem", fontWeight: 500 }}>Pilih palet warna (klik motif di kanvas dulu):</p>
                   </div>
-                  
+
                   <div className="space-y-3 pr-1">
                     {colorPresets.map((preset, i) => {
                       const isActive = selectedPreset.name === preset.name;
                       return (
-                        <button 
-                          key={i} 
+                        <button
+                          key={i}
                           onClick={() => setSelectedPreset(preset)}
-                          className={`w-full p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${
-                            isActive 
-                              ? "bg-[rgba(139,111,71,0.06)] border-[#8B6F47] border-2 shadow-sm" 
-                              : "bg-[#FAF8F5] hover:bg-[#FFFFFF] hover:border-[#8B6F47]/30 border border-[rgba(139,111,71,0.12)] hover:shadow-sm"
-                          }`}
+                          className={`w-full p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${isActive
+                            ? "bg-[rgba(139,111,71,0.06)] border-[#8B6F47] border-2 shadow-sm"
+                            : "bg-[#FAF8F5] hover:bg-[#FFFFFF] hover:border-[#8B6F47]/30 border border-[rgba(139,111,71,0.12)] hover:shadow-sm"
+                            }`}
                         >
                           <div className="flex-1 min-w-0 pr-3">
                             <div style={{ color: "#3D2B1F", fontSize: "0.875rem", fontWeight: 700, marginBottom: "2px" }}>
@@ -1740,13 +1865,12 @@ export function CustomBatikPage() {
                   </div>
                 </TabsContent>
 
-                {/* Tab: Layer Management */}
-                <TabsContent value="layer" className="p-5 m-0 max-h-[500px] overflow-y-auto" style={{ background: "#FFFFFF" }}>
+                <TabsContent value="layer" className="p-5 m-0 max-h-[650px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: "#FFFFFF" }}>
                   <div className="flex items-center gap-2 mb-4 px-1">
                     <Layers className="w-4 h-4 text-[#8B6F47]" />
                     <p style={{ color: "#7A6B5E", fontSize: "0.8rem", fontWeight: 500 }}>Kelola urutan dan visibilitas layer:</p>
                   </div>
-                  
+
                   {layers.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 rounded-2xl border border-dashed" style={{ borderColor: "rgba(139,111,71,0.15)", background: "#FAF8F5" }}>
                       <Layers className="w-12 h-12 mb-3 opacity-20 text-[#8B6F47]" />
@@ -1760,8 +1884,8 @@ export function CustomBatikPage() {
                         const actualIndex = layers.length - 1 - reverseIndex;
                         const isSelected = selectedLayerId === layer.id;
                         return (
-                          <div 
-                            key={layer.id} 
+                          <div
+                            key={layer.id}
                             ref={(el) => { layerItemRefs.current[layer.id] = el; }}
                             onClick={() => {
                               if (layer.fabricObject && fabricCanvasRef.current) {
@@ -1770,11 +1894,10 @@ export function CustomBatikPage() {
                                 setSelectedLayerId(layer.id);
                               }
                             }}
-                            className={`p-3 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col gap-2.5 ${
-                              isSelected 
-                                ? "bg-[rgba(139,111,71,0.06)] border-[#8B6F47] border-2 shadow-sm" 
-                                : "bg-[#FAF8F5] hover:bg-[#FFFFFF] hover:border-[#8B6F47]/20 border border-[rgba(139,111,71,0.12)] hover:shadow-sm"
-                            }`}
+                            className={`p-3 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col gap-2.5 ${isSelected
+                              ? "bg-[rgba(139,111,71,0.06)] border-[#8B6F47] border-2 shadow-sm"
+                              : "bg-[#FAF8F5] hover:bg-[#FFFFFF] hover:border-[#8B6F47]/20 border border-[rgba(139,111,71,0.12)] hover:shadow-sm"
+                              }`}
                           >
                             <div className="flex items-center gap-3">
                               <div className="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center p-1 bg-white border border-black/5">
@@ -1791,7 +1914,7 @@ export function CustomBatikPage() {
                                   )}
                                 </div>
                               </div>
-                              
+
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-bold truncate" style={{ color: "#3D2B1F" }}>
                                   {layer.name}
@@ -1801,11 +1924,11 @@ export function CustomBatikPage() {
                                 </p>
                               </div>
                             </div>
-                            
+
                             <div className="flex items-center justify-between border-t pt-2 border-black/5">
                               {/* Layer stack reordering buttons */}
                               <div className="flex items-center gap-1">
-                                <button 
+                                <button
                                   onClick={(e) => { e.stopPropagation(); moveLayer(layer.id, "up"); }}
                                   disabled={actualIndex === layers.length - 1}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white border"
@@ -1814,7 +1937,7 @@ export function CustomBatikPage() {
                                 >
                                   <ArrowUp className="w-3.5 h-3.5 text-[#8B6F47]" />
                                 </button>
-                                <button 
+                                <button
                                   onClick={(e) => { e.stopPropagation(); moveLayer(layer.id, "down"); }}
                                   disabled={actualIndex === 0}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-white border"
@@ -1824,10 +1947,10 @@ export function CustomBatikPage() {
                                   <ArrowDown className="w-3.5 h-3.5 text-[#8B6F47]" />
                                 </button>
                               </div>
-                              
+
                               {/* Layer state buttons */}
                               <div className="flex items-center gap-1">
-                                <button 
+                                <button
                                   onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); }}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 bg-white hover:bg-slate-100 border"
                                   style={{ borderColor: "rgba(139,111,71,0.1)" }}
@@ -1835,7 +1958,7 @@ export function CustomBatikPage() {
                                 >
                                   {layer.visible ? <Eye className="w-3.5 h-3.5 text-[#8B6F47]" /> : <EyeOff className="w-3.5 h-3.5 text-[#8B6F47]" />}
                                 </button>
-                                <button 
+                                <button
                                   onClick={(e) => { e.stopPropagation(); toggleLayerLock(layer.id); }}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 bg-white hover:bg-slate-100 border"
                                   style={{ borderColor: "rgba(139,111,71,0.1)" }}
@@ -1843,7 +1966,7 @@ export function CustomBatikPage() {
                                 >
                                   {layer.locked ? <Lock className="w-3.5 h-3.5 text-[#8B6F47]" /> : <Unlock className="w-3.5 h-3.5 text-[#8B6F47]" />}
                                 </button>
-                                <button 
+                                <button
                                   onClick={(e) => { e.stopPropagation(); duplicateLayer(layer.id); }}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 bg-white hover:bg-slate-100 border"
                                   style={{ borderColor: "rgba(139,111,71,0.1)" }}
@@ -1851,7 +1974,7 @@ export function CustomBatikPage() {
                                 >
                                   <Copy className="w-3.5 h-3.5 text-[#8B6F47]" />
                                 </button>
-                                <button 
+                                <button
                                   onClick={(e) => { e.stopPropagation(); setSelectedLayerId(layer.id); deleteSelectedLayer(); }}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 bg-red-50 hover:bg-red-100 border"
                                   style={{ borderColor: "rgba(220,38,38,0.15)" }}
@@ -1872,6 +1995,63 @@ export function CustomBatikPage() {
           </div>
         </div>
       </div>
+
+      {/* ── SUCCESS MODAL ──────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSuccessModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowSuccessModal(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-2xl"
+              style={{ border: "1px solid rgba(212,184,139,0.3)" }}
+            >
+              <button
+                onClick={() => setShowSuccessModal(null)}
+                className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}>
+                {showSuccessModal === "cart" ? <ShoppingCart className="w-10 h-10 text-white" /> : <CheckCircle2 className="w-10 h-10 text-white" />}
+              </div>
+
+              <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+                {showSuccessModal === "cart" ? "Berhasil!" : "Disimpan!"}
+              </h3>
+              <p className="text-[#7A6B5E] mb-8 text-sm">
+                {showSuccessModal === "cart"
+                  ? "Desain kustom Anda berhasil ditambahkan ke keranjang belanja."
+                  : "Desain Anda berhasil disimpan di koleksi profil."}
+              </p>
+
+              <div className="space-y-3">
+                {showSuccessModal === "cart" && (
+                  <button onClick={() => navigate("/cart")} className="w-full py-3.5 rounded-xl font-bold text-white transition-all hover:opacity-95" style={{ background: "linear-gradient(135deg, #3D2B1F, #5A3D2B)" }}>
+                    Lihat Keranjang
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowSuccessModal(null)}
+                  className="w-full py-3.5 rounded-xl font-bold transition-all"
+                  style={{ color: "#8B6F47", border: "1.5px solid rgba(139,111,71,0.2)", background: "rgba(139,111,71,0.04)" }}
+                >
+                  Tutup
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

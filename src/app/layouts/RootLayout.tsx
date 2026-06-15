@@ -1,15 +1,54 @@
 import { motion, AnimatePresence } from "motion/react";
-import { Outlet, Link, useLocation } from "react-router";
-import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, MapPin } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Outlet, Link, useLocation, useNavigate } from "react-router";
+import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { BatikBackground } from "../components/BatikBackground";
 import logoImg from "../../imports/rekabatik-logo.png";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
+import { useAuth } from "../../lib/AuthContext";
+import { supabase } from "../../lib/supabase";
+
+/** Derive initials from full_name or email */
+function getInitials(user: { user_metadata?: { full_name?: string }; email?: string }) {
+  const name = user.user_metadata?.full_name;
+  if (name) {
+    const parts = name.trim().split(" ");
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : parts[0].slice(0, 2).toUpperCase();
+  }
+  return (user.email ?? "U").slice(0, 2).toUpperCase();
+}
 
 export function RootLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, loading, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const fetchCartCount = useCallback(async () => {
+    if (!user) { setCartCount(0); return; }
+    const { count } = await supabase
+      .from("cart_items")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    setCartCount(count || 0);
+  }, [user]);
+
+  useEffect(() => {
+    fetchCartCount();
+    if (!user) return;
+    // Subscribe to cart changes in real-time
+    const channel = supabase
+      .channel("cart-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "cart_items", filter: `user_id=eq.${user.id}` }, fetchCartCount)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, fetchCartCount]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -22,6 +61,24 @@ export function RootLayout() {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  // Close user dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    setUserMenuOpen(false);
+    toast.success("Berhasil keluar. Sampai jumpa!");
+    navigate("/");
+  };
+
   const navItems = [
     { path: "/", label: "Beranda" },
     { path: "/catalog", label: "Katalog" },
@@ -29,6 +86,9 @@ export function RootLayout() {
     { path: "/orders", label: "Pesanan" },
     { path: "/desa-jetis", label: "Tentang Kami" },
   ];
+
+  const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Pengguna";
+  const initials = user ? getInitials(user) : "U";
 
   return (
     <div
@@ -38,7 +98,7 @@ export function RootLayout() {
         fontFamily: "'Inter', sans-serif",
       }}
     >
-      <Toaster position="top-right" richColors />
+      <Toaster position="top-right" richColors closeButton />
       {/* Header */}
       <header
         className="sticky top-0 z-50"
@@ -98,26 +158,169 @@ export function RootLayout() {
             {/* Right actions */}
             <div className="flex items-center gap-3">
               {/* Cart Icon */}
-              <button
-                className="hidden md:flex items-center justify-center w-10 h-10 rounded-md transition-all hover:bg-gray-100"
+              <Link
+                to="/cart"
+                className="hidden md:flex items-center justify-center w-10 h-10 rounded-md transition-all hover:bg-gray-100 relative"
                 style={{ color: "#3D2B1F" }}
               >
                 <ShoppingBag className="w-5 h-5" />
-              </button>
+                <AnimatePresence>
+                  {cartCount > 0 && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                      style={{ background: "#D97706" }}
+                    >
+                      {cartCount > 9 ? "9+" : cartCount}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </Link>
 
-              {/* Login Button */}
-              <button
-                className="hidden md:flex items-center gap-2 px-5 py-2 rounded-md transition-all"
-                style={{
-                  background: "#3D2B1F",
-                  color: "#FFFFFF",
-                  fontSize: "0.9rem",
-                  fontWeight: 500,
-                }}
-              >
-                <User className="w-4 h-4" />
-                Login
-              </button>
+              {/* ── Auth Area ─────────────────────────────── */}
+              {loading ? (
+                /* skeleton while loading auth */
+                <div
+                  className="hidden md:block w-24 h-9 rounded-md animate-pulse"
+                  style={{ background: "rgba(139,111,71,0.1)" }}
+                />
+              ) : user ? (
+                /* Logged in → user avatar + dropdown */
+                <div className="hidden md:block relative" ref={userMenuRef}>
+                  <motion.button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+                    style={{
+                      border: "1.5px solid rgba(139,111,71,0.2)",
+                      background: userMenuOpen ? "rgba(139,111,71,0.06)" : "transparent",
+                    }}
+                    whileHover={{ background: "rgba(139,111,71,0.06)" }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    {/* Avatar */}
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                      style={{
+                        background: "linear-gradient(135deg, #3D2B1F, #8B6F47)",
+                        color: "#FAF8F5",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      {initials}
+                    </div>
+                    <span
+                      className="text-sm font-medium max-w-[100px] truncate"
+                      style={{ color: "#3D2B1F" }}
+                    >
+                      {displayName}
+                    </span>
+                    <motion.svg
+                      animate={{ rotate: userMenuOpen ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#7A6B5E"
+                      strokeWidth="2"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </motion.svg>
+                  </motion.button>
+
+                  {/* Dropdown menu */}
+                  <AnimatePresence>
+                    {userMenuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                        transition={{ duration: 0.18 }}
+                        className="absolute right-0 top-full mt-2 w-56 rounded-2xl overflow-hidden"
+                        style={{
+                          background: "#FFFFFF",
+                          border: "1px solid rgba(139,111,71,0.12)",
+                          boxShadow: "0 8px 32px rgba(61,43,31,0.14)",
+                          zIndex: 100,
+                        }}
+                      >
+                        {/* User info header */}
+                        <div
+                          className="px-4 py-3.5"
+                          style={{ borderBottom: "1px solid rgba(139,111,71,0.08)" }}
+                        >
+                          <p className="text-sm font-semibold truncate" style={{ color: "#3D2B1F" }}>
+                            {displayName}
+                          </p>
+                          <p className="text-xs truncate mt-0.5" style={{ color: "#9E8E82" }}>
+                            {user.email}
+                          </p>
+                        </div>
+
+                        {/* Menu items */}
+                        <div className="py-1.5">
+                          <Link
+                            to="/orders"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            style={{ color: "#5A4A3E" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <Package className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                            Pesanan Saya
+                          </Link>
+                          <Link
+                            to="/custom"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            style={{ color: "#5A4A3E" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <Settings className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                            Studio Kustom
+                          </Link>
+                        </div>
+
+                        {/* Sign out */}
+                        <div
+                          className="py-1.5"
+                          style={{ borderTop: "1px solid rgba(139,111,71,0.08)" }}
+                        >
+                          <button
+                            onClick={handleSignOut}
+                            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm transition-colors"
+                            style={{ color: "#ef4444" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.05)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Keluar
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                /* Not logged in → Login button */
+                <Link
+                  to="/auth"
+                  className="hidden md:flex items-center gap-2 px-5 py-2 rounded-md transition-all"
+                  style={{
+                    background: "#3D2B1F",
+                    color: "#FFFFFF",
+                    fontSize: "0.9rem",
+                    fontWeight: 500,
+                  }}
+                >
+                  <User className="w-4 h-4" />
+                  Login
+                </Link>
+              )}
 
               {/* Mobile hamburger */}
               <motion.button
@@ -157,6 +360,7 @@ export function RootLayout() {
         </div>
 
         {/* Mobile Nav Drawer */}
+
         <AnimatePresence>
           {mobileOpen && (
             <motion.div
@@ -190,13 +394,28 @@ export function RootLayout() {
                 {/* Mobile Actions */}
                 <div className="pt-3 space-y-3">
                   <div className="flex items-center gap-2">
-                    <button
-                      className="flex-1 flex items-center justify-center w-10 h-10 rounded-md border"
+                    <Link
+                      to="/cart"
+                      className="flex-1 flex items-center justify-center w-10 h-10 rounded-md border relative"
                       style={{ color: "#3D2B1F", borderColor: "#E8E1DA" }}
                     >
                       <ShoppingBag className="w-5 h-5" />
-                    </button>
-                    <button
+                      <AnimatePresence>
+                        {cartCount > 0 && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            className="absolute -top-1 right-2 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                            style={{ background: "#D97706" }}
+                          >
+                            {cartCount > 9 ? "9+" : cartCount}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </Link>
+                    <Link
+                      to="/auth"
                       className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-md"
                       style={{
                         background: "#3D2B1F",
@@ -206,7 +425,7 @@ export function RootLayout() {
                     >
                       <User className="w-4 h-4" />
                       Login
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>
