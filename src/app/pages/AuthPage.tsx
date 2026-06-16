@@ -231,49 +231,6 @@ export function AuthPage() {
             </span>
           </Link>
         </div>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Bottom: Tagline */}
-        <div className="relative z-10 p-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-          >
-            {/* Glassmorphism card */}
-            <div
-              className="rounded-2xl p-6"
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(212,184,139,0.25)",
-              }}
-            >
-              <p
-                style={{
-                  fontFamily: "'Playfair Display', serif",
-                  color: "#FAF8F5",
-                  fontSize: "1.5rem",
-                  fontWeight: 600,
-                  lineHeight: 1.4,
-                  marginBottom: "0.5rem",
-                  textShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                }}
-              >
-                Wujudkan Karya Batik
-                <br />
-                <span style={{ color: "#D4B88B" }}>Impian Anda</span>
-              </p>
-              <p style={{ color: "rgba(250,248,245,0.72)", fontSize: "0.9rem", lineHeight: 1.6 }}>
-                Platform kustomisasi batik digital terdepan
-                <br />
-                dari pengrajin terbaik Desa Jetis, Sidoarjo.
-              </p>
-            </div>
-          </motion.div>
-        </div>
       </div>
 
 

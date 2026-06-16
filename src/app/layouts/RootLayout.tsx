@@ -106,8 +106,8 @@ export function RootLayout() {
           background: "#ffffffff",
         }}
       >
-        <div className="container mx-auto px-8 relative z-10">
-          <div className="flex items-center justify-around h-20">
+        <div className="container mx-auto px-4 md:px-8 relative z-10">
+          <div className="flex items-center justify-between md:justify-around h-20">
 
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3 group flex-shrink-0">

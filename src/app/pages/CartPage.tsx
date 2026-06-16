@@ -443,8 +443,8 @@ export function CartPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex justify-between items-start gap-2 mb-1">
                                 <h3 className="font-semibold truncate" style={{ color: "#3D2B1F" }}>{name}</h3>
-                                <button onClick={() => removeItem(item.id)} className="flex-shrink-0 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors">
-                                  <Trash2 className="w-4 h-4" />
+                                <button onClick={() => removeItem(item.id)} className="flex-shrink-0 p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 transition-all group">
+                                  <Trash2 className="w-4 h-4 transition-all group-hover:stroke-[2.5px] group-hover:scale-110" />
                                 </button>
                               </div>
                               <p className="text-xs mb-3" style={{ color: "#A89B8F" }}>{origin}</p>
