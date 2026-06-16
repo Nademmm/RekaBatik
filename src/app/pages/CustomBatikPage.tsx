@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
   ZoomOut,
+  ZoomIn,
   Loader2,
   GripVertical,
   RotateCw,
@@ -26,6 +27,11 @@ import {
   X,
   CheckCircle2,
   Package,
+  PaintBucket,
+  Square,
+  Circle,
+  Slash,
+  MousePointer2,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -64,7 +70,8 @@ const batikSvgMap: Record<string, string> = {
   "sido-mukti": sidoMuktiDummySvg,
 };
 
-type Tool = "select" | "brush" | "eraser";
+type Tool = "select" | "brush" | "eraser" | "fill" | "shape";
+type ShapeType = "rect" | "circle" | "line";
 
 interface CustomLayer {
   id: string;
@@ -144,6 +151,8 @@ export function CustomBatikPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState<"saved" | "cart" | "order" | null>(null);
+  const [showProjectModal, setShowProjectModal] = useState<"save" | "cart" | "order" | null>(null);
+  const [projectInfo, setProjectInfo] = useState({ name: "", description: "", fabric: "Katun Primisima" });
   const [savedDesignId, setSavedDesignId] = useState<number | null>(null);
   const [historyIndex, setHistoryIndex] = useState(-1); // For brush
   const [historyLength, setHistoryLength] = useState(0); // For brush
@@ -161,6 +170,14 @@ export function CustomBatikPage() {
   // Warna yang sudah 'dikonfirmasi' (debounced) — hanya ini yang masuk history
   const [committedBg, setCommittedBg] = useState("#ffffff");
   const bgDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ─── Shape Tool State ────────────────────────────────────────────────────────
+  const [shapeType, setShapeType] = useState<ShapeType>("rect");
+  const [shapeFill, setShapeFill] = useState("#8B6F47");
+  const [shapeStroke, setShapeStroke] = useState("#3D2B1F");
+  const [shapeStrokeWidth, setShapeStrokeWidth] = useState(2);
+  const [shapeOpacity, setShapeOpacity] = useState(100);
+  // ─── Zoom State ──────────────────────────────────────────────────────────────
+  const [zoomLevel, setZoomLevel] = useState(100);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const historyRef = useRef<string[]>([]);
@@ -198,8 +215,27 @@ export function CustomBatikPage() {
   const redoAllRef = useRef<() => void>(() => { });
   // Refs untuk auto-scroll ke layer terpilih di sidebar
   const layerItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  // Ref untuk melacak apakah mousedown terakhir terjadi di dalam canvas (bukan di sidebar/UI luar)
+  const lastMousedownInCanvasRef = useRef(false);
+  // Refs untuk shape drawing
+  const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const shapePreviewRef = useRef<fabric.Object | null>(null);
+  const shapeTypeRef = useRef<ShapeType>("rect");
+  const shapeFillRef = useRef("#8B6F47");
+  const shapeStrokeRef = useRef("#3D2B1F");
+  const shapeStrokeWidthRef = useRef(2);
+  const shapeOpacityRef = useRef(100);
+  // Refs untuk zoom & pan
+  const zoomLevelRef = useRef(100);
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
+  useEffect(() => { shapeTypeRef.current = shapeType; }, [shapeType]);
+  useEffect(() => { shapeFillRef.current = shapeFill; }, [shapeFill]);
+  useEffect(() => { shapeStrokeRef.current = shapeStroke; }, [shapeStroke]);
+  useEffect(() => { shapeStrokeWidthRef.current = shapeStrokeWidth; }, [shapeStrokeWidth]);
+  useEffect(() => { shapeOpacityRef.current = shapeOpacity; }, [shapeOpacity]);
   useEffect(() => { brushSizeRef.current = brushSize[0]; }, [brushSize]);
   useEffect(() => { brushColorRef.current = brushColor; }, [brushColor]);
   useEffect(() => { brushOpacityRef.current = brushOpacity[0]; }, [brushOpacity]);
@@ -369,7 +405,115 @@ export function CustomBatikPage() {
 
 
 
+  // ─── Flood Fill (BFS) untuk Fill Bucket ─────────────────────────────────────
+  const floodFill = useCallback((
+    startX: number,
+    startY: number,
+    fillHex: string,
+    tolerance = 35
+  ) => {
+    const offscreen = offscreenRef.current;
+    if (!offscreen) return;
+    const ctx = offscreen.getContext("2d")!;
+    const W = offscreen.width;
+    const H = offscreen.height;
+    const imageData = ctx.getImageData(0, 0, W, H);
+    const data = imageData.data;
+
+    // Helper: get pixel rgba at index
+    const idx = (x: number, y: number) => (y * W + x) * 4;
+
+    const sr = data[idx(startX, startY)];
+    const sg = data[idx(startX, startY) + 1];
+    const sb = data[idx(startX, startY) + 2];
+    const sa = data[idx(startX, startY) + 3];
+
+    // Parse fill color
+    const fr = parseInt(fillHex.slice(1, 3), 16);
+    const fg = parseInt(fillHex.slice(3, 5), 16);
+    const fb = parseInt(fillHex.slice(5, 7), 16);
+    const fa = 255;
+
+    // Jika warna sama, skip
+    if (sr === fr && sg === fg && sb === fb && sa === fa) return;
+
+    const colorMatch = (x: number, y: number) => {
+      const i = idx(x, y);
+      return (
+        Math.abs(data[i] - sr) <= tolerance &&
+        Math.abs(data[i + 1] - sg) <= tolerance &&
+        Math.abs(data[i + 2] - sb) <= tolerance &&
+        Math.abs(data[i + 3] - sa) <= tolerance
+      );
+    };
+
+    const filled = new Uint8Array(W * H);
+    const queue: number[] = [];
+
+    const enqueue = (x: number, y: number) => {
+      if (x < 0 || x >= W || y < 0 || y >= H) return;
+      const pos = y * W + x;
+      if (filled[pos]) return;
+      if (!colorMatch(x, y)) return;
+      filled[pos] = 1;
+      queue.push(x, y);
+    };
+
+    enqueue(startX, startY);
+
+    while (queue.length > 0) {
+      const x = queue.shift()!;
+      const y = queue.shift()!;
+      const i = idx(x, y);
+      data[i] = fr;
+      data[i + 1] = fg;
+      data[i + 2] = fb;
+      data[i + 3] = fa;
+      enqueue(x + 1, y);
+      enqueue(x - 1, y);
+      enqueue(x, y + 1);
+      enqueue(x, y - 1);
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    syncDisplay();
+    setHasOffscreenContent(true);
+    saveOffscreenSnapshot();
+  }, [syncDisplay, saveOffscreenSnapshot]);
+
+  // ─── Zoom helpers ─────────────────────────────────────────────────────────
+  const applyZoom = useCallback((newZoom: number, originX?: number, originY?: number) => {
+    const fc = fabricCanvasRef.current;
+    const container = containerRef.current;
+    if (!fc || !container) return;
+
+    const clamped = Math.max(50, Math.min(300, Math.round(newZoom / 25) * 25));
+    zoomLevelRef.current = clamped;
+    setZoomLevel(clamped);
+
+    const scale = clamped / 100;
+    if (originX !== undefined && originY !== undefined) {
+      fc.zoomToPoint(new fabric.Point(originX, originY), scale);
+    } else {
+      const center = fc.getCenter();
+      fc.zoomToPoint(new fabric.Point(center.left, center.top), scale);
+    }
+    fc.requestRenderAll();
+  }, []);
+
+  const zoomIn = useCallback(() => applyZoom(zoomLevelRef.current + 25), [applyZoom]);
+  const zoomOut = useCallback(() => applyZoom(zoomLevelRef.current - 25), [applyZoom]);
+  const resetZoom = useCallback(() => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+    fc.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    zoomLevelRef.current = 100;
+    setZoomLevel(100);
+    fc.requestRenderAll();
+  }, []);
+
   // ─── Restore Fabric snapshot (untuk pattern) ──────────────────────────────
+
   const restoreSnapshot = useCallback((index: number) => {
     const fc = fabricCanvasRef.current;
     if (!fc) return;
@@ -741,8 +885,26 @@ export function CustomBatikPage() {
       }
     });
     canvas.on("selection:cleared", () => {
-      setSelectedLayerId(null);
+      // Hanya clear selection jika mousedown terjadi di dalam canvas
+      // Mencegah klik di sidebar/UI luar menghapus selection
+      if (lastMousedownInCanvasRef.current) {
+        setSelectedLayerId(null);
+      }
     });
+
+    // Track apakah mousedown terjadi di dalam canvas wrapper
+    const handleGlobalMousedown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const fabricEl = canvas.getElement();
+      const wrapper = fabricEl?.parentElement;
+      const displayCanvas = displayCanvasRef.current;
+      // Klik dianggap "di dalam canvas" jika target adalah canvas fabric atau display canvas
+      lastMousedownInCanvasRef.current = !!(
+        (wrapper && wrapper.contains(target)) ||
+        (displayCanvas && displayCanvas.contains(target))
+      );
+    };
+    window.addEventListener("mousedown", handleGlobalMousedown, true);
 
     canvas.on("object:modified", () => saveSnapshot());
     canvas.on("object:removed", () => saveSnapshot());
@@ -796,6 +958,7 @@ export function CustomBatikPage() {
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handleGlobalMousedown, true);
       canvas.dispose();
     };
   }, [saveSnapshot, saveOffscreenSnapshot]);
@@ -807,6 +970,22 @@ export function CustomBatikPage() {
 
     const onStart = (e: MouseEvent | TouchEvent) => {
       const tool = activeToolRef.current;
+
+      // Fill bucket: satu klik langsung flood fill
+      if (tool === "fill") {
+        const pos = getPos(e, display);
+        // Konversi ke koordinat offscreen (800x600)
+        const rect = display.getBoundingClientRect();
+        const scaleX = 800 / rect.width;
+        const scaleY = 600 / rect.height;
+        const clientX = e instanceof TouchEvent ? e.touches[0].clientX : e.clientX;
+        const clientY = e instanceof TouchEvent ? e.touches[0].clientY : e.clientY;
+        const ox = Math.floor((clientX - rect.left) * scaleX);
+        const oy = Math.floor((clientY - rect.top) * scaleY);
+        floodFill(ox, oy, brushColorRef.current);
+        return;
+      }
+
       if (tool !== "brush" && tool !== "eraser") return;
       if (e instanceof TouchEvent) e.preventDefault();
 
@@ -864,72 +1043,224 @@ export function CustomBatikPage() {
       display.removeEventListener("touchmove", onMove);
       window.removeEventListener("touchend", onEnd);
     };
-  }, [continueStroke, startStroke, syncDisplay, saveOffscreenSnapshot]);
+  }, [continueStroke, startStroke, syncDisplay, saveOffscreenSnapshot, floodFill]);
 
 
+
+  // ─── Shape tool event listeners di Fabric canvas ──────────────────────────
+  useEffect(() => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    const getCanvasPos = (e: fabric.IEvent<MouseEvent>) => {
+      const pointer = fc.getPointer(e.e);
+      return { x: pointer.x, y: pointer.y };
+    };
+
+    const onMouseDown = (e: fabric.IEvent<MouseEvent>) => {
+      if (activeToolRef.current !== "shape") return;
+      const pos = getCanvasPos(e);
+      shapeStartRef.current = pos;
+
+      // Buat shape preview sementara
+      const common = {
+        left: pos.x,
+        top: pos.y,
+        fill: shapeFillRef.current,
+        stroke: shapeStrokeRef.current,
+        strokeWidth: shapeStrokeWidthRef.current,
+        opacity: shapeOpacityRef.current / 100,
+        selectable: false,
+        evented: false,
+        objectCaching: false,
+      };
+
+      let preview: fabric.Object;
+      if (shapeTypeRef.current === "rect") {
+        preview = new fabric.Rect({ ...common, width: 1, height: 1 });
+      } else if (shapeTypeRef.current === "circle") {
+        preview = new fabric.Ellipse({ ...common, rx: 1, ry: 1 });
+      } else {
+        preview = new fabric.Line([pos.x, pos.y, pos.x, pos.y], {
+          stroke: shapeStrokeRef.current,
+          strokeWidth: Math.max(shapeStrokeWidthRef.current, 2),
+          selectable: false,
+          evented: false,
+          fill: "",
+          opacity: shapeOpacityRef.current / 100,
+        });
+      }
+      shapePreviewRef.current = preview;
+      fc.add(preview);
+    };
+
+    const onMouseMove = (e: fabric.IEvent<MouseEvent>) => {
+      if (activeToolRef.current !== "shape" || !shapeStartRef.current || !shapePreviewRef.current) return;
+      const pos = getCanvasPos(e);
+      const start = shapeStartRef.current;
+      const preview = shapePreviewRef.current;
+
+      if (shapeTypeRef.current === "rect") {
+        const left = Math.min(start.x, pos.x);
+        const top = Math.min(start.y, pos.y);
+        const width = Math.abs(pos.x - start.x);
+        const height = Math.abs(pos.y - start.y);
+        preview.set({ left, top, width, height });
+      } else if (shapeTypeRef.current === "circle") {
+        const left = Math.min(start.x, pos.x);
+        const top = Math.min(start.y, pos.y);
+        const rx = Math.abs(pos.x - start.x) / 2;
+        const ry = Math.abs(pos.y - start.y) / 2;
+        preview.set({ left, top, rx, ry, width: rx * 2, height: ry * 2 });
+      } else {
+        (preview as fabric.Line).set({ x2: pos.x, y2: pos.y });
+      }
+      preview.setCoords();
+      fc.requestRenderAll();
+    };
+
+    const onMouseUp = (e: fabric.IEvent<MouseEvent>) => {
+      if (activeToolRef.current !== "shape" || !shapeStartRef.current || !shapePreviewRef.current) return;
+      const pos = getCanvasPos(e);
+      const start = shapeStartRef.current;
+      const preview = shapePreviewRef.current;
+
+      // Hapus preview lama, buat objek final yang selectable
+      fc.remove(preview);
+      shapePreviewRef.current = null;
+      shapeStartRef.current = null;
+
+      const common = {
+        fill: shapeFillRef.current,
+        stroke: shapeStrokeRef.current,
+        strokeWidth: shapeStrokeWidthRef.current,
+        opacity: shapeOpacityRef.current / 100,
+        selectable: true,
+        evented: true,
+        objectCaching: false,
+      };
+
+      let finalShape: fabric.Object;
+      if (shapeTypeRef.current === "rect") {
+        const left = Math.min(start.x, pos.x);
+        const top = Math.min(start.y, pos.y);
+        const width = Math.max(Math.abs(pos.x - start.x), 5);
+        const height = Math.max(Math.abs(pos.y - start.y), 5);
+        finalShape = new fabric.Rect({ ...common, left, top, width, height });
+      } else if (shapeTypeRef.current === "circle") {
+        const left = Math.min(start.x, pos.x);
+        const top = Math.min(start.y, pos.y);
+        const rx = Math.max(Math.abs(pos.x - start.x) / 2, 3);
+        const ry = Math.max(Math.abs(pos.y - start.y) / 2, 3);
+        finalShape = new fabric.Ellipse({ ...common, left, top, rx, ry });
+      } else {
+        finalShape = new fabric.Line([start.x, start.y, pos.x, pos.y], {
+          stroke: shapeStrokeRef.current,
+          strokeWidth: Math.max(shapeStrokeWidthRef.current, 2),
+          selectable: true,
+          evented: true,
+          fill: "",
+          opacity: shapeOpacityRef.current / 100,
+        });
+      }
+
+      const newLayerId = Date.now().toString();
+      const shapeLabel = shapeTypeRef.current === "rect" ? "Kotak" : shapeTypeRef.current === "circle" ? "Lingkaran" : "Garis";
+      (finalShape as any).data = { layerId: newLayerId, layerName: shapeLabel };
+
+      fc.add(finalShape);
+      fc.setActiveObject(finalShape);
+      fc.requestRenderAll();
+
+      setLayers((prev) => [...prev, {
+        id: newLayerId,
+        type: "drawing" as const,
+        name: shapeLabel,
+        visible: true,
+        locked: false,
+        fabricObject: finalShape,
+      }]);
+      setSelectedLayerId(newLayerId);
+      setActiveTab("layer");
+      saveSnapshot();
+    };
+
+    fc.on("mouse:down", onMouseDown);
+    fc.on("mouse:move", onMouseMove);
+    fc.on("mouse:up", onMouseUp);
+
+    // Scroll wheel zoom
+    const handleWheel = (opt: fabric.IEvent<WheelEvent>) => {
+      const e = opt.e;
+      if (!e.ctrlKey) return; // hanya zoom jika tahan Ctrl
+      e.preventDefault();
+      const delta = e.deltaY;
+      const newZoom = zoomLevelRef.current + (delta < 0 ? 25 : -25);
+      applyZoom(newZoom, e.offsetX, e.offsetY);
+    };
+    fc.on("mouse:wheel", handleWheel);
+
+    return () => {
+      fc.off("mouse:down", onMouseDown);
+      fc.off("mouse:move", onMouseMove);
+      fc.off("mouse:up", onMouseUp);
+      fc.off("mouse:wheel", handleWheel);
+    };
+  }, [saveSnapshot, applyZoom]);
 
   // ─── Switch tool ───────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
     const display = displayCanvasRef.current;
-    const fabricEl = canvas?.getElement()?.parentElement; // wrapper div Fabric
+    const fabricEl = canvas?.getElement()?.parentElement;
     if (!canvas || !display) return;
 
     if (activeTool === "select") {
       canvas.isDrawingMode = false;
       canvas.selection = true;
-      canvas.forEachObject((obj) => {
-        obj.evented = true;
-      });
+      canvas.defaultCursor = "default";
+      canvas.hoverCursor = "move";
+      canvas.forEachObject((obj) => { obj.evented = true; });
       canvas.renderAll();
-
-      // Display canvas di atas Fabric dengan pointer-events: none agar tetap terlihat tetapi click-through
-      display.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        pointer-events: none !important;
-        z-index: 2;
-      `;
-
-      // Pastikan Fabric canvas wrapper di atas
+      display.style.cssText = `position:absolute;top:0;left:0;pointer-events:none!important;z-index:2;`;
       if (fabricEl) {
-        (fabricEl as HTMLElement).style.zIndex = "1";
-        (fabricEl as HTMLElement).style.position = "absolute";
-        (fabricEl as HTMLElement).style.top = "0";
-        (fabricEl as HTMLElement).style.left = "0";
+        (fabricEl as HTMLElement).style.cssText = "position:absolute;top:0;left:0;z-index:1;";
+      }
+    } else if (activeTool === "shape") {
+      // Shape: Fabric aktif (pointer events ON) tapi tidak bisa select objek lama
+      canvas.isDrawingMode = false;
+      canvas.selection = false;
+      canvas.defaultCursor = "crosshair";
+      canvas.hoverCursor = "crosshair";
+      canvas.forEachObject((obj) => { obj.evented = false; });
+      canvas.renderAll();
+      display.style.cssText = `position:absolute;top:0;left:0;pointer-events:none!important;z-index:2;`;
+      if (fabricEl) {
+        (fabricEl as HTMLElement).style.cssText = "position:absolute;top:0;left:0;z-index:3;";
       }
     } else {
+      // brush, eraser, fill — display canvas di atas
       canvas.isDrawingMode = false;
       canvas.selection = false;
       canvas.discardActiveObject();
-      canvas.forEachObject((obj) => {
-        obj.evented = false;
-      });
+      canvas.forEachObject((obj) => { obj.evented = false; });
       canvas.renderAll();
 
-      // Display canvas di ATAS untuk brush/eraser
-      display.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        pointer-events: auto !important;
-        z-index: 2;
-      `;
-
-      if (fabricEl) {
-        (fabricEl as HTMLElement).style.zIndex = "1";
-        (fabricEl as HTMLElement).style.position = "absolute";
-        (fabricEl as HTMLElement).style.top = "0";
-        (fabricEl as HTMLElement).style.left = "0";
+      let cursor = "crosshair";
+      if (activeTool === "fill") {
+        cursor = "cell";
+      } else {
+        const size = brushSizeRef.current;
+        const cursorSvg =
+          activeTool === "eraser"
+            ? `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${size / 2}' cy='${size / 2}' r='${size / 2 - 1}' fill='none' stroke='%23333' stroke-width='1.5'/></svg>`
+            : `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${size / 2}' cy='${size / 2}' r='${size / 2 - 1}' fill='${brushColorRef.current.replace("#", "%23")}' opacity='0.7'/></svg>`;
+        cursor = `url("data:image/svg+xml,${cursorSvg}") ${size / 2} ${size / 2}, crosshair`;
       }
-
-      const size = brushSize[0];
-      const cursorSvg =
-        activeTool === "eraser"
-          ? `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${size / 2}' cy='${size / 2}' r='${size / 2 - 1}' fill='none' stroke='%23333' stroke-width='1.5'/></svg>`
-          : `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${size / 2}' cy='${size / 2}' r='${size / 2 - 1}' fill='${brushColor.replace("#", "%23")}' opacity='0.7'/></svg>`;
-      display.style.cursor = `url("data:image/svg+xml,${cursorSvg}") ${size / 2} ${size / 2}, crosshair`;
+      display.style.cssText = `position:absolute;top:0;left:0;pointer-events:auto!important;z-index:2;cursor:${cursor};`;
+      if (fabricEl) {
+        (fabricEl as HTMLElement).style.cssText = "position:absolute;top:0;left:0;z-index:1;";
+      }
     }
   }, [activeTool, brushSize, brushColor]);
 
@@ -1390,6 +1721,7 @@ export function CustomBatikPage() {
         offscreenDataUrl: offscreenRef.current?.toDataURL("image/png") || null,
         canvasBackground,
         canvasThumbnail: thumbnailDataUrl,
+        projectInfo,
       };
 
       const { data, error } = await supabase.from("custom_designs").insert([
@@ -1416,16 +1748,8 @@ export function CustomBatikPage() {
     }
   };
 
-  // ─── Save lalu tampilkan modal konfirmasi ─────────────────────────────────
-  const handleSaveAndShowModal = async () => {
-    const id = await saveDesign();
-    if (id !== null) {
-      setShowSuccessModal("saved");
-    }
-  };
-
-  // ─── Tambah ke Keranjang ───────────────────────────────────────────────────
-  const addToCart = async () => {
+  // ─── Modal Triggers ────────────────────────────────────────────────────────
+  const triggerSaveAction = (type: "save" | "cart" | "order") => {
     if (!user) {
       toast.error("Silakan login terlebih dahulu");
       navigate("/auth?redirect=/custom");
@@ -1435,91 +1759,77 @@ export function CustomBatikPage() {
       toast.error("Kanvas masih kosong! Tambahkan motif atau gambar terlebih dahulu.");
       return;
     }
-    setIsAddingToCart(true);
-    try {
-      // Simpan design dulu, dapatkan id
-      let designId = savedDesignId;
-      if (!designId) {
-        designId = await saveDesign();
-        if (!designId) { setIsAddingToCart(false); return; }
-      }
 
-      // Cek apakah sudah ada di keranjang
-      const { data: existing } = await supabase
-        .from("cart_items")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("custom_design_id", designId)
-        .single();
-
-      if (existing) {
-        // Sudah di keranjang, increment qty
-        await supabase
-          .from("cart_items")
-          .update({ quantity: 1 })
-          .eq("id", existing.id);
-      } else {
-        // Tambahkan baru
-        const { error } = await supabase.from("cart_items").insert([{
-          user_id: user.id,
-          custom_design_id: designId,
-          quantity: 1,
-        }]);
-        if (error) throw error;
-      }
-
-      setShowSuccessModal("cart");
-    } catch (err) {
-      console.error(err);
-      toast.error("Gagal menambahkan ke keranjang");
-    } finally {
-      setIsAddingToCart(false);
+    if (savedDesignId) {
+      // Jika sudah pernah disimpan di sesi ini, tidak perlu isi modal info lagi
+      executeAction(type);
+    } else {
+      setShowProjectModal(type);
     }
   };
 
-  // ─── Langsung Pesan ────────────────────────────────────────────────────────
-  const orderNow = async () => {
-    if (!user) {
-      toast.error("Silakan login terlebih dahulu");
-      navigate("/auth?redirect=/custom");
-      return;
-    }
-    if (layers.length === 0 && !hasOffscreenContent) {
-      toast.error("Kanvas masih kosong! Tambahkan motif atau gambar terlebih dahulu.");
-      return;
-    }
-    // Tambah ke keranjang dulu lalu langsung ke halaman keranjang
-    setIsAddingToCart(true);
-    try {
-      let designId = savedDesignId;
-      if (!designId) {
-        designId = await saveDesign();
-        if (!designId) { setIsAddingToCart(false); return; }
+  const handleSaveAndShowModal = () => triggerSaveAction("save");
+  const addToCart = () => triggerSaveAction("cart");
+  const orderNow = () => triggerSaveAction("order");
+
+  // ─── Execute Action ────────────────────────────────────────────────────────
+  const executeAction = async (actionType: "save" | "cart" | "order") => {
+    if (actionType === "save") {
+      const id = await saveDesign();
+      if (id !== null) setShowSuccessModal("saved");
+    } 
+    else if (actionType === "cart") {
+      setIsAddingToCart(true);
+      try {
+        let designId = savedDesignId;
+        if (!designId) {
+          designId = await saveDesign();
+          if (!designId) { setIsAddingToCart(false); return; }
+        }
+        // Cek existing
+        const { data: existing } = await supabase.from("cart_items").select("id").eq("user_id", user!.id).eq("custom_design_id", designId).single();
+        if (existing) {
+          await supabase.from("cart_items").update({ quantity: 1 }).eq("id", existing.id);
+        } else {
+          await supabase.from("cart_items").insert([{ user_id: user!.id, custom_design_id: designId, quantity: 1 }]);
+        }
+        setShowSuccessModal("cart");
+      } catch (err) {
+        console.error(err);
+        toast.error("Gagal menambahkan ke keranjang");
+      } finally {
+        setIsAddingToCart(false);
       }
-
-      const { data: existing } = await supabase
-        .from("cart_items")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("custom_design_id", designId)
-        .single();
-
-      if (!existing) {
-        const { error } = await supabase.from("cart_items").insert([{
-          user_id: user.id,
-          custom_design_id: designId,
-          quantity: 1,
-        }]);
-        if (error) throw error;
+    } 
+    else if (actionType === "order") {
+      setIsAddingToCart(true);
+      try {
+        let designId = savedDesignId;
+        if (!designId) {
+          designId = await saveDesign();
+          if (!designId) { setIsAddingToCart(false); return; }
+        }
+        // Cek existing
+        const { data: existing } = await supabase.from("cart_items").select("id").eq("user_id", user!.id).eq("custom_design_id", designId).single();
+        if (!existing) {
+          await supabase.from("cart_items").insert([{ user_id: user!.id, custom_design_id: designId, quantity: 1 }]);
+        }
+        navigate("/cart");
+      } catch (err) {
+        console.error(err);
+        toast.error("Gagal memproses pesanan");
+      } finally {
+        setIsAddingToCart(false);
       }
-
-      navigate("/cart");
-    } catch (err) {
-      console.error(err);
-      toast.error("Gagal memproses pesanan");
-    } finally {
-      setIsAddingToCart(false);
     }
+  };
+
+  // ─── Confirm Project Info & Execute Action ─────────────────────────────────
+  const confirmProjectInfo = async () => {
+    if (!showProjectModal) return;
+    const actionType = showProjectModal;
+    setShowProjectModal(null);
+    await executeAction(actionType);
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -1546,13 +1856,6 @@ export function CustomBatikPage() {
             </p>
           </div>
 
-          {/* Quick instructions / Info card */}
-          <div className="hidden lg:flex items-center gap-3 p-4 bg-white/60 backdrop-blur-md rounded-2xl border" style={{ borderColor: "rgba(212,184,139,0.25)" }}>
-            <div className="text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#A89B8F]">Panduan Cepat</p>
-              <p className="text-xs font-semibold text-[#5A4A3E] mt-0.5">Pilih motif → Atur di Kanvas → Unduh PNG</p>
-            </div>
-          </div>
         </motion.div>
 
         <div className="grid lg:grid-cols-12 gap-8 items-stretch">
@@ -1560,173 +1863,536 @@ export function CustomBatikPage() {
           <div className="lg:col-span-8 space-y-6">
             <div className="rounded-[32px] overflow-hidden shadow-[0_20px_50px_rgba(61,43,31,0.06)] border bg-white" style={{ borderColor: "rgba(212,184,139,0.3)" }}>
 
-              {/* Responsive Toolbar */}
-              <div className="px-4 py-3.5 flex flex-wrap items-center gap-3.5 justify-between" style={{ background: "#FFFFFF", borderBottom: "1px solid rgba(212,184,139,0.15)" }}>
+              {/* ═══════════════════════════════════════════════════════════════ */}
+              {/* Canvas Toolbar — 2-Row Premium Design                          */}
+              {/* ═══════════════════════════════════════════════════════════════ */}
+              <div
+                style={{
+                  background: "linear-gradient(to bottom, #FDFCFA 0%, #FFFFFF 100%)",
+                  borderBottom: "1px solid rgba(212,184,139,0.2)",
+                }}
+              >
+                {/* ─── Row 1: Mode Selector + Global Actions ─────────────────── */}
+                <div
+                  className="px-3 py-2 flex items-center gap-2 overflow-x-auto"
+                  style={{
+                    borderBottom: "1px solid rgba(212,184,139,0.12)",
+                    scrollbarWidth: "none",
+                    msOverflowStyle: "none",
+                  }}
+                >
+                  {/* ── Left: Tool Mode Segmented Control ── */}
+                  <div
+                    className="flex items-center p-0.5 rounded-xl gap-0.5 flex-shrink-0"
+                    style={{
+                      background: "rgba(139,111,71,0.06)",
+                      border: "1px solid rgba(212,184,139,0.2)",
+                    }}
+                  >
+                    {([
+                      { tool: "select" as Tool, icon: MousePointer2, label: "Pilih" },
+                      { tool: "brush" as Tool, icon: Brush, label: "Kuas" },
+                      { tool: "eraser" as Tool, icon: Eraser, label: "Hapus" },
+                      { tool: "fill" as Tool, icon: PaintBucket, label: "Isi" },
+                      { tool: "shape" as Tool, icon: Square, label: "Bentuk" },
+                    ] as const).map(({ tool, icon: Icon, label }) => {
+                      const isActive = activeTool === tool;
+                      return (
+                        <button
+                          key={tool}
+                          onClick={() => setActiveTool(tool)}
+                          title={label}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-xs font-semibold select-none flex-shrink-0"
+                          style={{
+                            background: isActive
+                              ? "linear-gradient(135deg, #8B6F47 0%, #A0845E 100%)"
+                              : "transparent",
+                            color: isActive ? "#FFFFFF" : "#7A6B5E",
+                            boxShadow: isActive
+                              ? "0 2px 8px rgba(139,111,71,0.25), inset 0 1px 0 rgba(255,255,255,0.15)"
+                              : "none",
+                          }}
+                        >
+                          <Icon style={{ width: "13px", height: "13px", flexShrink: 0 }} />
+                          <span className="hidden lg:inline whitespace-nowrap">{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                {/* Group 1: Edit Mode */}
-                <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: "rgba(139,111,71,0.04)", border: "1px solid rgba(212,184,139,0.15)" }}>
-                  {([
-                    { tool: "select" as Tool, icon: ZoomOut, label: "Pilih" },
-                    { tool: "brush" as Tool, icon: Brush, label: "Kuas" },
-                    { tool: "eraser" as Tool, icon: Eraser, label: "Hapus" },
-                  ] as const).map(({ tool, icon: Icon, label }) => (
-                    <button key={tool}
-                      onClick={() => setActiveTool(tool)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-xs font-semibold cursor-pointer"
+                  {/* ── Right: All Global Actions in ONE compact pill ── */}
+                  <div className="flex items-center ml-auto flex-shrink-0">
+                    <div
+                      className="flex items-center gap-0.5 p-1 rounded-xl"
                       style={{
-                        background: activeTool === tool ? "linear-gradient(135deg, #8B6F47 0%, #A88967 100%)" : "transparent",
-                        color: activeTool === tool ? "#FFFFFF" : "#7A6B5E",
-                        boxShadow: activeTool === tool ? "0 4px 12px rgba(139,111,71,0.2)" : "none",
+                        background: "#F8F6F2",
+                        border: "1px solid rgba(212,184,139,0.2)",
                       }}
-                      title={label}
                     >
-                      <Icon className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">{label}</span>
-                    </button>
-                  ))}
+                      {/* Zoom */}
+                      <button
+                        onClick={zoomOut}
+                        disabled={zoomLevel <= 50}
+                        title="Perkecil"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm"
+                        style={{ color: "#8B6F47" }}
+                      >
+                        <ZoomOut style={{ width: "13px", height: "13px" }} />
+                      </button>
+                      <button
+                        onClick={resetZoom}
+                        title="Reset Zoom"
+                        className="h-7 px-1 rounded-lg text-[10px] font-bold font-mono transition-all duration-150 hover:bg-white hover:shadow-sm cursor-pointer"
+                        style={{ color: zoomLevel !== 100 ? "#8B6F47" : "#A89B8F", minWidth: "38px" }}
+                      >
+                        {zoomLevel}%
+                      </button>
+                      <button
+                        onClick={zoomIn}
+                        disabled={zoomLevel >= 300}
+                        title="Perbesar"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm"
+                        style={{ color: "#8B6F47" }}
+                      >
+                        <ZoomIn style={{ width: "13px", height: "13px" }} />
+                      </button>
+
+                      {/* Divider */}
+                      <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      {/* Canvas Background */}
+                      <div
+                        className="relative flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer hover:bg-white transition-all"
+                        title="Warna latar kanvas"
+                      >
+                        <div
+                          className="w-3.5 h-3.5 rounded border"
+                          style={{ background: canvasBackground, borderColor: "rgba(0,0,0,0.1)" }}
+                        />
+                        <span className="text-[10px] font-bold text-[#A89B8F] uppercase select-none hidden sm:inline">Latar</span>
+                        <input
+                          type="color"
+                          value={canvasBackground}
+                          onChange={(e) => setCanvasBackground(e.target.value)}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          title="Ubah warna latar kanvas"
+                        />
+                      </div>
+
+                      {/* Divider */}
+                      <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      {/* Undo */}
+                      <button
+                        onClick={undoAll}
+                        disabled={!canUndo}
+                        title="Undo (Ctrl+Z)"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm"
+                        style={{ color: "#8B6F47" }}
+                      >
+                        <RotateCcw style={{ width: "13px", height: "13px" }} />
+                      </button>
+                      {/* Redo */}
+                      <button
+                        onClick={redoAll}
+                        disabled={!canRedo}
+                        title="Redo (Ctrl+Y)"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm"
+                        style={{ color: "#8B6F47" }}
+                      >
+                        <RotateCw style={{ width: "13px", height: "13px" }} />
+                      </button>
+
+                      {/* Divider */}
+                      <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      {/* Clear */}
+                      <button
+                        onClick={clearAll}
+                        title="Bersihkan kanvas"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 cursor-pointer hover:bg-red-50"
+                        style={{ color: "#C0614A" }}
+                      >
+                        <Trash2 style={{ width: "13px", height: "13px" }} />
+                      </button>
+                      {/* Download */}
+                      <button
+                        onClick={downloadDesign}
+                        disabled={isDownloading}
+                        title="Unduh PNG"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm"
+                        style={{ color: "#8B6F47" }}
+                      >
+                        {isDownloading
+                          ? <Loader2 style={{ width: "13px", height: "13px" }} className="animate-spin" />
+                          : <Download style={{ width: "13px", height: "13px" }} />}
+                      </button>
+                      {/* Save */}
+                      <button
+                        onClick={handleSaveAndShowModal}
+                        disabled={isSaving}
+                        title="Simpan desain"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm"
+                        style={{ color: "#8B6F47" }}
+                      >
+                        {isSaving
+                          ? <Loader2 style={{ width: "13px", height: "13px" }} className="animate-spin" />
+                          : <Save style={{ width: "13px", height: "13px" }} />}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Group 2: Brush/Eraser controls */}
-                {activeTool !== "select" && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {activeTool === "brush" && (
-                      <div className="flex items-center gap-2 px-2.5 py-1 bg-white rounded-xl border border-stone-200/50 shadow-sm flex-shrink-0">
-                        <div className="relative p-0.5 bg-white border border-stone-200 rounded-md cursor-pointer hover:border-[#8B6F47] transition-colors" title="Warna kuas">
-                          <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent block [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md" />
+                {/* ─── Row 2: Contextual Tool Options Bar ─────────────────────── */}
+                <div
+                  className="px-4 flex items-center gap-3 overflow-x-auto"
+                  style={{
+                    background: "#FAF9F6",
+                    minHeight: "44px",
+                    scrollbarWidth: "none",
+                  }}
+                >
+
+                  {/* MODE: SELECT */}
+                  {activeTool === "select" && (
+                    <div className="flex items-center gap-2 py-2.5">
+                      <div
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+                        style={{
+                          background: "rgba(139,111,71,0.07)",
+                          border: "1px solid rgba(212,184,139,0.25)",
+                          color: "#8B6F47",
+                        }}
+                      >
+                        <MousePointer2 style={{ width: "12px", height: "12px", flexShrink: 0 }} />
+                        <span>Klik motif di kanvas untuk memilih, lalu geser, putar, atau ubah ukurannya</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MODE: BRUSH */}
+                  {activeTool === "brush" && (
+                    <div className="flex items-center gap-3 py-2">
+
+                      {/* Color Picker + Swatches */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">
+                          Warna
+                        </span>
+                        <div
+                          className="relative p-0.5 rounded-lg cursor-pointer transition-all hover:scale-105"
+                          title="Pilih warna kustom"
+                          style={{
+                            background: brushColor,
+                            border: "2px solid rgba(255,255,255,0.8)",
+                            boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 6px rgba(0,0,0,0.12)",
+                            width: "26px",
+                            height: "26px",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <input
+                            type="color"
+                            value={brushColor}
+                            onChange={(e) => setBrushColor(e.target.value)}
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          />
                         </div>
-                        {/* Quick swatches */}
-                        <div className="flex gap-1 flex-shrink-0">
-                          {["#8B6F47", "#D4B88B", "#3D2B1F", "#6B3A1F", "#2A4B7C", "#2D5A2D", "#8B2A2A"].map((c, idx) => (
-                            <button key={idx} onClick={() => setBrushColor(c)}
-                              className="w-3.5 h-3.5 rounded-full border flex-shrink-0 transition-all hover:scale-110 active:scale-95 cursor-pointer"
-                              style={{ background: c, borderColor: brushColor === c ? "#3D2B1F" : "rgba(0,0,0,0.1)" }}
+                        <div className="flex items-center gap-1.5">
+                          {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#6B3A1F", "#ffffff"].map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => setBrushColor(c)}
+                              title={c}
+                              className="transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0"
+                              style={{
+                                width: brushColor === c ? "20px" : "16px",
+                                height: brushColor === c ? "20px" : "16px",
+                                borderRadius: "50%",
+                                background: c,
+                                border: brushColor === c
+                                  ? "2.5px solid #3D2B1F"
+                                  : "1.5px solid rgba(0,0,0,0.12)",
+                                boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none",
+                                transition: "all 0.15s ease",
+                              }}
                             />
                           ))}
                         </div>
                       </div>
-                    )}
 
-                    {/* Size */}
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-xl border border-stone-200/50 shadow-sm flex-shrink-0">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#A89B8F] select-none">Ukuran</span>
-                      <Minus className="w-3 h-3 text-[#B8A898]" />
-                      <input type="range" min="2" max="80" step="2" value={brushSize[0]} onChange={(e) => setBrushSize([Number(e.target.value)])}
-                        className="w-14 sm:w-20 h-1 rounded-full appearance-none cursor-pointer"
-                        style={{ accentColor: "#8B6F47", background: "rgba(139,111,71,0.15)" }}
-                        title="Ukuran kuas" />
-                      <Plus className="w-3 h-3 text-[#B8A898]" />
-                      <span className="text-xs font-bold font-mono w-5 text-right text-[#3D2B1F]">{brushSize[0]}</span>
-                    </div>
+                      {/* Divider */}
+                      <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
 
-                    {/* Opacity */}
-                    {activeTool === "brush" && (
-                      <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-xl border border-stone-200/50 shadow-sm flex-shrink-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#A89B8F] select-none">Opasitas</span>
-                        <input type="range" min="5" max="100" step="5" value={brushOpacity[0]} onChange={(e) => setBrushOpacity([Number(e.target.value)])}
-                          className="w-10 sm:w-16 h-1 rounded-full appearance-none cursor-pointer"
-                          style={{ accentColor: "#8B6F47", background: "rgba(139,111,71,0.15)" }}
-                          title="Opasitas" />
-                        <span className="text-xs font-bold font-mono w-7 text-right text-[#3D2B1F]">{brushOpacity[0]}%</span>
+                      {/* Brush Size */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">
+                          Ukuran
+                        </span>
+                        <button
+                          onClick={() => setBrushSize([Math.max(2, brushSize[0] - 2)])}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer"
+                          style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}
+                        >
+                          <Minus style={{ width: "10px", height: "10px" }} />
+                        </button>
+                        <div className="relative flex items-center" style={{ width: "90px" }}>
+                          <input
+                            type="range" min="2" max="80" step="2"
+                            value={brushSize[0]}
+                            onChange={(e) => setBrushSize([Number(e.target.value)])}
+                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                            style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${((brushSize[0] - 2) / 78) * 100}%, rgba(139,111,71,0.15) 0%)` }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => setBrushSize([Math.min(80, brushSize[0] + 2)])}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer"
+                          style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}
+                        >
+                          <Plus style={{ width: "10px", height: "10px" }} />
+                        </button>
+                        <span
+                          className="text-xs font-bold font-mono text-right flex-shrink-0"
+                          style={{ color: "#3D2B1F", minWidth: "24px" }}
+                        >
+                          {brushSize[0]}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                )}
 
-                {/* Group 3: Canvas / Background Settings */}
-                <div className="flex items-center gap-2 ml-auto md:ml-0">
-                  <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-stone-200/50 shadow-sm">
-                    {/* Canvas background picker */}
-                    <div className="relative flex items-center gap-1.5 px-2 py-0.5 border-r border-stone-100" title="Warna latar kanvas">
-                      <div className="w-4 h-4 rounded border" style={{ background: canvasBackground, borderColor: "rgba(0,0,0,0.1)" }} />
-                      <input
-                        type="color"
-                        value={canvasBackground}
-                        onChange={(e) => setCanvasBackground(e.target.value)}
-                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                        title="Ubah warna latar kanvas"
-                      />
-                      <span className="text-[10px] font-bold text-[#A89B8F] uppercase select-none">Latar</span>
-                    </div>
+                      {/* Divider */}
+                      <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
 
-                    {/* Undo / Redo */}
-                    <button
-                      onClick={undoAll}
-                      disabled={!canUndo}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-stone-50 cursor-pointer"
-                      style={{ color: "#8B6F47" }}
-                      title="Undo (Ctrl+Z)"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={redoAll}
-                      disabled={!canRedo}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-stone-50 cursor-pointer"
-                      style={{ color: "#8B6F47" }}
-                      title="Redo (Ctrl+Y)"
-                    >
-                      <RotateCw className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Clear */}
-                    <div className="border-l border-stone-100 pl-1">
-                      <button
-                        onClick={clearAll}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-50 hover:text-red-600 cursor-pointer"
-                        style={{ color: "#7A6B5E" }}
-                        title="Bersihkan kanvas"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Group 4: Actions */}
-                  {activeTool === "select" && (
-                    <div className="flex items-center gap-2">
-                      <button onClick={downloadDesign} disabled={isDownloading}
-                        className="flex items-center gap-1.5 px-3 h-9 rounded-xl transition-all duration-200 text-xs font-bold disabled:opacity-50 hover:bg-[#F5F0EB] border cursor-pointer"
-                        style={{ color: "#8B6F47", background: "rgba(139,111,71,0.04)", borderColor: "rgba(139,111,71,0.15)" }}
-                        title="Unduh gambar PNG"
-                      >
-                        {isDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                        <span className="hidden lg:inline">Unduh</span>
-                      </button>
-
-                      <button onClick={handleSaveAndShowModal} disabled={isSaving}
-                        className="flex items-center gap-1.5 px-3 h-9 rounded-xl transition-all duration-200 text-xs font-bold disabled:opacity-50 hover:bg-[#F5F0EB] border cursor-pointer"
-                        style={{ color: "#8B6F47", background: "rgba(139,111,71,0.04)", borderColor: "rgba(139,111,71,0.15)" }}
-                        title="Simpan desain ke akun Anda"
-                      >
-                        {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                        <span className="hidden lg:inline">Simpan</span>
-                      </button>
-
-                      <div className="w-px h-5 mx-1" style={{ background: "rgba(139,111,71,0.2)" }} />
-
-                      <button onClick={addToCart} disabled={isAddingToCart}
-                        className="flex items-center gap-1.5 px-3 h-9 rounded-xl transition-all duration-200 text-xs font-bold disabled:opacity-50 border cursor-pointer"
-                        style={{ color: "#3D2B1F", background: "#FFFFFF", borderColor: "rgba(139,111,71,0.25)" }}
-                        title="Masukkan ke keranjang belanja"
-                      >
-                        {isAddingToCart ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShoppingCart className="w-3.5 h-3.5" />}
-                        <span className="hidden lg:inline">+ Keranjang</span>
-                      </button>
-
-                      <button onClick={orderNow} disabled={isAddingToCart}
-                        className="flex items-center gap-1.5 px-4 h-9 rounded-xl transition-all duration-200 text-xs font-bold text-white hover:opacity-95 cursor-pointer"
-                        style={{ background: "linear-gradient(135deg, #3D2B1F 0%, #5A3D2B 100%)", boxShadow: "0 4px 12px rgba(61,43,31,0.25)" }}
-                        title="Pesan desain ini sekarang"
-                      >
-                        {isAddingToCart ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Package className="w-3.5 h-3.5" />}
-                        <span>Pesan Sekarang</span>
-                      </button>
+                      {/* Brush Opacity */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">
+                          Opasitas
+                        </span>
+                        <input
+                          type="range" min="5" max="100" step="5"
+                          value={brushOpacity[0]}
+                          onChange={(e) => setBrushOpacity([Number(e.target.value)])}
+                          className="h-1.5 rounded-full appearance-none cursor-pointer"
+                          style={{ width: "72px", accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${brushOpacity[0]}%, rgba(139,111,71,0.15) 0%)` }}
+                        />
+                        <span
+                          className="text-xs font-bold font-mono flex-shrink-0"
+                          style={{ color: "#3D2B1F", minWidth: "32px" }}
+                        >
+                          {brushOpacity[0]}%
+                        </span>
+                      </div>
                     </div>
                   )}
+
+                  {/* MODE: ERASER */}
+                  {activeTool === "eraser" && (
+                    <div className="flex items-center gap-3 py-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">
+                          Ukuran Hapus
+                        </span>
+                        <button
+                          onClick={() => setBrushSize([Math.max(2, brushSize[0] - 2)])}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer"
+                          style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}
+                        >
+                          <Minus style={{ width: "10px", height: "10px" }} />
+                        </button>
+                        <div className="relative flex items-center" style={{ width: "100px" }}>
+                          <input
+                            type="range" min="2" max="80" step="2"
+                            value={brushSize[0]}
+                            onChange={(e) => setBrushSize([Number(e.target.value)])}
+                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                            style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${((brushSize[0] - 2) / 78) * 100}%, rgba(139,111,71,0.15) 0%)` }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => setBrushSize([Math.min(80, brushSize[0] + 2)])}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer"
+                          style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}
+                        >
+                          <Plus style={{ width: "10px", height: "10px" }} />
+                        </button>
+                        <span
+                          className="text-xs font-bold font-mono flex-shrink-0"
+                          style={{ color: "#3D2B1F", minWidth: "24px" }}
+                        >
+                          {brushSize[0]}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MODE: FILL */}
+                  {activeTool === "fill" && (
+                    <div className="flex items-center gap-3 py-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">
+                        Warna Isi
+                      </span>
+                      <div
+                        className="relative p-0.5 rounded-lg cursor-pointer transition-all hover:scale-105"
+                        title="Pilih warna kustom"
+                        style={{
+                          background: brushColor,
+                          border: "2px solid rgba(255,255,255,0.8)",
+                          boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 6px rgba(0,0,0,0.12)",
+                          width: "26px",
+                          height: "26px",
+                          borderRadius: "8px",
+                        }}
+                      >
+                        <input
+                          type="color"
+                          value={brushColor}
+                          onChange={(e) => setBrushColor(e.target.value)}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#6B3A1F", "#ffffff"].map((c) => (
+                          <button
+                            key={c}
+                            onClick={() => setBrushColor(c)}
+                            title={c}
+                            className="transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0"
+                            style={{
+                              width: brushColor === c ? "20px" : "16px",
+                              height: brushColor === c ? "20px" : "16px",
+                              borderRadius: "50%",
+                              background: c,
+                              border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)",
+                              boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none",
+                              transition: "all 0.15s ease",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MODE: SHAPE */}
+                  {activeTool === "shape" && (
+                    <div className="flex items-center gap-3 py-2">
+
+                      {/* Shape Type Selector */}
+                      <div className="flex-shrink-0">
+                        <div
+                          className="flex items-center p-0.5 rounded-xl gap-0.5"
+                          style={{
+                            background: "rgba(139,111,71,0.08)",
+                            border: "1px solid rgba(212,184,139,0.2)",
+                          }}
+                        >
+                          {(["rect", "circle", "line"] as ShapeType[]).map((t) => {
+                            const IconMap = { rect: Square, circle: Circle, line: Slash };
+                            const LabelMap = { rect: "Kotak", circle: "Lingkaran", line: "Garis" };
+                            const Icon = IconMap[t];
+                            const isActive = shapeType === t;
+                            return (
+                              <button
+                                key={t}
+                                onClick={() => setShapeType(t)}
+                                title={LabelMap[t]}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 cursor-pointer"
+                                style={{
+                                  background: isActive ? "white" : "transparent",
+                                  color: isActive ? "#8B6F47" : "#7A6B5E",
+                                  boxShadow: isActive ? "0 1px 6px rgba(0,0,0,0.1)" : "none",
+                                }}
+                              >
+                                <Icon style={{ width: "12px", height: "12px" }} />
+                                <span className="hidden sm:inline">{LabelMap[t]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      {/* Fill Color (hidden for line) */}
+                      {shapeType !== "line" && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Isi</span>
+                          <div
+                            className="relative rounded-lg cursor-pointer transition-all hover:scale-105"
+                            style={{
+                              background: shapeFill,
+                              border: "2px solid rgba(255,255,255,0.8)",
+                              boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 4px rgba(0,0,0,0.1)",
+                              width: "24px",
+                              height: "24px",
+                            }}
+                          >
+                            <input
+                              type="color"
+                              value={shapeFill}
+                              onChange={(e) => setShapeFill(e.target.value)}
+                              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stroke Color + Width */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Garis</span>
+                        <div
+                          className="relative rounded-lg cursor-pointer transition-all hover:scale-105"
+                          style={{
+                            background: shapeStroke,
+                            border: "2px solid rgba(255,255,255,0.8)",
+                            boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 4px rgba(0,0,0,0.1)",
+                            width: "24px",
+                            height: "24px",
+                          }}
+                        >
+                          <input
+                            type="color"
+                            value={shapeStroke}
+                            onChange={(e) => setShapeStroke(e.target.value)}
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          />
+                        </div>
+                        <input
+                          type="range" min="1" max="20" step="1"
+                          value={shapeStrokeWidth}
+                          onChange={(e) => setShapeStrokeWidth(Number(e.target.value))}
+                          className="h-1.5 rounded-full appearance-none cursor-pointer"
+                          style={{ width: "64px", accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${(shapeStrokeWidth / 20) * 100}%, rgba(139,111,71,0.15) 0%)` }}
+                        />
+                        <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "26px" }}>
+                          {shapeStrokeWidth}px
+                        </span>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      {/* Shape Opacity */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Opasitas</span>
+                        <input
+                          type="range" min="10" max="100" step="10"
+                          value={shapeOpacity}
+                          onChange={(e) => setShapeOpacity(Number(e.target.value))}
+                          className="h-1.5 rounded-full appearance-none cursor-pointer"
+                          style={{ width: "64px", accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${shapeOpacity}%, rgba(139,111,71,0.15) 0%)` }}
+                        />
+                        <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "32px" }}>
+                          {shapeOpacity}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               </div>
 
-              {/* Canvas Area Wrapped in a Padded Drawing Board */}
+              {/* ─── Canvas Area ────────────────────────────── */}
               <div className="p-4 sm:p-6 bg-[#F8F6F2]" style={{ borderTop: "1px solid rgba(212,184,139,0.12)" }}>
                 <div className="relative rounded-2xl overflow-hidden shadow-inner border border-stone-200/50" style={{ boxShadow: "inset 0 4px 20px rgba(61,43,31,0.05)" }}>
 
@@ -1763,6 +2429,60 @@ export function CustomBatikPage() {
                   </div>
                 </div>
               </div>
+
+              {/* ─── Beli / Pesan CTA Bar ─────────────────────────── */}
+              <div
+                className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4"
+                style={{
+                  background: "linear-gradient(to right, #FAF8F5, #FFFFFF)",
+                  borderTop: "1px solid rgba(212,184,139,0.18)",
+                }}
+              >
+                {/* Info harga / estimasi */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-[#A89B8F] mb-0.5">Desain Siap Dipesan</p>
+                  <p className="text-sm font-semibold text-[#3D2B1F] leading-snug">
+                    Wujudkan desain batik kamu menjadi produk nyata.
+                  </p>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex items-center gap-2.5 flex-shrink-0">
+                  <button
+                    onClick={addToCart}
+                    disabled={isAddingToCart}
+                    className="flex items-center gap-2 px-4 h-10 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-50 cursor-pointer border hover:shadow-sm active:scale-95"
+                    style={{
+                      color: "#5A3D2B",
+                      background: "#FFFFFF",
+                      borderColor: "rgba(139,111,71,0.3)",
+                    }}
+                    title="Tambah ke keranjang"
+                  >
+                    {isAddingToCart
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <ShoppingCart className="w-4 h-4" />}
+                    <span>Keranjang</span>
+                  </button>
+
+                  <button
+                    onClick={orderNow}
+                    disabled={isAddingToCart}
+                    className="flex items-center gap-2 px-5 h-10 rounded-2xl font-bold text-sm text-white transition-all duration-200 disabled:opacity-50 cursor-pointer hover:brightness-110 active:scale-95"
+                    style={{
+                      background: "linear-gradient(135deg, #8B6F47 0%, #6B4F2F 100%)",
+                      boxShadow: "0 4px 16px rgba(139,111,71,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
+                    }}
+                    title="Pesan sekarang"
+                  >
+                    {isAddingToCart
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Package className="w-4 h-4" />}
+                    <span>Pesan Sekarang</span>
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -1999,7 +2719,7 @@ export function CustomBatikPage() {
       {/* ── SUCCESS MODAL ──────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showSuccessModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -2048,6 +2768,90 @@ export function CustomBatikPage() {
                   Tutup
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── PROJECT INFO MODAL ──────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showProjectModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowProjectModal(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl text-left"
+              style={{ border: "1px solid rgba(212,184,139,0.3)" }}
+            >
+              <button
+                onClick={() => setShowProjectModal(null)}
+                className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <h3 className="text-2xl font-bold mb-1" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+                Detail Proyek Batik
+              </h3>
+              <p className="text-[#7A6B5E] mb-6 text-sm">
+                Lengkapi informasi desain kustom Anda sebelum melanjutkan.
+              </p>
+
+              <div className="space-y-4 mb-8">
+                <div>
+                  <label className="block text-sm font-bold text-[#3D2B1F] mb-1.5">Nama Desain</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Batik Sarimbit Keluarga"
+                    value={projectInfo.name}
+                    onChange={(e) => setProjectInfo(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-xl border outline-none transition-all focus:border-[#8B6F47] focus:ring-1 focus:ring-[#8B6F47]"
+                    style={{ borderColor: "rgba(212,184,139,0.3)", background: "#FAF9F6" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-[#3D2B1F] mb-1.5">Deskripsi / Tujuan</label>
+                  <textarea
+                    placeholder="Contoh: Untuk seragam pernikahan bulan depan..."
+                    value={projectInfo.description}
+                    onChange={(e) => setProjectInfo(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-xl border outline-none transition-all focus:border-[#8B6F47] focus:ring-1 focus:ring-[#8B6F47] resize-none h-24"
+                    style={{ borderColor: "rgba(212,184,139,0.3)", background: "#FAF9F6" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-[#3D2B1F] mb-1.5">Pilihan Kain Dasar</label>
+                  <select
+                    value={projectInfo.fabric}
+                    onChange={(e) => setProjectInfo(prev => ({ ...prev, fabric: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-xl border outline-none transition-all focus:border-[#8B6F47] focus:ring-1 focus:ring-[#8B6F47]"
+                    style={{ borderColor: "rgba(212,184,139,0.3)", background: "#FAF9F6" }}
+                  >
+                    <option value="Katun Primisima">Katun Primisima (Rekomendasi)</option>
+                    <option value="Katun Dobby">Katun Dobby</option>
+                    <option value="Sutra ATBM">Sutra ATBM</option>
+                    <option value="Viscose">Viscose</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={confirmProjectInfo}
+                disabled={!projectInfo.name.trim() || isSaving}
+                className="w-full py-3.5 rounded-xl font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-95"
+                style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}
+              >
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {showProjectModal === "save" ? "Simpan Desain" : showProjectModal === "cart" ? "Simpan & Masukkan Keranjang" : "Simpan & Pesan Sekarang"}
+              </button>
             </motion.div>
           </div>
         )}

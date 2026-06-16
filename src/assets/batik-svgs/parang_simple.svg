@@ -1,5 +1,5 @@
 <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-  <rect fill="#f3f3f3" width="200" height="200"/>
+
   <path d="M0 50 Q50 0 100 50 Q150 100 200 50" stroke="#242020" stroke-width="8" fill="none"/>
   <path d="M0 100 Q50 50 100 100 Q150 150 200 100" stroke="#5e5c5c" stroke-width="8" fill="none"/>
   <path d="M0 150 Q50 100 100 150 Q150 200 200 150" stroke="#a1a0a0" stroke-width="8" fill="none"/>
