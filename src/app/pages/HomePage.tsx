@@ -850,7 +850,7 @@ export function HomePage() {
         <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-[#D4B88B] rounded-full mix-blend-overlay filter blur-[150px] opacity-10 pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-[#8B6F47] rounded-full mix-blend-overlay filter blur-[120px] opacity-10 pointer-events-none" />
         
-        <BatikBackground opacity={0.03} patternType="sekar" />
+        <BatikBackground opacity={0.03} patternType="parang" />
 
         <div className="container mx-auto px-6 md:px-12 lg:px-24 relative z-10">
           {/* Section Header */}
