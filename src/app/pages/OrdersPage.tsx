@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Package, Clock, CheckCircle, Truck, Plus, Search, Star, ChevronRight,
   ShoppingBag, MapPin, CreditCard, RotateCcw, X, Loader2, CheckCircle2,
-  AlertCircle, ShoppingCart, Download
+  AlertCircle, ShoppingCart, Download, MessageCircle
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
@@ -62,6 +62,7 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
   const sc = statusConfig[order.status];
   const [confirming, setConfirming] = useState(false);
   const [buyingAgain, setBuyingAgain] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -212,6 +213,14 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
+            <motion.button
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={() => { onClose(); navigate("/chat"); }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all"
+              style={{ border: "1.5px solid rgba(139,111,71,0.3)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
+            >
+              <MessageCircle className="w-4 h-4" />Hubungi Toko
+            </motion.button>
             {order.status === "shipping" && (
               <motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}

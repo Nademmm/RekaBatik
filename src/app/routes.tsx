@@ -7,6 +7,8 @@ import { DesaJetisPage } from "./pages/DesaJetisPage";
 import { DesaJetisStoreDetailPage } from "./pages/DesaJetisStoreDetailPage";
 import { AuthPage } from "./pages/AuthPage";
 import { CartPage } from "./pages/CartPage";
+import { DesainHistoriPage } from "./pages/DesainHistoriPage";
+import { ChatPage } from "./pages/ChatPage";
 import { RootLayout } from "./layouts/RootLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorPage } from "./components/ErrorPage";
@@ -33,10 +35,10 @@ export const router = createBrowserRouter([
         children: [
           { path: "orders", Component: OrdersPage },
           { path: "cart", Component: CartPage },
+          { path: "desain-histori", Component: DesainHistoriPage },
+          { path: "chat", Component: ChatPage },
         ],
       },
     ],
   },
 ]);
-
-

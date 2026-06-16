@@ -145,36 +145,36 @@ export function HomePage() {
           .limit(6);
         
         if (pError) throw pError;
-        if (patternsData && patternsData.length > 0) {
-          setPopularPatterns(patternsData.map((p: any) => ({
-            ...p,
-            tag: p.sold > 200 ? "Terlaris" : "Populer"
-          })));
-        } else {
-          setPopularPatterns([]);
-        }
+              const safePatterns = patternsData || [];
+              if (safePatterns.length > 0) {
+                setPopularPatterns(safePatterns.map((p: any) => ({
+                  ...p,
+                  tag: p.sold > 200 ? "Terlaris" : "Populer"
+                })));
+              } else {
+                setPopularPatterns([]);
+              }
 
-        // Fetch reviews
-        const { data: reviewsData, error: rError } = await supabase
-          .from("reviews")
-          .select("*")
-          .limit(4);
-        
-        if (rError) throw rError;
-        if (reviewsData && reviewsData.length > 0) {
-          setReviews(reviewsData);
-        } else {
-          setReviews([]);
-        }
+              // Fetch reviews
+              const { data: reviewsData, error: rError } = await supabase
+                .from("reviews")
+                .select("*")
+                .limit(4);
+              
+              if (rError) throw rError;
+              const safeReviews = reviewsData || [];
+              if (safeReviews.length > 0) {
+                setReviews(safeReviews);
+              } else {
+                setReviews([]);
+              }
 
-        // Trending items (mocking growth for now)
-        if (patternsData) {
-          setTrendingItems(patternsData.slice(0, 5).map((p: any) => ({
-            name: p.name,
-            sold: p.sold,
-            growth: `+${Math.floor(Math.random() * 30) + 10}%`
-          })));
-        }
+              // Trending items (mocking growth for now)
+              setTrendingItems(safePatterns.slice(0, 5).map((p: any) => ({
+                name: p.name || "Batik",
+                sold: p.sold || 0,
+                growth: `+${Math.floor(Math.random() * 30) + 10}%`
+              })));
 
       } catch (err: any) {
         handleSupabaseError(err, "HomePage.fetchData");

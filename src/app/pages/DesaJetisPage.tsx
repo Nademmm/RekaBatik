@@ -2,15 +2,33 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   MapPin, Phone, Clock, Star, ChevronRight, Users, Award,
-  ShoppingBag, Heart, ExternalLink, Camera, Info, Car, Bus, Bike, Watch, Wallet, Sparkles
+  ShoppingBag, Heart, ExternalLink, Camera, Info, Car, Bus, Bike, Watch, Wallet, Sparkles, Store
 } from "lucide-react";
 import { Link } from "react-router";
 
 const MotionLink = motion(Link);
 import { BatikBackground, BatikDivider } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
-import { Store } from "../../types/database";
 import { Skeleton } from "../components/ui/skeleton";
+
+type BatikStore = {
+  id: number;
+  name: string;
+  owner: string;
+  established: string;
+  specialty: string;
+  address: string;
+  phone: string;
+  hours: string;
+  rating: number;
+  review_count: number;
+  price_range: string;
+  tags: string[];
+  image: string;
+  featured: boolean;
+  description: string;
+  motifs: string[];
+};
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -47,13 +65,13 @@ const timeline = [
 ];
 
 export function DesaJetisPage() {
-  const [stores, setStores] = useState<Store[]>([]);
+  const [stores, setStores] = useState<BatikStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTag, setFilterTag] = useState<string>("all");
 
   useEffect(() => {
     // Gunakan mock data secara langsung untuk memastikan konten muncul
-    const mockStores: Store[] = [
+    const mockStores: BatikStore[] = [
       {
         id: 1,
         name: "Batik Amri Jetis",
@@ -142,41 +160,34 @@ export function DesaJetisPage() {
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF8F5" }}>
       {/* ======================== HERO ======================== */}
-      <section className="relative min-h-[80vh] flex items-center overflow-hidden">
+      <section className="relative min-h-[85vh] flex items-center overflow-hidden">
         {/* Background Image & Overlay */}
         <div className="absolute inset-0">
           <img src={villageImg} alt="Desa Jetis" className="w-full h-full object-cover" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(115deg, rgba(61, 43, 31, 0.95) 0%, rgba(61, 43, 31, 0.75) 55%, rgba(61, 43, 31, 0.6) 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(120deg, rgba(61, 43, 31, 0.98) 0%, rgba(61, 43, 31, 0.80) 50%, rgba(61, 43, 31, 0.65) 100%)" }} />
         </div>
         
         {/* Decorative Batik Background */}
-        <BatikBackground opacity={0.08} patternType="kawung" className="z-10" />
+        <BatikBackground opacity={0.07} patternType="kawung" className="z-10" />
         
         {/* Decorative Elements */}
-        <div className="absolute top-20 right-0 w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
-        <div className="absolute bottom-10 left-10 w-56 h-56 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
+        <div className="absolute top-20 right-0 w-80 h-80 rounded-full opacity-12" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
+        <div className="absolute bottom-10 left-10 w-60 h-60 rounded-full opacity-8" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
         
-        <div className="container mx-auto px-6 relative z-20 py-20 max-w-[185vh]">
+        <div className="container mx-auto px-6 relative z-20 py-24 max-w-7xl">
           <div className="max-w-4xl">
-            {/* Location Badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="flex items-center gap-2 mb-6"
-            >
-            </motion.div>
+            
             
             {/* Main Heading */}
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="mb-6"
-              style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(2.5rem, 6vw, 4rem)", color: "#FAF8F5", lineHeight: "1.15", fontWeight: 700 }}
+              className="mb-7"
+              style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(2.5rem, 6vw, 4.2rem)", color: "#FAF8F5", lineHeight: "1.15", fontWeight: 700 }}
             >
-              Desa Batik Jetis
-              <span style={{ color: "#D4B88B", display: "block", marginTop: "0.5rem" }}>Warisan Budaya Nusantara</span>
+              Hubungkan dengan<br/>
+              <span style={{ color: "#D4B88B" }}>Pengrajin Batik Terbaik</span>
             </motion.h1>
             
             {/* Description */}
@@ -185,33 +196,34 @@ export function DesaJetisPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
               className="mb-10 max-w-2xl"
-              style={{ color: "rgba(250, 248, 245, 0.88)", lineHeight: "1.9", fontSize: "1.1rem" }}
+              style={{ color: "rgba(250, 248, 245, 0.85)", lineHeight: "1.9", fontSize: "1.15rem" }}
             >
-              Lebih dari 100 tahun, Desa Jetis menjadi jantung produksi batik Sidoarjo. Dengan ratusan pengrajin
-              terampil, motif-motif khas seperti <em style={{ color: "#D4B88B", fontStyle: "normal", fontWeight: 600 }}>"Beras Utah"</em>, flora, fauna, dan lukisan alam menjadi
-              identitas budaya yang tak ternilai.
+              RekaBatik adalah platform yang menghubungkan Anda langsung dengan pengrajin batik berpengalaman di Desa Batik Jetis. Kustomisasi batik sesuai keinginan, bicarakan langsung dengan pembuatnya, dan dapatkan karya budaya berkualitas tinggi.
             </motion.p>
             
-            {/* Stats Mini */}
+            {/* Stats Grid */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="flex flex-wrap gap-7 mb-9"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-11"
             >
               {[
-                { value: "100+", label: "Tahun Sejarah" },
-                { value: "350+", label: "Pengrajin" },
-                { value: "30+", label: "Toko Batik" },
+                { value: "35+", label: "Pengrajin Mitra" },
+                { value: "12.500+", label: "Pelanggan Puas" },
+                { value: "48.200+", label: "Pesanan Selesai" },
               ].map((stat, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-15 h-14 rounded-full flex items-center justify-center" style={{ background: "rgba(212, 184, 139, 0.15)", border: "1px solid rgba(212, 184, 139, 0.3)" }}>
-                    <span style={{ fontFamily: "'Playfair Display', serif", color: "#D4B88B", fontSize: "1.25rem", fontWeight: 700, marginBottom: "0.5rem", marginLeft: "0.2rem" }}>{`${stat.value}`}</span>
-                  </div>
-                  <div>
-                    <div style={{ color: "#FAF8F5", fontWeight: 600 }}>{stat.label}</div>
-                  </div>
-                </div>
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.4 + i * 0.1 }}
+                  className="p-5 rounded-2xl"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(212, 184, 139, 0.25)" }}
+                >
+                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#D4B88B", fontSize: "2rem", fontWeight: 700, marginBottom: "0.25rem" }}>{stat.value}</div>
+                  <div style={{ color: "rgba(250,248,245,0.7)", fontSize: "0.9rem", fontWeight: 500 }}>{stat.label}</div>
+                </motion.div>
               ))}
             </motion.div>
             
@@ -222,25 +234,44 @@ export function DesaJetisPage() {
               transition={{ duration: 0.6, delay: 0.5 }}
               className="flex flex-wrap gap-4"
             >
+              <MotionLink
+                to="/custom"
+                className="flex items-center gap-2.5 px-9 py-4 rounded-2xl"
+                whileHover={{ scale: 1.03 }}
+                transition={{ duration: 0.3 }}
+                style={{
+                  background: "linear-gradient(135deg, #D4B88B, #C9AB7F)",
+                  color: "#3D2B1F",
+                  fontWeight: 700,
+                  fontSize: "1.05rem",
+                  boxShadow: "0 8px 24px rgba(212, 184, 139, 0.35)"
+                }}
+              >
+                <Sparkles className="w-5 h-5" />
+                Mulai Kustomisasi
+              </MotionLink>
               <motion.a
                 href="#toko"
-                className="flex items-center gap-2.5 px-8 py-4 rounded-2xl"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{ background: "linear-gradient(135deg, #D4B88B, #C9AB7F)", color: "#3D2B1F", fontWeight: 600 }}
+                className="flex items-center gap-2.5 px-9 py-4 rounded-2xl"
+                whileHover={{ scale: 1.03 }}
+                transition={{ duration: 0.3 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  const section = document.getElementById("toko");
+                  if (section) {
+                    section.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}
+                style={{
+                  color: "#FAF8F5",
+                  border: "2px solid rgba(250, 248, 245, 0.45)",
+                  fontWeight: 600,
+                  background: "transparent",
+                  fontSize: "1.05rem"
+                }}
               >
-                <ShoppingBag className="w-5 h-5" />
-                Jelajahi Toko
-              </motion.a>
-              <motion.a
-                href="#sejarah"
-                className="flex items-center gap-2.5 px-8 py-4 rounded-2xl"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{ color: "#FAF8F5", border: "2px solid rgba(250, 248, 245, 0.4)", fontWeight: 600, background: "transparent" }}
-              >
-                <Info className="w-5 h-5" />
-                Sejarah Desa
+                <Store className="w-5 h-5" />
+                Lihat Pengrajin
               </motion.a>
             </motion.div>
           </div>
@@ -285,64 +316,14 @@ export function DesaJetisPage() {
         {/* Decorative Elements */}
         <div className="absolute top-40 right-0 w-96 h-96 rounded-full opacity-8" style={{ background: "radial-gradient(circle, #8B6F47 0%, transparent 70%)" }} />
         
-        <div className="container mx-auto px-6 relative z-10 max-w-[185vh]">
+        <div className="container mx-auto px-6 relative z-10 max-w-7xl">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Content Side */}
+            {/* Image Side */}
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.7 }}
-            >
-           
-              <h2 className="mb-7" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2rem, 4vw, 2.75rem)", lineHeight: "1.2", fontWeight: 700 }}>
-                Sentra Batik Sidoarjo yang Mendunia
-              </h2>
-              
-              <div className="space-y-5 mb-8" style={{ color: "#7A6B5E", lineHeight: "1.9", fontSize: "1rem" }}>
-                <p>
-                  Berlokasi di Kelurahan Jetis, Kecamatan Sidoarjo, Kabupaten Sidoarjo, Jawa Timur, kampung batik ini
-                  merupakan salah satu pusat produksi batik tertua di kawasan Jawa Timur. Sejak awal abad ke-20,
-                  warga Jetis telah menggeluti seni membatik secara turun-temurun.
-                </p>
-                <p>
-                  Ciri khas batik Jetis adalah penggunaan motif <span style={{ color: "#3D2B1F", fontWeight: 700, fontFamily: "'Playfair Display', serif" }}>Beras Utah</span> (butiran beras berserakan),
-                  yang terinspirasi dari kelimpahan hasil pertanian setempat. Motif ini telah terdaftar sebagai
-                  kekayaan intelektual daerah dan menjadi simbol kebanggaan Sidoarjo.
-                </p>
-                <p>
-                  Selain Beras Utah, pengrajin Jetis juga mengembangkan motif flora-fauna khas Jawa Timur, seperti
-                  burung merak, kupu-kupu, bunga kenongo, dan ikan kerapu — mencerminkan kekayaan alam dan budaya setempat.
-                </p>
-              </div>
-
-              {/* Motif highlights */}
-              <div className="mb-2" style={{ color: "#7A6B5E", fontSize: "0.875rem", fontWeight: 600 }}>
-                Motif Unggulan Desa Jetis:
-              </div>
-              <div className="flex flex-wrap gap-2.5">
-                {["Beras Utah", "Burung Merak", "Kenongo", "Kembang Setaman", "Sisik Ikan", "Kupu-kupu"].map((m, i) => (
-                  <motion.span
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.4, delay: i * 0.08 }}
-                    whileHover={{ scale: 1.05 }}
-                    className="px-4 py-2.5 rounded-full text-sm"
-                    style={{ background: "rgba(212, 184, 139, 0.15)", color: "#8B6F47", border: "1px solid rgba(212, 184, 139, 0.3)", fontWeight: 600 }}>
-                    {m}
-                  </motion.span>
-                ))}
-              </div>
-            </motion.div>
-            
-            {/* Image Side */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.7, delay: 0.2 }}
               className="relative"
             >
               {/* Decorative Corner Elements */}
@@ -382,6 +363,64 @@ export function DesaJetisPage() {
                     <img src={batikFabricImg} alt="Kain batik" className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                   </motion.div>
                 </div>
+              </div>
+            </motion.div>
+            
+            {/* Content Side */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.7, delay: 0.2 }}
+            >
+              <h2 className="mb-7" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2rem, 4vw, 2.75rem)", lineHeight: "1.2", fontWeight: 700 }}>
+                Mengapa RekaBatik Memilih Desa Jetis?
+              </h2>
+              
+              <div className="space-y-5 mb-8" style={{ color: "#7A6B5E", lineHeight: "1.9", fontSize: "1rem" }}>
+                <p>
+                  Desa Batik Jetis di Sidoarjo, Jawa Timur, adalah salah satu sentra batik tertua dan terbaik di Indonesia. 
+                  Sejak awal abad ke-20, pengrajin di sini telah mewarisi keahlian membatik secara turun-temurun.
+                </p>
+                <p>
+                  Ciri khas batik Jetis adalah motif <span style={{ color: "#3D2B1F", fontWeight: 700, fontFamily: "'Playfair Display', serif" }}>Beras Utah</span> — butiran beras berserakan yang terinspirasi dari kelimpahan pertanian setempat. 
+                  Motif ini sudah mendapatkan Hak Kekayaan Intelektual (HAKI) dan menjadi ikon batik Sidoarjo.
+                </p>
+                <p>
+                  Di RekaBatik, kami percaya bahwa batik terbaik dibuat dengan tangan yang penuh cinta dan pengalaman. 
+                  Oleh karena itu, kami bekerja sama langsung dengan pengrajin lokal terbaik di Desa Jetis untuk memastikan setiap karya memiliki kualitas premium.
+                </p>
+              </div>
+
+              {/* Features */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { icon: Award, text: "Kualitas Premium", desc: "Bahan dan pewarna terbaik" },
+                  { icon: Users, text: "Pengrajin Berpengalaman", desc: "Pengalaman turun temurun" },
+                  { icon: Heart, text: "Cinta & Dedikasi", desc: "Setiap karya dibuat dengan hati" },
+                  { icon: Sparkles, text: "Motif Tradisional", desc: "Motif khas Jawa Timur" },
+                ].map((item, i) => {
+                  const Icon = item.icon;
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: 0.2 + i * 0.1 }}
+                      className="p-5 rounded-2xl"
+                      style={{ background: "rgba(212, 184, 139, 0.1)", border: "1px solid rgba(212, 184, 139, 0.25)" }}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(212, 184, 139, 0.25)" }}>
+                          <Icon className="w-5 h-5" style={{ color: "#8B6F47" }} />
+                        </div>
+                        <span style={{ color: "#3D2B1F", fontWeight: 600, fontSize: "1.05rem" }}>{item.text}</span>
+                      </div>
+                      <p style={{ color: "#7A6B5E", fontSize: "0.9rem" }}>{item.desc}</p>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           </div>

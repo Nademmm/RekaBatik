@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings } from "lucide-react";
+import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BatikBackground } from "../components/BatikBackground";
 import logoImg from "../../imports/rekabatik-logo.png";
@@ -83,6 +83,7 @@ export function RootLayout() {
     { path: "/", label: "Beranda" },
     { path: "/catalog", label: "Katalog" },
     { path: "/custom", label: "Kustom" },
+    { path: "/desain-histori", label: "Desainku" },
     { path: "/orders", label: "Pesanan" },
     { path: "/desa-jetis", label: "Tentang Kami" },
   ];
@@ -271,6 +272,28 @@ export function RootLayout() {
                           >
                             <Package className="w-4 h-4" style={{ color: "#8B6F47" }} />
                             Pesanan Saya
+                          </Link>
+                          <Link
+                            to="/desain-histori"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            style={{ color: "#5A4A3E" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <BookOpen className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                            Desain Saya
+                          </Link>
+                          <Link
+                            to="/chat"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            style={{ color: "#5A4A3E" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <MessageCircle className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                            Chat Toko
                           </Link>
                           <Link
                             to="/custom"

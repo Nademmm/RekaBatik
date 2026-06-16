@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, ChevronLeft,
   MapPin, CreditCard, CheckCircle2, Package, ChevronRight, User, Phone,
-  Building2, Navigation, Hash, StickyNote, BadgeCheck, Palette
+  Building2, Navigation, Hash, StickyNote, BadgeCheck, Palette, Store, MessageCircle
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
@@ -36,6 +36,14 @@ const PROVINCES = [
   "Papua Barat", "Papua", "NTB", "NTT", "Aceh",
 ];
 
+// ─── Toko Pengrajin Batik ──────────────────────────────────────────────────
+const BATIK_STORES = [
+  { id: 1, name: "Batik Amri Jetis", owner: "Pak Amri", avatar: "BA", color: "#8B6F47", specialty: "Batik Tulis Beras Utah", rating: 4.9 },
+  { id: 2, name: "Batik Siti Collection", owner: "Bu Siti", avatar: "BS", color: "#5A7C8B", specialty: "Batik Cap Modern", rating: 4.7 },
+  { id: 3, name: "Rumah Batik Hartono", owner: "Pak Hartono", avatar: "RB", color: "#6B3A8B", specialty: "Batik Tulis Premium", rating: 4.8 },
+  { id: 4, name: "Batik Jetis Muda", owner: "Kak Dian", avatar: "BJ", color: "#2D5A2D", specialty: "Batik Kontemporer", rating: 4.6 },
+];
+
 // ─── SVG Pattern Mini ──────────────────────────────────────────────────────
 function PatternThumb({ bg, primary }: { bg: string; primary: string }) {
   return (
@@ -56,17 +64,37 @@ function PatternThumb({ bg, primary }: { bg: string; primary: string }) {
 }
 
 // ─── Stepper ───────────────────────────────────────────────────────────────
-const STEPS = [
+const STEPS_NORMAL = [
   { step: 1, label: "Keranjang", icon: ShoppingBag },
   { step: 2, label: "Alamat", icon: MapPin },
   { step: 3, label: "Pembayaran", icon: CreditCard },
   { step: 4, label: "Konfirmasi", icon: CheckCircle2 },
 ];
 
-function Stepper({ current }: { current: CheckoutStep }) {
+const STEPS_CUSTOM = [
+  { step: 1, label: "Keranjang", icon: ShoppingBag },
+  { step: 2, label: "Alamat", icon: MapPin },
+  { step: 3, label: "Pilih Toko", icon: Store },
+  { step: 4, label: "Konfirmasi", icon: CheckCircle2 },
+];
+
+function Stepper({ current, steps = STEPS_NORMAL }: { current: CheckoutStep; steps?: typeof STEPS_NORMAL }) {
+  // Make absolutely 100% sure we have a valid array!
+  let safeSteps: typeof STEPS_NORMAL = [];
+  if (Array.isArray(steps)) {
+    safeSteps = steps;
+  } else if (Array.isArray(STEPS_NORMAL)) {
+    safeSteps = STEPS_NORMAL;
+  }
+  
+  // Extra fallback
+  if (!Array.isArray(safeSteps) || safeSteps.length === 0) {
+    safeSteps = STEPS_NORMAL;
+  }
+
   return (
     <div className="flex items-center justify-center mb-10">
-      {STEPS.map((s, i) => {
+      {safeSteps.map((s, i) => {
         const done = current > s.step;
         const active = current === s.step;
         const Icon = s.icon;
@@ -90,7 +118,7 @@ function Stepper({ current }: { current: CheckoutStep }) {
                 {s.label}
               </span>
             </div>
-            {i < STEPS.length - 1 && (
+            {i < safeSteps.length - 1 && (
               <div
                 className="w-12 sm:w-20 h-0.5 mx-2 mb-5 transition-all duration-500"
                 style={{ background: current > s.step ? "#8B6F47" : "rgba(212,184,139,0.25)" }}
@@ -128,6 +156,9 @@ export function CartPage() {
 
   // Step 3 — Pembayaran
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer_bca");
+
+  // Step 3 — Pilih Toko (custom flow)
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
 
   const SHIPPING_COST = 20000;
 
@@ -195,8 +226,14 @@ export function CartPage() {
   // ── Checkout ──────────────────────────────────────────────────────────────
   const handleCheckout = async () => {
     if (!user || cartItems.length === 0) return;
+    if (hasCustomItems && !selectedStoreId) {
+      toast.error("Silakan pilih toko pengrajin terlebih dahulu.");
+      return;
+    }
     setIsSubmitting(true);
     try {
+      const store = BATIK_STORES.find(s => s.id === selectedStoreId);
+
       const ordersToInsert = cartItems.map(item => {
         const bItem = item.batik_items;
         const cItem = item.custom_designs;
@@ -204,7 +241,8 @@ export function CartPage() {
         try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
         const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 999).toString().padStart(3, "0")}`;
         
-        const price = bItem ? bItem.price : 150000;
+        const isCustom = !bItem && !!cItem;
+        const price = bItem ? bItem.price : 0;
         const name = bItem ? bItem.name : "Desain Batik Kustom";
         const desc = bItem ? bItem.description : "Karya seni batik kustom buatan Anda sendiri.";
 
@@ -214,31 +252,56 @@ export function CartPage() {
           item: name,
           description: desc,
           status: "processing",
-          total: (price * item.quantity) + SHIPPING_COST,
+          total: bItem ? ((price * item.quantity) + SHIPPING_COST) : 0,
           type: bItem?.category || "custom",
           primary_color: bItem?.primary_color || "#3D2B1F",
           secondary_color: bItem?.secondary_color || "#D4B88B",
           bg_color: bItem?.bg_color || cData?.canvasThumbnail || cData?.canvasBackground || "#FAF8F5",
-          artisan: "RekaBatik Artisan",
+          artisan: hasCustomItems && store ? store.name : "RekaBatik Artisan",
           can_review: false,
           reviewed: false,
           date: new Date().toISOString(),
           quantity: item.quantity,
-          payment_method: paymentMethod,
-          payment_status: paymentMethod === "cod" ? "pending" : "pending",
+          payment_method: hasCustomItems ? "cod" : paymentMethod,
+          payment_status: "pending",
           shipping_address: address,
           notes: notes || null,
         };
       });
 
-      const { data: insertedOrders, error: insertError } = await supabase.from("orders").insert(ordersToInsert).select();
+      const { error: insertError } = await supabase.from("orders").insert(ordersToInsert).select();
       if (insertError) throw insertError;
 
       // Clear cart
       await supabase.from("cart_items").delete().eq("user_id", user.id);
-
-      setSuccessOrderId(ordersToInsert[0].id);
       setCartItems([]);
+
+      if (hasCustomItems && store) {
+        // Collect custom design thumbnails for the chat opening message
+        const customThumbnails = cartItems
+          .filter(i => i.custom_designs && !i.batik_items)
+          .map(i => {
+            if (!i.custom_designs?.drawing_data) return null;
+            try {
+              const d = JSON.parse(i.custom_designs.drawing_data);
+              return d?.canvasThumbnail || null;
+            } catch { return null; }
+          })
+          .filter(Boolean);
+
+        // Redirect to chat with store info and custom design data
+        navigate("/chat", {
+          state: {
+            fromCheckout: true,
+            storeId: store.id,
+            orderId: ordersToInsert[0].id,
+            customThumbnails,
+          },
+        });
+        toast.success("Pesanan dibuat! Silakan diskusikan desain & harga dengan toko.");
+      } else {
+        setSuccessOrderId(ordersToInsert[0].id);
+      }
     } catch (err) {
       console.error(err);
       toast.error("Checkout gagal. Silakan coba lagi.");
@@ -249,12 +312,16 @@ export function CartPage() {
 
   // ── Computed ──────────────────────────────────────────────────────────────
   const subtotal = cartItems.reduce((sum, item) => {
-    const price = item.batik_items ? item.batik_items.price : 150000;
+    const price = item.batik_items ? item.batik_items.price : 0;
     return sum + (price * item.quantity);
   }, 0);
-  const total = subtotal > 0 ? subtotal + SHIPPING_COST : 0;
+  const hasRegularItems = cartItems.some(item => item.batik_items);
+  const hasCustomItems = cartItems.some(item => item.custom_designs && !item.batik_items);
+  const total = hasRegularItems ? subtotal + SHIPPING_COST : 0;
   const totalQty = cartItems.reduce((s, i) => s + i.quantity, 0);
   const selectedPayment = PAYMENT_OPTIONS.find(p => p.id === paymentMethod)!;
+  const selectedStore = BATIK_STORES.find(s => s.id === selectedStoreId);
+  const checkoutSteps = hasCustomItems ? STEPS_CUSTOM : STEPS_NORMAL;
 
   // ─────────────────────────────────────────────────────────────────────────
   // SUCCESS MODAL
@@ -314,7 +381,9 @@ export function CartPage() {
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span style={{ color: "#7A6B5E" }}>Total Tagihan</span>
-                <span className="font-bold text-xl" style={{ color: "#8B6F47" }}>Rp {total.toLocaleString("id-ID")}</span>
+                <span className="font-bold text-xl" style={{ color: "#8B6F47" }}>
+                  {total > 0 ? `Rp ${total.toLocaleString("id-ID")}` : "Menunggu Konfirmasi CS"}
+                </span>
               </div>
               
               {paymentMethod !== "cod" && (
@@ -371,7 +440,7 @@ export function CartPage() {
         </h1>
 
         {/* Stepper */}
-        <Stepper current={step} />
+        <Stepper current={step} steps={checkoutSteps} />
 
         {loading ? (
           <div className="grid lg:grid-cols-3 gap-6">
@@ -420,7 +489,7 @@ export function CartPage() {
                         let cData = null;
                         try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
 
-                        const price = bItem ? bItem.price : 150000;
+                        const price = bItem ? bItem.price : 0;
                         const name = bItem ? bItem.name : "Desain Batik Kustom";
                         const origin = bItem ? bItem.origin : "RekaBatik Studio";
 
@@ -450,8 +519,12 @@ export function CartPage() {
                               <p className="text-xs mb-3" style={{ color: "#A89B8F" }}>{origin}</p>
                               <div className="flex items-center justify-between">
                                 <span className="font-bold" style={{ color: "#8B6F47" }}>
-                                  Rp {(price * item.quantity).toLocaleString("id-ID")}
-                                  {item.quantity > 1 && <span className="text-xs font-normal ml-1" style={{ color: "#A89B8F" }}>(Rp {price.toLocaleString("id-ID")} × {item.quantity})</span>}
+                                  {bItem ? (
+                                    `Rp ${(price * item.quantity).toLocaleString("id-ID")}`
+                                  ) : (
+                                    <span className="text-sm">Menunggu Konfirmasi CS</span>
+                                  )}
+                                  {bItem && item.quantity > 1 && <span className="text-xs font-normal ml-1" style={{ color: "#A89B8F" }}>(Rp {price.toLocaleString("id-ID")} × {item.quantity})</span>}
                                 </span>
                                 <div className="flex items-center rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(139,111,71,0.2)" }}>
                                   <button onClick={() => updateQuantity(item.id, item.quantity, -1)} disabled={item.quantity <= 1} className="px-3 py-1.5 hover:bg-amber-50 disabled:opacity-40 transition-colors" style={{ color: "#5A4A3E" }}><Minus className="w-3.5 h-3.5" /></button>
@@ -538,44 +611,79 @@ export function CartPage() {
                   </motion.div>
                 )}
 
-                {/* STEP 3: Payment */}
+                {/* STEP 3: Payment or Select Store */}
                 {step === 3 && (
-                  <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                    className="p-6 rounded-2xl bg-white"
-                    style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
-                  >
-                    <h2 className="font-bold text-lg mb-6" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Metode Pembayaran</h2>
-                    <div className="space-y-3">
-                      {PAYMENT_OPTIONS.map(p => (
-                        <motion.button
-                          key={p.id}
-                          onClick={() => setPaymentMethod(p.id)}
-                          whileTap={{ scale: 0.99 }}
-                          className="w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all"
-                          style={{
-                            border: paymentMethod === p.id ? `2px solid ${p.color}` : "1.5px solid rgba(139,111,71,0.2)",
-                            background: paymentMethod === p.id ? `rgba(${parseInt(p.color.slice(1,3),16)},${parseInt(p.color.slice(3,5),16)},${parseInt(p.color.slice(5,7),16)},0.05)` : "#FAFAF8",
-                          }}
-                        >
-                          <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0" style={{ background: `rgba(${parseInt(p.color.slice(1,3),16)},${parseInt(p.color.slice(3,5),16)},${parseInt(p.color.slice(5,7),16)},0.1)` }}>
-                            {p.icon}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold" style={{ color: "#3D2B1F" }}>{p.label}</p>
-                            <p className="text-xs" style={{ color: "#A89B8F" }}>{p.desc}</p>
-                          </div>
-                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0`} style={{ borderColor: paymentMethod === p.id ? p.color : "rgba(139,111,71,0.3)" }}>
-                            {paymentMethod === p.id && <div className="w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />}
-                          </div>
-                        </motion.button>
-                      ))}
-                    </div>
-                    {paymentMethod !== "cod" && (
-                      <p className="mt-4 text-xs p-3 rounded-lg" style={{ color: "#7A6B5E", background: "rgba(139,111,71,0.06)", border: "1px solid rgba(139,111,71,0.1)" }}>
-                        ℹ️ Instruksi pembayaran akan ditampilkan setelah Anda klik "Konfirmasi Pesanan". Selesaikan dalam 24 jam.
-                      </p>
-                    )}
-                  </motion.div>
+                  hasCustomItems ? (
+                    <motion.div key="step3-custom" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                      className="p-6 rounded-2xl bg-white"
+                      style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
+                    >
+                      <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Pilih Toko Pengrajin</h2>
+                      <p className="text-sm mb-6" style={{ color: "#7A6B5E" }}>Pilih toko pengrajin batik yang ingin Anda ajak berdiskusi tentang desain dan harga.</p>
+                      <div className="space-y-3">
+                        {BATIK_STORES.map(store => (
+                          <motion.button
+                            key={store.id}
+                            onClick={() => setSelectedStoreId(store.id)}
+                            whileTap={{ scale: 0.99 }}
+                            className="w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all"
+                            style={{
+                              border: selectedStoreId === store.id ? `2px solid ${store.color}` : "1.5px solid rgba(139,111,71,0.2)",
+                              background: selectedStoreId === store.id ? `rgba(${parseInt(store.color.slice(1,3),16)},${parseInt(store.color.slice(3,5),16)},${parseInt(store.color.slice(5,7),16)},0.05)` : "#FAFAF8",
+                            }}
+                          >
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold text-white flex-shrink-0" style={{ background: store.color }}>
+                              {store.avatar}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold" style={{ color: "#3D2B1F" }}>{store.name}</p>
+                              <p className="text-xs" style={{ color: "#A89B8F" }}>{store.specialty}</p>
+                            </div>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0`} style={{ borderColor: selectedStoreId === store.id ? store.color : "rgba(139,111,71,0.3)" }}>
+                              {selectedStoreId === store.id && <div className="w-2.5 h-2.5 rounded-full" style={{ background: store.color }} />}
+                            </div>
+                          </motion.button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div key="step3-normal" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                      className="p-6 rounded-2xl bg-white"
+                      style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
+                    >
+                      <h2 className="font-bold text-lg mb-6" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Metode Pembayaran</h2>
+                      <div className="space-y-3">
+                        {PAYMENT_OPTIONS.map(p => (
+                          <motion.button
+                            key={p.id}
+                            onClick={() => setPaymentMethod(p.id)}
+                            whileTap={{ scale: 0.99 }}
+                            className="w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all"
+                            style={{
+                              border: paymentMethod === p.id ? `2px solid ${p.color}` : "1.5px solid rgba(139,111,71,0.2)",
+                              background: paymentMethod === p.id ? `rgba(${parseInt(p.color.slice(1,3),16)},${parseInt(p.color.slice(3,5),16)},${parseInt(p.color.slice(5,7),16)},0.05)` : "#FAFAF8",
+                            }}
+                          >
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0" style={{ background: `rgba(${parseInt(p.color.slice(1,3),16)},${parseInt(p.color.slice(3,5),16)},${parseInt(p.color.slice(5,7),16)},0.1)` }}>
+                              {p.icon}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold" style={{ color: "#3D2B1F" }}>{p.label}</p>
+                              <p className="text-xs" style={{ color: "#A89B8F" }}>{p.desc}</p>
+                            </div>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0`} style={{ borderColor: paymentMethod === p.id ? p.color : "rgba(139,111,71,0.3)" }}>
+                              {paymentMethod === p.id && <div className="w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />}
+                            </div>
+                          </motion.button>
+                        ))}
+                      </div>
+                      {paymentMethod !== "cod" && (
+                        <p className="mt-4 text-xs p-3 rounded-lg" style={{ color: "#7A6B5E", background: "rgba(139,111,71,0.06)", border: "1px solid rgba(139,111,71,0.1)" }}>
+                          ℹ️ Instruksi pembayaran akan ditampilkan setelah Anda klik "Konfirmasi Pesanan". Selesaikan dalam 24 jam.
+                        </p>
+                      )}
+                    </motion.div>
+                  )
                 )}
 
                 {/* STEP 4: Review & Confirm */}
@@ -592,7 +700,7 @@ export function CartPage() {
                         let cData = null;
                         try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
 
-                        const price = bItem ? bItem.price : 150000;
+                        const price = bItem ? bItem.price : 0;
                         const name = bItem ? bItem.name : "Desain Batik Kustom";
                         return (
                           <div key={item.id} className="flex items-center gap-3 py-2.5 border-b last:border-0" style={{ borderColor: "rgba(212,184,139,0.15)" }}>
@@ -609,7 +717,9 @@ export function CartPage() {
                               <p className="text-sm font-medium truncate" style={{ color: "#3D2B1F" }}>{name}</p>
                               <p className="text-xs" style={{ color: "#A89B8F" }}>Qty: {item.quantity}</p>
                             </div>
-                            <span className="text-sm font-bold" style={{ color: "#8B6F47" }}>Rp {(price * item.quantity).toLocaleString("id-ID")}</span>
+                            <span className="text-sm font-bold" style={{ color: "#8B6F47" }}>
+                              {bItem ? `Rp ${(price * item.quantity).toLocaleString("id-ID")}` : "Tanya CS"}
+                            </span>
                           </div>
                         );
                       })}
@@ -626,15 +736,33 @@ export function CartPage() {
                       {notes && <p className="mt-2 text-xs italic" style={{ color: "#A89B8F" }}>Catatan: {notes}</p>}
                     </div>
 
-                    {/* Payment Review */}
-                    <div className="p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <CreditCard className="w-4 h-4" style={{ color: "#8B6F47" }} />
-                        <h3 className="font-semibold" style={{ color: "#3D2B1F" }}>Metode Pembayaran</h3>
+                    {/* Payment or Store Review */}
+                    {hasCustomItems && selectedStore ? (
+                      <div className="p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Store className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                          <h3 className="font-semibold" style={{ color: "#3D2B1F" }}>Toko Pengrajin</h3>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white" style={{ background: selectedStore.color }}>
+                            {selectedStore.avatar}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>{selectedStore.name}</p>
+                            <p className="text-xs" style={{ color: "#A89B8F" }}>{selectedStore.specialty}</p>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>{selectedPayment.icon} {selectedPayment.label}</p>
-                      <p className="text-xs" style={{ color: "#A89B8F" }}>{selectedPayment.desc}</p>
-                    </div>
+                    ) : (
+                      <div className="p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <CreditCard className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                          <h3 className="font-semibold" style={{ color: "#3D2B1F" }}>Metode Pembayaran</h3>
+                        </div>
+                        <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>{selectedPayment.icon} {selectedPayment.label}</p>
+                        <p className="text-xs" style={{ color: "#A89B8F" }}>{selectedPayment.desc}</p>
+                      </div>
+                    )}
                   </motion.div>
                 )}
 
@@ -657,12 +785,16 @@ export function CartPage() {
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     onClick={() => {
                       if (step === 2 && !validateAddress()) return;
+                      if (step === 3 && hasCustomItems && !selectedStoreId) {
+                        toast.error("Silakan pilih toko pengrajin terlebih dahulu.");
+                        return;
+                      }
                       setStep(prev => (prev + 1) as CheckoutStep);
                     }}
                     className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white text-sm"
                     style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}
                   >
-                    {step === 1 ? "Isi Alamat Pengiriman" : step === 2 ? "Pilih Pembayaran" : "Review Pesanan"}
+                    {step === 1 ? "Isi Alamat Pengiriman" : step === 2 ? (hasCustomItems ? "Pilih Toko" : "Pilih Pembayaran") : "Review Pesanan"}
                     <ChevronRight className="w-4 h-4" />
                   </motion.button>
                 ) : (
@@ -673,7 +805,7 @@ export function CartPage() {
                     className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-white disabled:opacity-70"
                     style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}
                   >
-                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5" />Konfirmasi Pesanan</>}
+                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : hasCustomItems ? <><MessageCircle className="w-5 h-5" />Hubungi Toko</> : <><CheckCircle2 className="w-5 h-5" />Konfirmasi Pesanan</>}
                   </motion.button>
                 )}
               </div>
@@ -688,12 +820,14 @@ export function CartPage() {
                     const bItem = item.batik_items;
                     const cItem = item.custom_designs;
                     if (!bItem && !cItem) return null;
-                    const price = bItem ? bItem.price : 150000;
+                    const price = bItem ? bItem.price : 0;
                     const name = bItem ? bItem.name : "Desain Batik Kustom";
                     return (
                       <div key={item.id} className="flex justify-between text-sm">
                         <span className="truncate max-w-[140px]" style={{ color: "#7A6B5E" }}>{name} ×{item.quantity}</span>
-                        <span className="font-medium flex-shrink-0 ml-2" style={{ color: "#5A4A3E" }}>Rp {(price * item.quantity).toLocaleString("id-ID")}</span>
+                        <span className="font-medium flex-shrink-0 ml-2" style={{ color: "#5A4A3E" }}>
+                          {bItem ? `Rp ${(price * item.quantity).toLocaleString("id-ID")}` : "Tanya CS"}
+                        </span>
                       </div>
                     );
                   })}

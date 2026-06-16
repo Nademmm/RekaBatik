@@ -23,17 +23,19 @@ import {
   Copy,
   ArrowUp,
   ArrowDown,
-  ShoppingCart,
   X,
   CheckCircle2,
-  Package,
   PaintBucket,
   Square,
   Circle,
   Slash,
   MousePointer2,
+  Star,
+  History,
+  ShoppingCart,
+  Package,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
@@ -71,7 +73,7 @@ const batikSvgMap: Record<string, string> = {
 };
 
 type Tool = "select" | "brush" | "eraser" | "fill" | "shape";
-type ShapeType = "rect" | "circle" | "line";
+type ShapeType = "rect" | "circle" | "line" | "star";
 
 interface CustomLayer {
   id: string;
@@ -135,8 +137,20 @@ const recolorSVG = (svgString: string, preset: typeof colorPresets[0]) => {
   return result;
 };
 
+// ─── Helper: Buat titik polygon bintang ─────────────────────────────────────
+function makeStarPoints(cx: number, cy: number, numPoints: number, outerR: number, innerR: number) {
+  const points: { x: number; y: number }[] = [];
+  for (let i = 0; i < numPoints * 2; i++) {
+    const angle = (Math.PI / numPoints) * i - Math.PI / 2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    points.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+  }
+  return points;
+}
+
 export function CustomBatikPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
 
   const [patterns, setPatterns] = useState<BatikItem[]>([]);
@@ -796,7 +810,83 @@ export function CustomBatikPage() {
     fetchPatterns();
   }, []);
 
+  // ─── Load desain dari histori jika ada ?editDesignId ──────────────────────
+  useEffect(() => {
+    const editDesignId = searchParams.get("editDesignId");
+    if (!editDesignId || !user) return;
 
+    const loadDesign = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("custom_designs")
+          .select("*")
+          .eq("id", editDesignId)
+          .eq("user_id", user.id)
+          .single();
+        if (error || !data) return;
+
+        // Wait for canvas to be ready
+        const waitForCanvas = () => new Promise<void>(resolve => {
+          const check = () => {
+            if (fabricCanvasRef.current) resolve();
+            else setTimeout(check, 100);
+          };
+          check();
+        });
+        await waitForCanvas();
+
+        const fc = fabricCanvasRef.current!;
+        let parsed: any = null;
+        try { parsed = JSON.parse(data.drawing_data); } catch { return; }
+
+        // Set background
+        if (parsed.canvasBackground) {
+          setCanvasBackground(parsed.canvasBackground);
+        }
+
+        // Load fabric objects
+        if (parsed.objects) {
+          fc.loadFromJSON({ objects: parsed.objects, background: parsed.canvasBackground || "#ffffff" }, () => {
+            fc.getObjects().forEach((obj: any) => {
+              if (obj.data?.layerId) {
+                setLayers(prev => [...prev, {
+                  id: obj.data.layerId,
+                  type: "pattern" as const,
+                  name: obj.data.layerName || "Layer",
+                  visible: true,
+                  locked: false,
+                  fabricObject: obj,
+                }]);
+              }
+            });
+            fc.requestRenderAll();
+          });
+        }
+
+        // Load offscreen brush layer
+        if (parsed.offscreenDataUrl && offscreenRef.current) {
+          const img = new Image();
+          img.onload = () => {
+            const ctx = offscreenRef.current!.getContext("2d")!;
+            ctx.clearRect(0, 0, 800, 600);
+            ctx.drawImage(img, 0, 0, 800, 600);
+            syncDisplay();
+            setHasOffscreenContent(true);
+          };
+          img.src = parsed.offscreenDataUrl;
+        }
+
+        // Set savedDesignId agar update (bukan insert baru) saat save
+        setSavedDesignId(Number(editDesignId));
+        toast.success("Desain berhasil dimuat untuk diedit");
+      } catch (err) {
+        toast.error("Gagal memuat desain");
+      }
+    };
+
+    loadDesign();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
 
   // ─── Initialize Fabric Canvas ─────────────────────────────────────────────
   useEffect(() => {
@@ -1052,12 +1142,12 @@ export function CustomBatikPage() {
     const fc = fabricCanvasRef.current;
     if (!fc) return;
 
-    const getCanvasPos = (e: fabric.IEvent<MouseEvent>) => {
+    const getCanvasPos = (e: any) => {
       const pointer = fc.getPointer(e.e);
       return { x: pointer.x, y: pointer.y };
     };
 
-    const onMouseDown = (e: fabric.IEvent<MouseEvent>) => {
+    const onMouseDown = (e: any) => {
       if (activeToolRef.current !== "shape") return;
       const pos = getCanvasPos(e);
       shapeStartRef.current = pos;
@@ -1080,6 +1170,10 @@ export function CustomBatikPage() {
         preview = new fabric.Rect({ ...common, width: 1, height: 1 });
       } else if (shapeTypeRef.current === "circle") {
         preview = new fabric.Ellipse({ ...common, rx: 1, ry: 1 });
+      } else if (shapeTypeRef.current === "star") {
+        // Star preview — small placeholder polygon
+        const starPoints = makeStarPoints(pos.x, pos.y, 5, 20, 10);
+        preview = new fabric.Polygon(starPoints, { ...common, left: pos.x - 20, top: pos.y - 20 });
       } else {
         preview = new fabric.Line([pos.x, pos.y, pos.x, pos.y], {
           stroke: shapeStrokeRef.current,
@@ -1094,7 +1188,7 @@ export function CustomBatikPage() {
       fc.add(preview);
     };
 
-    const onMouseMove = (e: fabric.IEvent<MouseEvent>) => {
+    const onMouseMove = (e: any) => {
       if (activeToolRef.current !== "shape" || !shapeStartRef.current || !shapePreviewRef.current) return;
       const pos = getCanvasPos(e);
       const start = shapeStartRef.current;
@@ -1111,7 +1205,13 @@ export function CustomBatikPage() {
         const top = Math.min(start.y, pos.y);
         const rx = Math.abs(pos.x - start.x) / 2;
         const ry = Math.abs(pos.y - start.y) / 2;
-        preview.set({ left, top, rx, ry, width: rx * 2, height: ry * 2 });
+        (preview as fabric.Ellipse).set({ left, top, rx, ry, width: rx * 2, height: ry * 2 } as any);
+      } else if (shapeTypeRef.current === "star") {
+        const cx = (start.x + pos.x) / 2;
+        const cy = (start.y + pos.y) / 2;
+        const r = Math.max(Math.abs(pos.x - start.x), Math.abs(pos.y - start.y)) / 2;
+        const newPoints = makeStarPoints(cx, cy, 5, r, r * 0.45);
+        (preview as fabric.Polygon).set({ points: newPoints, left: cx - r, top: cy - r, width: r * 2, height: r * 2 } as any);
       } else {
         (preview as fabric.Line).set({ x2: pos.x, y2: pos.y });
       }
@@ -1119,7 +1219,7 @@ export function CustomBatikPage() {
       fc.requestRenderAll();
     };
 
-    const onMouseUp = (e: fabric.IEvent<MouseEvent>) => {
+    const onMouseUp = (e: any) => {
       if (activeToolRef.current !== "shape" || !shapeStartRef.current || !shapePreviewRef.current) return;
       const pos = getCanvasPos(e);
       const start = shapeStartRef.current;
@@ -1153,6 +1253,12 @@ export function CustomBatikPage() {
         const rx = Math.max(Math.abs(pos.x - start.x) / 2, 3);
         const ry = Math.max(Math.abs(pos.y - start.y) / 2, 3);
         finalShape = new fabric.Ellipse({ ...common, left, top, rx, ry });
+      } else if (shapeTypeRef.current === "star") {
+        const cx = (start.x + pos.x) / 2;
+        const cy = (start.y + pos.y) / 2;
+        const r = Math.max(Math.max(Math.abs(pos.x - start.x), Math.abs(pos.y - start.y)) / 2, 15);
+        const starPoints = makeStarPoints(cx, cy, 5, r, r * 0.45);
+        finalShape = new fabric.Polygon(starPoints, { ...common, left: cx - r, top: cy - r });
       } else {
         finalShape = new fabric.Line([start.x, start.y, pos.x, pos.y], {
           stroke: shapeStrokeRef.current,
@@ -1165,7 +1271,7 @@ export function CustomBatikPage() {
       }
 
       const newLayerId = Date.now().toString();
-      const shapeLabel = shapeTypeRef.current === "rect" ? "Kotak" : shapeTypeRef.current === "circle" ? "Lingkaran" : "Garis";
+      const shapeLabel = shapeTypeRef.current === "rect" ? "Kotak" : shapeTypeRef.current === "circle" ? "Lingkaran" : shapeTypeRef.current === "star" ? "Bintang" : "Garis";
       (finalShape as any).data = { layerId: newLayerId, layerName: shapeLabel };
 
       fc.add(finalShape);
@@ -1190,7 +1296,7 @@ export function CustomBatikPage() {
     fc.on("mouse:up", onMouseUp);
 
     // Scroll wheel zoom
-    const handleWheel = (opt: fabric.IEvent<WheelEvent>) => {
+    const handleWheel = (opt: any) => {
       const e = opt.e;
       if (!e.ctrlKey) return; // hanya zoom jika tahan Ctrl
       e.preventDefault();
@@ -1631,6 +1737,20 @@ export function CustomBatikPage() {
     // 3. Brush/Eraser layer (offscreen canvas — pixel-perfect, sudah ada lubang eraser)
     ctx.drawImage(offscreen, 0, 0, 800, 600);
 
+    // 4. Watermark "RekaBatik"
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.font = "bold 24px 'Playfair Display', serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("RekaBatik", 780, 580);
+    ctx.restore();
+
     return final;
   };
 
@@ -1760,8 +1880,8 @@ export function CustomBatikPage() {
       return;
     }
 
-    if (savedDesignId) {
-      // Jika sudah pernah disimpan di sesi ini, tidak perlu isi modal info lagi
+    if (savedDesignId && type !== "save") {
+      // Jika design sudah disimpan, langung action
       executeAction(type);
     } else {
       setShowProjectModal(type);
@@ -1769,15 +1889,17 @@ export function CustomBatikPage() {
   };
 
   const handleSaveAndShowModal = () => triggerSaveAction("save");
-  const addToCart = () => triggerSaveAction("cart");
-  const orderNow = () => triggerSaveAction("order");
+  const addToCart = () => triggerSaveAction("cart"); // Tetap ada di execute action tapi dipanggil dari modal/CTA
 
   // ─── Execute Action ────────────────────────────────────────────────────────
   const executeAction = async (actionType: "save" | "cart" | "order") => {
     if (actionType === "save") {
       const id = await saveDesign();
-      if (id !== null) setShowSuccessModal("saved");
-    } 
+      if (id !== null) {
+        toast.success("Desain berhasil disimpan ke Histori!");
+        navigate("/desain-histori");
+      }
+    }
     else if (actionType === "cart") {
       setIsAddingToCart(true);
       try {
@@ -1793,6 +1915,7 @@ export function CustomBatikPage() {
         } else {
           await supabase.from("cart_items").insert([{ user_id: user!.id, custom_design_id: designId, quantity: 1 }]);
         }
+        
         setShowSuccessModal("cart");
       } catch (err) {
         console.error(err);
@@ -2285,9 +2408,9 @@ export function CustomBatikPage() {
                             border: "1px solid rgba(212,184,139,0.2)",
                           }}
                         >
-                          {(["rect", "circle", "line"] as ShapeType[]).map((t) => {
-                            const IconMap = { rect: Square, circle: Circle, line: Slash };
-                            const LabelMap = { rect: "Kotak", circle: "Lingkaran", line: "Garis" };
+                          {(["rect", "circle", "line", "star"] as ShapeType[]).map((t) => {
+                            const IconMap = { rect: Square, circle: Circle, line: Slash, star: Star };
+                            const LabelMap = { rect: "Kotak", circle: "Lingkaran", line: "Garis", star: "Bintang" };
                             const Icon = IconMap[t];
                             const isActive = shapeType === t;
                             return (
@@ -2430,7 +2553,7 @@ export function CustomBatikPage() {
                 </div>
               </div>
 
-              {/* ─── Beli / Pesan CTA Bar ─────────────────────────── */}
+              {/* ─── CTA Bar (Simpan / Unduh) ─────────────────────────── */}
               <div
                 className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4"
                 style={{
@@ -2438,47 +2561,47 @@ export function CustomBatikPage() {
                   borderTop: "1px solid rgba(212,184,139,0.18)",
                 }}
               >
-                {/* Info harga / estimasi */}
+                {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-[#A89B8F] mb-0.5">Desain Siap Dipesan</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-[#A89B8F] mb-0.5">Simpan atau Unduh</p>
                   <p className="text-sm font-semibold text-[#3D2B1F] leading-snug">
-                    Wujudkan desain batik kamu menjadi produk nyata.
+                    Simpan desain ke histori untuk dipesan nanti, atau unduh sebagai gambar.
                   </p>
                 </div>
 
                 {/* Buttons */}
                 <div className="flex items-center gap-2.5 flex-shrink-0">
                   <button
-                    onClick={addToCart}
-                    disabled={isAddingToCart}
+                    onClick={downloadDesign}
+                    disabled={isDownloading || (layers.length === 0 && !hasOffscreenContent)}
                     className="flex items-center gap-2 px-4 h-10 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-50 cursor-pointer border hover:shadow-sm active:scale-95"
                     style={{
                       color: "#5A3D2B",
                       background: "#FFFFFF",
                       borderColor: "rgba(139,111,71,0.3)",
                     }}
-                    title="Tambah ke keranjang"
+                    title="Unduh desain"
                   >
-                    {isAddingToCart
+                    {isDownloading
                       ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : <ShoppingCart className="w-4 h-4" />}
-                    <span>Keranjang</span>
+                      : <Download className="w-4 h-4" />}
+                    <span>Unduh</span>
                   </button>
 
                   <button
-                    onClick={orderNow}
-                    disabled={isAddingToCart}
+                    onClick={handleSaveAndShowModal}
+                    disabled={isSaving || (layers.length === 0 && !hasOffscreenContent)}
                     className="flex items-center gap-2 px-5 h-10 rounded-2xl font-bold text-sm text-white transition-all duration-200 disabled:opacity-50 cursor-pointer hover:brightness-110 active:scale-95"
                     style={{
                       background: "linear-gradient(135deg, #8B6F47 0%, #6B4F2F 100%)",
                       boxShadow: "0 4px 16px rgba(139,111,71,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
                     }}
-                    title="Pesan sekarang"
+                    title="Simpan ke histori"
                   >
-                    {isAddingToCart
+                    {isSaving
                       ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : <Package className="w-4 h-4" />}
-                    <span>Pesan Sekarang</span>
+                      : <Save className="w-4 h-4" />}
+                    <span>Simpan</span>
                   </button>
                 </div>
               </div>
@@ -2788,16 +2911,9 @@ export function CustomBatikPage() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl text-left"
+              className="relative w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl"
               style={{ border: "1px solid rgba(212,184,139,0.3)" }}
             >
-              <button
-                onClick={() => setShowProjectModal(null)}
-                className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
               <h3 className="text-2xl font-bold mb-1" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
                 Detail Proyek Batik
               </h3>
