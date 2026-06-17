@@ -382,8 +382,8 @@ export function CartPage() {
               <div className="flex justify-between items-center text-sm">
                 <span style={{ color: "#7A6B5E" }}>Total Tagihan</span>
                 <span className="font-bold text-xl" style={{ color: "#8B6F47" }}>
-                  {total > 0 ? `Rp ${total.toLocaleString("id-ID")}` : "Menunggu Konfirmasi CS"}
-                </span>
+                      {!hasCustomItems ? `Rp ${total.toLocaleString("id-ID")}` : "Rp xxx.xxx"}
+                    </span>
               </div>
               
               {paymentMethod !== "cod" && (
@@ -522,7 +522,7 @@ export function CartPage() {
                                   {bItem ? (
                                     `Rp ${(price * item.quantity).toLocaleString("id-ID")}`
                                   ) : (
-                                    <span className="text-sm">Menunggu Konfirmasi CS</span>
+                                    <span className="text-sm">Rp xxx.xxx</span>
                                   )}
                                   {bItem && item.quantity > 1 && <span className="text-xs font-normal ml-1" style={{ color: "#A89B8F" }}>(Rp {price.toLocaleString("id-ID")} × {item.quantity})</span>}
                                 </span>
@@ -718,7 +718,7 @@ export function CartPage() {
                               <p className="text-xs" style={{ color: "#A89B8F" }}>Qty: {item.quantity}</p>
                             </div>
                             <span className="text-sm font-bold" style={{ color: "#8B6F47" }}>
-                              {bItem ? `Rp ${(price * item.quantity).toLocaleString("id-ID")}` : "Tanya CS"}
+                              {bItem ? `Rp ${(price * item.quantity).toLocaleString("id-ID")}` : "Rp xxx.xxx"}
                             </span>
                           </div>
                         );
@@ -826,7 +826,7 @@ export function CartPage() {
                       <div key={item.id} className="flex justify-between text-sm">
                         <span className="truncate max-w-[140px]" style={{ color: "#7A6B5E" }}>{name} ×{item.quantity}</span>
                         <span className="font-medium flex-shrink-0 ml-2" style={{ color: "#5A4A3E" }}>
-                          {bItem ? `Rp ${(price * item.quantity).toLocaleString("id-ID")}` : "Tanya CS"}
+                          {bItem ? `Rp ${(price * item.quantity).toLocaleString("id-ID")}` : "Rp xxx.xxx"}
                         </span>
                       </div>
                     );
@@ -835,17 +835,21 @@ export function CartPage() {
                 <div className="pt-3 border-t space-y-2 mb-4" style={{ borderColor: "rgba(212,184,139,0.2)" }}>
                   <div className="flex justify-between text-sm" style={{ color: "#7A6B5E" }}>
                     <span>Subtotal ({totalQty} barang)</span>
-                    <span>Rp {subtotal.toLocaleString("id-ID")}</span>
+                    <span>{hasRegularItems ? `Rp ${subtotal.toLocaleString("id-ID")} ` : "Rp xxx.xxx"}</span>
                   </div>
-                  <div className="flex justify-between text-sm" style={{ color: "#7A6B5E" }}>
-                    <span>Ongkos Kirim</span>
-                    <span>Rp {SHIPPING_COST.toLocaleString("id-ID")}</span>
-                  </div>
+                  {hasRegularItems && (
+                    <div className="flex justify-between text-sm" style={{ color: "#7A6B5E" }}>
+                      <span>Ongkos Kirim</span>
+                      <span>Rp {SHIPPING_COST.toLocaleString("id-ID")}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="pt-3 border-t" style={{ borderColor: "rgba(212,184,139,0.2)" }}>
                   <div className="flex justify-between items-end">
                     <span className="text-sm font-semibold" style={{ color: "#5A4A3E" }}>Total</span>
-                    <span className="text-xl font-bold" style={{ color: "#3D2B1F" }}>Rp {total.toLocaleString("id-ID")}</span>
+                    <span className="text-xl font-bold" style={{ color: "#3D2B1F" }}>
+                      {!hasCustomItems ? `Rp ${total.toLocaleString("id-ID")}` : "Rp xxx.xxx"}
+                    </span>
                   </div>
                 </div>
               </div>

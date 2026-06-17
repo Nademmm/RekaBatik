@@ -32,11 +32,12 @@ export function RootLayout() {
 
   const fetchCartCount = useCallback(async () => {
     if (!user) { setCartCount(0); return; }
-    const { count } = await supabase
+    const { data } = await supabase
       .from("cart_items")
-      .select("*", { count: "exact", head: true })
+      .select("quantity")
       .eq("user_id", user.id);
-    setCartCount(count || 0);
+    const totalQty = data?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+    setCartCount(totalQty);
   }, [user]);
 
   useEffect(() => {
