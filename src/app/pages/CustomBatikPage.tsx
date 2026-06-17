@@ -49,8 +49,10 @@ import { useAuth } from "../../lib/AuthContext";
 import parangDummySvg from "../../assets/batik-svgs/parang-dummy.svg?raw";
 import parangBatikSvg from "../../assets/batik-svgs/parang_batik.svg?raw";
 import parangSimpleSvg from "../../assets/batik-svgs/parang_simple.svg?raw";
+import parangNewSvg from "../../assets/batik-svgs/parang.svg?raw";
 import kawungDummySvg from "../../assets/batik-svgs/kawung-dummy.svg?raw";
 import megaMendungDummySvg from "../../assets/batik-svgs/mega-mendung-dummy.svg?raw";
+import megaMendungNewSvg from "../../assets/batik-svgs/mega_mendung.svg?raw";
 import truntumDummySvg from "../../assets/batik-svgs/truntum-dummy.svg?raw";
 import sekarDummySvg from "../../assets/batik-svgs/sekar-dummy.svg?raw";
 import sidoMuktiDummySvg from "../../assets/batik-svgs/sido-mukti-dummy.svg?raw";
@@ -58,13 +60,14 @@ import sidoMuktiDummySvg from "../../assets/batik-svgs/sido-mukti-dummy.svg?raw"
 // Mapping style_type ke SVG
 const batikSvgMap: Record<string, string> = {
   parang: parangBatikSvg,
+  "parang-new": parangNewSvg,
   "traditional": parangBatikSvg,
-  "diagonal-lines": parangBatikSvg,
+  "diagonal-lines": parangNewSvg,
   kawung: kawungDummySvg,
   circles: kawungDummySvg,
-  mega: megaMendungDummySvg,
-  clouds: megaMendungDummySvg,
-  regional: megaMendungDummySvg,
+  mega: megaMendungNewSvg,
+  clouds: megaMendungNewSvg,
+  regional: megaMendungNewSvg,
   truntum: truntumDummySvg,
   stars: truntumDummySvg,
   sekar: sekarDummySvg,
@@ -124,6 +127,11 @@ const colorPresets = [
 const recolorSVG = (svgString: string, preset: typeof colorPresets[0]) => {
   let result = svgString;
 
+  // Jika SVG tidak punya fill attributes (seperti parang.svg dan mega_mendung.svg),
+  // tambahkan fill="#000000" ke semua path dan g elements agar bisa di-recolor:
+  result = result.replace(/<path(?=[\s>])(?!.*\sfill=)/g, '<path fill="#000000"');
+  result = result.replace(/<g(?=[\s>])(?!.*\sfill=)/g, '<g fill="#000000"');
+
   // Untuk parang_batik yang pakai 4 warna khusus:
   result = result.replace(/#f3f3f3/gi, preset.batik.background); // Latar belakang
   result = result.replace(/#a1a0a0/gi, preset.batik.light);     // Warna terang
@@ -133,6 +141,10 @@ const recolorSVG = (svgString: string, preset: typeof colorPresets[0]) => {
   // Untuk dummy SVGs yang pakai #8B6F47 dan #D4B88B:
   result = result.replace(/#8B6F47/gi, preset.colors.primary);
   result = result.replace(/#D4B88B/gi, preset.colors.secondary);
+  
+  // Untuk parang.svg dan mega_mendung.svg:
+  result = result.replace(/#000000/gi, preset.colors.primary); // Hitam diganti warna utama
+  result = result.replace(/#caac47/gi, preset.colors.secondary); // Kuning diganti warna sekunder
 
   return result;
 };
@@ -800,9 +812,168 @@ export function CustomBatikPage() {
           .select("*")
           .order("id", { ascending: true });
         if (error) throw error;
-        if (data && data.length > 0) setPatterns(data);
+        if (data && data.length > 0) {
+          // Check if we already have both parang options, if not add them
+          const hasParangBatik = data.some(p => p.style_type === "parang");
+          const hasParangNew = data.some(p => p.style_type === "parang-new");
+          const fallbackPatterns: BatikItem[] = [];
+          if (!hasParangBatik) {
+            fallbackPatterns.push({
+              id: 999,
+              name: "Parang Klasik",
+              category: "tradisional",
+              price: 0,
+              description: "Motif parang klasik dengan garis diagonal khas batik Jawa",
+              origin: "Jawa Tengah",
+              primary_color: "#8B6F47",
+              secondary_color: "#D4B88B",
+              bg_color: "#f3f3f3",
+              rating: 5,
+              sold: 0,
+              style_type: "parang",
+            });
+          }
+          if (!hasParangNew) {
+            fallbackPatterns.push({
+              id: 1000,
+              name: "Parang Baru",
+              category: "tradisional",
+              price: 0,
+              description: "Motif parang baru dengan detail yang lebih kompleks",
+              origin: "Jawa Tengah",
+              primary_color: "#8B6F47",
+              secondary_color: "#D4B88B",
+              bg_color: "#f3f3f3",
+              rating: 5,
+              sold: 0,
+              style_type: "parang-new",
+            });
+          }
+          setPatterns([...data, ...fallbackPatterns]);
+        } else {
+          // Use full fallback patterns if nothing in DB
+          const fallback: BatikItem[] = [
+            {
+              id: 1,
+              name: "Parang Klasik",
+              category: "tradisional",
+              price: 0,
+              description: "Motif parang klasik dengan garis diagonal khas batik Jawa",
+              origin: "Jawa Tengah",
+              primary_color: "#8B6F47",
+              secondary_color: "#D4B88B",
+              bg_color: "#f3f3f3",
+              rating: 5,
+              sold: 0,
+              style_type: "parang",
+            },
+            {
+              id: 2,
+              name: "Parang Baru",
+              category: "tradisional",
+              price: 0,
+              description: "Motif parang baru dengan detail yang lebih kompleks",
+              origin: "Jawa Tengah",
+              primary_color: "#8B6F47",
+              secondary_color: "#D4B88B",
+              bg_color: "#f3f3f3",
+              rating: 5,
+              sold: 0,
+              style_type: "parang-new",
+            },
+            {
+              id: 3,
+              name: "Kawung",
+              category: "tradisional",
+              price: 0,
+              description: "Motif kawung yang terinspirasi dari buah aren",
+              origin: "Jawa Tengah",
+              primary_color: "#8B6F47",
+              secondary_color: "#D4B88B",
+              bg_color: "#f3f3f3",
+              rating: 5,
+              sold: 0,
+              style_type: "kawung",
+            },
+            {
+              id: 4,
+              name: "Mega Mendung",
+              category: "tradisional",
+              price: 0,
+              description: "Motif mega mendung yang terinspirasi dari awan",
+              origin: "Cirebon",
+              primary_color: "#8B6F47",
+              secondary_color: "#D4B88B",
+              bg_color: "#f3f3f3",
+              rating: 5,
+              sold: 0,
+              style_type: "mega",
+            },
+          ];
+          setPatterns(fallback);
+        }
       } catch (err: any) {
         handleSupabaseError(err, "CustomBatikPage.fetchPatterns");
+        // Use fallback patterns on error
+        const fallback: BatikItem[] = [
+          {
+            id: 1,
+            name: "Parang Klasik",
+            category: "tradisional",
+            price: 0,
+            description: "Motif parang klasik dengan garis diagonal khas batik Jawa",
+            origin: "Jawa Tengah",
+            primary_color: "#8B6F47",
+            secondary_color: "#D4B88B",
+            bg_color: "#f3f3f3",
+            rating: 5,
+            sold: 0,
+            style_type: "parang",
+          },
+          {
+            id: 2,
+            name: "Parang Baru",
+            category: "tradisional",
+            price: 0,
+            description: "Motif parang baru dengan detail yang lebih kompleks",
+            origin: "Jawa Tengah",
+            primary_color: "#8B6F47",
+            secondary_color: "#D4B88B",
+            bg_color: "#f3f3f3",
+            rating: 5,
+            sold: 0,
+            style_type: "parang-new",
+          },
+          {
+            id: 3,
+            name: "Kawung",
+            category: "tradisional",
+            price: 0,
+            description: "Motif kawung yang terinspirasi dari buah aren",
+            origin: "Jawa Tengah",
+            primary_color: "#8B6F47",
+            secondary_color: "#D4B88B",
+            bg_color: "#f3f3f3",
+            rating: 5,
+            sold: 0,
+            style_type: "kawung",
+          },
+          {
+            id: 4,
+            name: "Mega Mendung",
+            category: "tradisional",
+            price: 0,
+            description: "Motif mega mendung yang terinspirasi dari awan",
+            origin: "Cirebon",
+            primary_color: "#8B6F47",
+            secondary_color: "#D4B88B",
+            bg_color: "#f3f3f3",
+            rating: 5,
+            sold: 0,
+            style_type: "mega",
+          },
+        ];
+        setPatterns(fallback);
       } finally {
         setLoading(false);
       }
@@ -1402,7 +1573,7 @@ export function CustomBatikPage() {
     const id = `pattern-${pattern.id}`;
     const colors = { primary: "#8B6F47", secondary: "#D4B88B", background: "transparent" };
     let patternContent = "";
-    if (pattern.style_type === "parang" || pattern.style_type === "traditional" || pattern.style_type === "diagonal-lines") {
+    if (pattern.style_type === "parang" || pattern.style_type === "parang-new" || pattern.style_type === "traditional" || pattern.style_type === "diagonal-lines") {
       patternContent = `<rect fill="${colors.background}" width="100" height="100" /><path d="M0,50 Q25,25 50,50 Q75,75 100,50" stroke="${colors.primary}" stroke-width="6" fill="none" /><path d="M0,80 Q25,55 50,80 Q75,105 100,80" stroke="${colors.secondary}" stroke-width="3" fill="none" /><path d="M0,20 Q25,-5 50,20 Q75,45 100,20" stroke="${colors.secondary}" stroke-width="3" fill="none" />`;
     } else if (pattern.style_type === "kawung" || pattern.style_type === "circles") {
       patternContent = `<rect fill="${colors.background}" width="80" height="80" /><ellipse cx="40" cy="22" rx="10" ry="18" fill="none" stroke="${colors.primary}" stroke-width="2.5" /><ellipse cx="40" cy="58" rx="10" ry="18" fill="none" stroke="${colors.primary}" stroke-width="2.5" /><ellipse cx="22" cy="40" rx="18" ry="10" fill="none" stroke="${colors.primary}" stroke-width="2.5" /><ellipse cx="58" cy="40" rx="18" ry="10" fill="none" stroke="${colors.primary}" stroke-width="2.5" /><circle cx="40" cy="40" r="5" fill="${colors.secondary}" />`;
@@ -1438,7 +1609,7 @@ export function CustomBatikPage() {
       <div className="w-full h-full">
         <svg width="100%" height="100%" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
           <rect fill="#FAF8F5" width="20" height="20" />
-          {(pattern.style_type === "parang" || pattern.style_type === "traditional" || pattern.style_type === "diagonal-lines") && (
+          {(pattern.style_type === "parang" || pattern.style_type === "parang-new" || pattern.style_type === "traditional" || pattern.style_type === "diagonal-lines") && (
             <path d="M0,10 Q5,5 10,10 Q15,15 20,10" stroke={preset.colors.primary} strokeWidth="1.5" fill="none" />
           )}
           {(pattern.style_type === "kawung" || pattern.style_type === "circles") && (
@@ -1701,7 +1872,11 @@ export function CustomBatikPage() {
     layer.fabricObject.clone((clonedObj: fabric.Object) => {
       clonedObj.set({ left: (clonedObj.left || 0) + 20, top: (clonedObj.top || 0) + 20 });
       const newLayerId = Date.now().toString();
-      (clonedObj as any).data = { layerId: newLayerId };
+      // Copy all data properties from the original layer:
+      (clonedObj as any).data = {
+        ...(layer.fabricObject as any).data,
+        layerId: newLayerId,
+      };
       fabricCanvasRef.current?.add(clonedObj);
       setLayers((prev) => [...prev, {
         id: newLayerId, type: layer.type, name: `${layer.name} (Copy)`,
