@@ -82,6 +82,10 @@ export function RootLayout() {
     { path: "/chat", label: "Chat" },
   ];
 
+  const desktopNavItems = navItems.filter(item => 
+    !["Desainku", "Pesanan", "Chat"].includes(item.label)
+  );
+
   const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Pengguna";
   const initials = user ? getInitials(user) : "U";
 
@@ -131,7 +135,7 @@ export function RootLayout() {
 
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-2">
-              {navItems.map((item) => {
+              {desktopNavItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
                   <Link
