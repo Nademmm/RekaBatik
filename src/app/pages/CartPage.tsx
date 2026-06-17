@@ -424,7 +424,7 @@ export function CartPage() {
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen relative pb-20" style={{ background: "#FAF8F5" }}>
+    <div className="min-h-screen relative pb-20 max-w-7xl mx-auto" style={{ background: "#FAF8F5" }}>
       <BatikBackground opacity={0.03} patternType="kawung" />
       <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full opacity-5 pointer-events-none" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)", transform: "translate(20%, -20%)" }} />
 

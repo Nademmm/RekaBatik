@@ -325,8 +325,8 @@ export function HomePage() {
       {/* ======================== STATS BAR ======================== */}
       <section className="relative py-8 overflow-hidden" style={{ background: "#FFFFFF" }}>
         <BatikBackground opacity={0.03} patternType="kawung" />
-        <div className="container flex justify-around px-4 relative z-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 lg:gap-16 max-w-6xl mx-auto">
+        <div className="container flex justify-around px-4 relative z-10 mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 lg:gap-30 max-w-6xl mx-auto">
             {stats.map((stat, i) => {
               const Icon = stat.icon;
               return (

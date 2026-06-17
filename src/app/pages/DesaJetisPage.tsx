@@ -282,7 +282,7 @@ export function DesaJetisPage() {
       <section style={{ background: "#3D2B1F" }} className="relative py-8 overflow-hidden">
         <BatikBackground opacity={0.08} patternType="parang" />
         <div className="container flex justify-around px-4 relative z-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 lg:gap-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 lg:gap-30">
             {[
               { value: "100+", label: "Tahun Tradisi", icon: Award },
               { value: "350+", label: "Pengrajin Aktif", icon: Users },

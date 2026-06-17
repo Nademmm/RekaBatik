@@ -3111,7 +3111,7 @@ export function CustomBatikPage() {
                 <div>
                   <label className="block text-sm font-bold text-[#3D2B1F] mb-1.5">Deskripsi / Tujuan</label>
                   <textarea
-                    placeholder="Contoh: Untuk seragam pernikahan bulan depan..."
+                    placeholder="Contoh: Untuk seragam pernikahan bulan depan, Penjelasan motif apa yang anda pakai"
                     value={projectInfo.description}
                     onChange={(e) => setProjectInfo(prev => ({ ...prev, description: e.target.value }))}
                     className="w-full px-4 py-3 rounded-xl border outline-none transition-all focus:border-[#8B6F47] focus:ring-1 focus:ring-[#8B6F47] resize-none h-24"
