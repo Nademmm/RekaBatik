@@ -8,6 +8,7 @@ import {
 import { Link, useNavigate } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
 import { useAuth } from "../../lib/AuthContext";
+import { useCart } from "../../lib/CartContext";
 import { supabase } from "../../lib/supabase";
 import { CartItem, ShippingAddress } from "../../types/database";
 import { toast, Toaster } from "sonner";
@@ -134,6 +135,7 @@ function Stepper({ current, steps = STEPS_NORMAL }: { current: CheckoutStep; ste
 // ─── Main Component ────────────────────────────────────────────────────────
 export function CartPage() {
   const { user } = useAuth();
+  const { fetchFullCart, updateQuantity: updateCartQuantity, removeItem: removeCartItem, refreshCart } = useCart();
   const navigate = useNavigate();
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -167,19 +169,14 @@ export function CartPage() {
     if (!user) { setLoading(false); return; }
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("cart_items")
-        .select("*, batik_items(*), custom_designs(*)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+      const data = await fetchFullCart();
       setCartItems(data || []);
     } catch (err) {
       toast.error("Gagal memuat keranjang belanja");
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, fetchFullCart]);
 
   useEffect(() => { fetchCartItems(); }, [fetchCartItems]);
 
@@ -189,10 +186,10 @@ export function CartPage() {
     if (newQty < 1) return;
     setCartItems(prev => prev.map(item => item.id === id ? { ...item, quantity: newQty } : item));
     try {
-      const { error } = await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id).eq("user_id", user!.id);
-      if (error) throw error;
+      await updateCartQuantity(id, newQty);
     } catch {
-      toast.error("Gagal mengubah jumlah"); fetchCartItems();
+      toast.error("Gagal mengubah jumlah"); 
+      fetchCartItems();
     }
   };
 
@@ -200,11 +197,11 @@ export function CartPage() {
   const removeItem = async (id: string) => {
     setCartItems(prev => prev.filter(item => item.id !== id));
     try {
-      const { error } = await supabase.from("cart_items").delete().eq("id", id).eq("user_id", user!.id);
-      if (error) throw error;
+      await removeCartItem(id);
       toast.success("Barang dihapus dari keranjang");
     } catch {
-      toast.error("Gagal menghapus barang"); fetchCartItems();
+      toast.error("Gagal menghapus barang"); 
+      fetchCartItems();
     }
   };
 
@@ -275,6 +272,7 @@ export function CartPage() {
       // Clear cart
       await supabase.from("cart_items").delete().eq("user_id", user.id);
       setCartItems([]);
+      refreshCart();
 
       if (hasCustomItems && store) {
         // Collect custom design thumbnails for the chat opening message

@@ -1,37 +1,41 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Search, Filter, Heart, ShoppingBag, Star, MapPin, X, ChevronRight, Minus, Plus, Loader2, BadgeCheck } from "lucide-react";
+import { Search, Filter, ShoppingBag, Star, MapPin } from "lucide-react";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase } from "../../lib/supabase";
 import { BatikItem } from "../../types/database";
 import { Skeleton } from "../components/ui/skeleton";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { useAuth } from "../../lib/AuthContext";
+import { useCart } from "../../lib/CartContext";
 import { useNavigate } from "react-router";
 
 const categories = [
   { value: "all", label: "Semua" },
-  { value: "traditional", label: "Tradisional" },
+  { value: "tradisional", label: "Tradisional" },
   { value: "modern", label: "Modern" },
   { value: "regional", label: "Regional" },
   { value: "wedding", label: "Pernikahan" },
 ];
 
-function StarRating({ rating }: { rating: number }) {
-  return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((s) => (
-        <Star key={s} className="w-3.5 h-3.5" fill={s <= rating ? "#D4B88B" : "none"} color={s <= rating ? "#D4B88B" : "#E8E1DA"} />
-      ))}
-    </div>
-  );
-}
+const validStyleTypes = [
+  "parang",
+  "parang-new",
+  "mega",
+  "sido-mukti",
+  "bunga1",
+  "bunga2",
+  "ceplok",
+];
+
+
 
 import { BatikDetailModal, PatternMini, getPatternType } from "../components/BatikDetailModal";
 
-// ── Main Page ───────────────────────────────────────────────────────────────
+// ── Main Page ──────────────────────────────────────────────────────────────
 export function CatalogPage() {
   const { user } = useAuth();
+  const { addToCart } = useCart();
   const navigate = useNavigate();
 
   const [items, setItems] = useState<BatikItem[]>([]);
@@ -52,7 +56,9 @@ export function CatalogPage() {
 
         const { data, error } = await query;
         if (error) throw error;
-        setItems((data as BatikItem[]) || []);
+        // Filter only valid items
+        const validItems = (data as BatikItem[]).filter(item => item.style_type && validStyleTypes.includes(item.style_type));
+        setItems(validItems || []);
       } catch (err) {
         toast.error("Gagal memuat katalog batik.");
       } finally {
@@ -71,27 +77,7 @@ export function CatalogPage() {
 
     setIsAddingToCart(true);
     try {
-      // Check if item already in cart
-      const { data: existingCart } = await supabase
-        .from("cart_items")
-        .select("id, quantity")
-        .eq("user_id", user.id)
-        .eq("batik_id", batik.id)
-        .single();
-
-      if (existingCart) {
-        const { error } = await supabase
-          .from("cart_items")
-          .update({ quantity: existingCart.quantity + quantity })
-          .eq("id", existingCart.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("cart_items")
-          .insert([{ user_id: user.id, batik_id: batik.id, quantity }]);
-        if (error) throw error;
-      }
-      
+      await addToCart({ batikId: batik.id, quantity });
       toast.success(`${quantity}x ${batik.name} ditambahkan ke keranjang!`);
       setSelectedBatik(null); // Close modal on success
     } catch (err) {
@@ -174,7 +160,7 @@ export function CatalogPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
             <AnimatePresence>
               {items.map((item, idx) => {
-                const pType = getPatternType(item.category, item.id);
+                const pType = getPatternType(item.style_type);
                 return (
                   <motion.div
                     key={item.id}

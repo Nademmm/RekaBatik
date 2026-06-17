@@ -25,9 +25,17 @@ export function PatternMini({ primary, secondary, bg, type }: { primary: string;
   );
 }
 
-export function getPatternType(category: string, id: number): string {
-  const map: Record<number, string> = { 1: "diagonal", 2: "kawung", 3: "cloud", 4: "star", 5: "flower", 6: "geo", 7: "geo", 8: "diagonal", 9: "diagonal", 10: "flower", 11: "kawung", 12: "flower" };
-  return map[id] || "default";
+export function getPatternType(styleType: string | undefined): string {
+  const map: Record<string, string> = { 
+    "parang": "diagonal", 
+    "parang-new": "diagonal", 
+    "mega": "cloud", 
+    "sido-mukti": "geo", 
+    "bunga1": "flower", 
+    "bunga2": "flower", 
+    "ceplok": "geo" 
+  };
+  return styleType ? (map[styleType] || "default") : "default";
 }
 
 // ── Detail Modal Component ──────────────────────────────────────────────────
@@ -43,7 +51,7 @@ export function BatikDetailModal({
   isAdding: boolean;
 }) {
   const [qty, setQty] = useState(1);
-  const patternType = getPatternType(item.category, item.id);
+  const patternType = getPatternType(item.style_type);
 
   // Close on Escape
   useEffect(() => {

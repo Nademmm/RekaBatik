@@ -34,6 +34,7 @@ import {
   History,
   ShoppingCart,
   Package,
+  Type,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -44,38 +45,29 @@ import { toast } from "sonner";
 import { Skeleton } from "../components/ui/skeleton";
 import { fabric } from "fabric";
 import { useAuth } from "../../lib/AuthContext";
+import { useCart } from "../../lib/CartContext";
 
-// Import dummy SVG batik
-import parangDummySvg from "../../assets/batik-svgs/parang-dummy.svg?raw";
+// Import batik SVGs
 import parangBatikSvg from "../../assets/batik-svgs/parang_batik.svg?raw";
-import parangSimpleSvg from "../../assets/batik-svgs/parang_simple.svg?raw";
 import parangNewSvg from "../../assets/batik-svgs/parang.svg?raw";
-import kawungDummySvg from "../../assets/batik-svgs/kawung-dummy.svg?raw";
-import megaMendungDummySvg from "../../assets/batik-svgs/mega-mendung-dummy.svg?raw";
 import megaMendungNewSvg from "../../assets/batik-svgs/mega_mendung.svg?raw";
-import truntumDummySvg from "../../assets/batik-svgs/truntum-dummy.svg?raw";
-import sekarDummySvg from "../../assets/batik-svgs/sekar-dummy.svg?raw";
-import sidoMuktiDummySvg from "../../assets/batik-svgs/sido-mukti-dummy.svg?raw";
+import bunga1Svg from "../../assets/batik-svgs/bunga1.svg?raw";
+import bunga2Svg from "../../assets/batik-svgs/bunga2.svg?raw";
+import ceplokSvg from "../../assets/batik-svgs/ceplok.svg?raw";
+import sidomuktiSvg from "../../assets/batik-svgs/sidomukti.svg?raw";
 
 // Mapping style_type ke SVG
 const batikSvgMap: Record<string, string> = {
   parang: parangBatikSvg,
   "parang-new": parangNewSvg,
-  "traditional": parangBatikSvg,
-  "diagonal-lines": parangNewSvg,
-  kawung: kawungDummySvg,
-  circles: kawungDummySvg,
   mega: megaMendungNewSvg,
-  clouds: megaMendungNewSvg,
-  regional: megaMendungNewSvg,
-  truntum: truntumDummySvg,
-  stars: truntumDummySvg,
-  sekar: sekarDummySvg,
-  flowers: sekarDummySvg,
-  "sido-mukti": sidoMuktiDummySvg,
+  "sido-mukti": sidomuktiSvg,
+  bunga1: bunga1Svg,
+  bunga2: bunga2Svg,
+  ceplok: ceplokSvg,
 };
 
-type Tool = "select" | "brush" | "eraser" | "fill" | "shape";
+type Tool = "select" | "brush" | "eraser" | "fill" | "shape" | "text";
 type ShapeType = "rect" | "circle" | "line" | "star";
 
 interface CustomLayer {
@@ -138,10 +130,16 @@ const recolorSVG = (svgString: string, preset: typeof colorPresets[0]) => {
   result = result.replace(/#5e5c5c/gi, preset.batik.mid);       // Warna sedang
   result = result.replace(/#242020/gi, preset.batik.dark);      // Warna gelap
 
-  // Untuk dummy SVGs yang pakai #8B6F47 dan #D4B88B:
-  result = result.replace(/#8B6F47/gi, preset.colors.primary);
-  result = result.replace(/#D4B88B/gi, preset.colors.secondary);
-  
+  // Untuk bunga2.svg dan lainnya yang pakai grayscale:
+  result = result.replace(/#d0d0d0/gi, preset.batik.light);     // Warna terang
+  result = result.replace(/#b9b9b9/gi, preset.batik.light);     // Warna terang
+  result = result.replace(/#a3a3a3/gi, preset.batik.mid);       // Warna sedang
+  result = result.replace(/#8c8c8c/gi, preset.batik.mid);       // Warna sedang
+  result = result.replace(/#767676/gi, preset.batik.dark);      // Warna gelap
+  result = result.replace(/#606060/gi, preset.batik.dark);      // Warna gelap
+  result = result.replace(/#494949/gi, preset.batik.dark);      // Warna gelap
+  result = result.replace(/#333333/gi, preset.batik.dark);      // Warna gelap
+
   // Untuk parang.svg dan mega_mendung.svg:
   result = result.replace(/#000000/gi, preset.colors.primary); // Hitam diganti warna utama
   result = result.replace(/#caac47/gi, preset.colors.secondary); // Kuning diganti warna sekunder
@@ -164,6 +162,7 @@ export function CustomBatikPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { addToCart: addToCartFromContext } = useCart();
 
   const [patterns, setPatterns] = useState<BatikItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,6 +201,13 @@ export function CustomBatikPage() {
   const [shapeStroke, setShapeStroke] = useState("#3D2B1F");
   const [shapeStrokeWidth, setShapeStrokeWidth] = useState(2);
   const [shapeOpacity, setShapeOpacity] = useState(100);
+  // ─── Text Tool State ─────────────────────────────────────────────────────
+  const [textColor, setTextColor] = useState("#3D2B1F");
+  const [fontSize, setFontSize] = useState(32);
+  const [fontFamily, setFontFamily] = useState("serif");
+  // ─── Selected Object State ─────────────────────────────────────────────────
+  const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(null);
+  const [selectedObjectType, setSelectedObjectType] = useState<"pattern" | "shape" | "text" | null>(null);
   // ─── Zoom State ──────────────────────────────────────────────────────────────
   const [zoomLevel, setZoomLevel] = useState(100);
 
@@ -251,6 +257,9 @@ export function CustomBatikPage() {
   const shapeStrokeRef = useRef("#3D2B1F");
   const shapeStrokeWidthRef = useRef(2);
   const shapeOpacityRef = useRef(100);
+  const textColorRef = useRef("#3D2B1F");
+  const fontSizeRef = useRef(32);
+  const fontFamilyRef = useRef("serif");
   // Refs untuk zoom & pan
   const zoomLevelRef = useRef(100);
   const isPanningRef = useRef(false);
@@ -265,6 +274,135 @@ export function CustomBatikPage() {
   useEffect(() => { brushSizeRef.current = brushSize[0]; }, [brushSize]);
   useEffect(() => { brushColorRef.current = brushColor; }, [brushColor]);
   useEffect(() => { brushOpacityRef.current = brushOpacity[0]; }, [brushOpacity]);
+  useEffect(() => { textColorRef.current = textColor; }, [textColor]);
+  useEffect(() => { fontSizeRef.current = fontSize; }, [fontSize]);
+  useEffect(() => { fontFamilyRef.current = fontFamily; }, [fontFamily]);
+
+  // Log selectedObject and selectedObjectType changes
+  useEffect(() => {
+    console.log("selectedObject changed:", selectedObject);
+    console.log("selectedObjectType changed:", selectedObjectType);
+  }, [selectedObject, selectedObjectType]);
+
+  // Sync state when selected object changes
+  useEffect(() => {
+    console.log("Sync state when selected object changes!");
+    console.log("selectedObject:", selectedObject);
+    console.log("selectedObjectType:", selectedObjectType);
+
+    if (!selectedObject) return;
+
+    // Check if it's a shape (has fill, stroke, etc.)
+    if (selectedObjectType === "shape") {
+      console.log("Syncing shape state!");
+      if (typeof selectedObject.fill === 'string') {
+        console.log("Setting shapeFill to:", selectedObject.fill);
+        setShapeFill(selectedObject.fill);
+      }
+      if (typeof selectedObject.stroke === 'string') {
+        console.log("Setting shapeStroke to:", selectedObject.stroke);
+        setShapeStroke(selectedObject.stroke);
+      }
+      if (typeof selectedObject.strokeWidth === 'number') {
+        console.log("Setting shapeStrokeWidth to:", selectedObject.strokeWidth);
+        setShapeStrokeWidth(selectedObject.strokeWidth);
+      }
+      if (typeof selectedObject.opacity === 'number') {
+        console.log("Setting shapeOpacity to:", selectedObject.opacity * 100);
+        setShapeOpacity(selectedObject.opacity * 100);
+      }
+    }
+
+    // Check if it's a text object
+    if (selectedObjectType === "text") {
+      console.log("Syncing text state!");
+      const textObj = selectedObject as fabric.IText;
+      if (typeof textObj.fill === 'string') {
+        console.log("Setting textColor to:", textObj.fill);
+        setTextColor(textObj.fill);
+      }
+      if (typeof textObj.fontSize === 'number') {
+        console.log("Setting fontSize to:", textObj.fontSize);
+        setFontSize(textObj.fontSize);
+      }
+      if ((textObj as any).fontFamily) {
+        console.log("Setting fontFamily to:", (textObj as any).fontFamily);
+        setFontFamily((textObj as any).fontFamily);
+      }
+    }
+  }, [selectedObject, selectedObjectType]);
+
+  // Update selected shape when shape state changes
+  useEffect(() => {
+    console.log("Update shape effect triggered!");
+    console.log("selectedObjectType:", selectedObjectType);
+    if (!selectedObject || selectedObjectType !== "shape") {
+      console.log("Not a shape, returning early");
+      return;
+    }
+
+    console.log("Updating shape with:", { shapeFill, shapeStroke, shapeStrokeWidth, shapeOpacity });
+
+    let needsRender = false;
+    const obj = selectedObject;
+
+    if (typeof obj.fill === 'string' && obj.fill !== shapeFill) {
+      obj.set("fill", shapeFill);
+      needsRender = true;
+    }
+    if (typeof obj.stroke === 'string' && obj.stroke !== shapeStroke) {
+      obj.set("stroke", shapeStroke);
+      needsRender = true;
+    }
+    if (typeof obj.strokeWidth === 'number' && obj.strokeWidth !== shapeStrokeWidth) {
+      obj.set("strokeWidth", shapeStrokeWidth);
+      needsRender = true;
+    }
+    const targetOpacity = shapeOpacity / 100;
+    if (typeof obj.opacity === 'number' && Math.abs(obj.opacity - targetOpacity) > 0.001) {
+      obj.set("opacity", targetOpacity);
+      needsRender = true;
+    }
+
+    if (needsRender) {
+      console.log("Rendering canvas!");
+      obj.setCoords();
+      fabricCanvasRef.current?.requestRenderAll();
+      fabricCanvasRef.current?.renderAll(); // Force a render
+    }
+  }, [shapeFill, shapeStroke, shapeStrokeWidth, shapeOpacity, selectedObject, selectedObjectType]);
+
+  // Update selected text when text state changes
+  useEffect(() => {
+    console.log("Update text effect triggered!");
+    console.log("selectedObjectType:", selectedObjectType);
+    if (!selectedObject || selectedObjectType !== "text") {
+      console.log("Not text, returning early");
+      return;
+    }
+
+    const textObj = selectedObject as fabric.IText;
+    let needsRender = false;
+
+    if (typeof textObj.fill === 'string' && textObj.fill !== textColor) {
+      textObj.set("fill", textColor);
+      needsRender = true;
+    }
+    if (typeof textObj.fontSize === 'number' && textObj.fontSize !== fontSize) {
+      textObj.set("fontSize", fontSize);
+      needsRender = true;
+    }
+    if ((textObj as any).fontFamily !== fontFamily) {
+      textObj.set("fontFamily", fontFamily);
+      needsRender = true;
+    }
+
+    if (needsRender) {
+      textObj.setCoords();
+      fabricCanvasRef.current?.requestRenderAll();
+      fabricCanvasRef.current?.renderAll();
+    }
+  }, [textColor, fontSize, fontFamily, selectedObject, selectedObjectType]);
 
   // ─── Sync canvas background color ke Fabric (langsung, no debounce) ──────
   const isApplyingBgUndoRef = useRef(false);
@@ -326,17 +464,6 @@ export function CustomBatikPage() {
     return () => clearTimeout(timer);
   }, [selectedLayerId, activeTab]);
 
-  // ─── Init offscreen canvas (sekali saja) ──────────────────────────────────
-  useEffect(() => {
-    const offscreen = document.createElement("canvas");
-    offscreen.width = 800;
-    offscreen.height = 600;
-    offscreenRef.current = offscreen;
-    // Save initial empty ImageData
-    const ctx = offscreen.getContext("2d")!;
-    initialOffscreenImageDataRef.current = ctx.getImageData(0, 0, 800, 600);
-  }, []);
-
   // Helper to check if two ImageData are the same
   const isImageDataEqual = (img1: ImageData, img2: ImageData) => {
     if (img1.width !== img2.width || img1.height !== img2.height) return false;
@@ -365,6 +492,20 @@ export function CustomBatikPage() {
     ctx.clearRect(0, 0, 800, 600);
     ctx.drawImage(offscreen, 0, 0);
   }, []);
+
+  // ─── Init offscreen canvas (sekali saja) ──────────────────────────────────
+  useEffect(() => {
+    const offscreen = document.createElement("canvas");
+    offscreen.width = 800;
+    offscreen.height = 600;
+    offscreenRef.current = offscreen;
+    // Save initial empty ImageData
+    const ctx = offscreen.getContext("2d")!;
+    initialOffscreenImageDataRef.current = ctx.getImageData(0, 0, 800, 600);
+    
+    // Sync display canvas right away
+    syncDisplay();
+  }, [syncDisplay]);
 
   // ─── Simpan snapshot ke history Fabric (untuk pattern) ────────────────────
   const saveSnapshot = useCallback(() => {
@@ -812,168 +953,14 @@ export function CustomBatikPage() {
           .select("*")
           .order("id", { ascending: true });
         if (error) throw error;
-        if (data && data.length > 0) {
-          // Check if we already have both parang options, if not add them
-          const hasParangBatik = data.some(p => p.style_type === "parang");
-          const hasParangNew = data.some(p => p.style_type === "parang-new");
-          const fallbackPatterns: BatikItem[] = [];
-          if (!hasParangBatik) {
-            fallbackPatterns.push({
-              id: 999,
-              name: "Parang Klasik",
-              category: "tradisional",
-              price: 0,
-              description: "Motif parang klasik dengan garis diagonal khas batik Jawa",
-              origin: "Jawa Tengah",
-              primary_color: "#8B6F47",
-              secondary_color: "#D4B88B",
-              bg_color: "#f3f3f3",
-              rating: 5,
-              sold: 0,
-              style_type: "parang",
-            });
-          }
-          if (!hasParangNew) {
-            fallbackPatterns.push({
-              id: 1000,
-              name: "Parang Baru",
-              category: "tradisional",
-              price: 0,
-              description: "Motif parang baru dengan detail yang lebih kompleks",
-              origin: "Jawa Tengah",
-              primary_color: "#8B6F47",
-              secondary_color: "#D4B88B",
-              bg_color: "#f3f3f3",
-              rating: 5,
-              sold: 0,
-              style_type: "parang-new",
-            });
-          }
-          setPatterns([...data, ...fallbackPatterns]);
-        } else {
-          // Use full fallback patterns if nothing in DB
-          const fallback: BatikItem[] = [
-            {
-              id: 1,
-              name: "Parang Klasik",
-              category: "tradisional",
-              price: 0,
-              description: "Motif parang klasik dengan garis diagonal khas batik Jawa",
-              origin: "Jawa Tengah",
-              primary_color: "#8B6F47",
-              secondary_color: "#D4B88B",
-              bg_color: "#f3f3f3",
-              rating: 5,
-              sold: 0,
-              style_type: "parang",
-            },
-            {
-              id: 2,
-              name: "Parang Baru",
-              category: "tradisional",
-              price: 0,
-              description: "Motif parang baru dengan detail yang lebih kompleks",
-              origin: "Jawa Tengah",
-              primary_color: "#8B6F47",
-              secondary_color: "#D4B88B",
-              bg_color: "#f3f3f3",
-              rating: 5,
-              sold: 0,
-              style_type: "parang-new",
-            },
-            {
-              id: 3,
-              name: "Kawung",
-              category: "tradisional",
-              price: 0,
-              description: "Motif kawung yang terinspirasi dari buah aren",
-              origin: "Jawa Tengah",
-              primary_color: "#8B6F47",
-              secondary_color: "#D4B88B",
-              bg_color: "#f3f3f3",
-              rating: 5,
-              sold: 0,
-              style_type: "kawung",
-            },
-            {
-              id: 4,
-              name: "Mega Mendung",
-              category: "tradisional",
-              price: 0,
-              description: "Motif mega mendung yang terinspirasi dari awan",
-              origin: "Cirebon",
-              primary_color: "#8B6F47",
-              secondary_color: "#D4B88B",
-              bg_color: "#f3f3f3",
-              rating: 5,
-              sold: 0,
-              style_type: "mega",
-            },
-          ];
-          setPatterns(fallback);
-        }
+        
+        // Filter only patterns that are in batikSvgMap
+        const filteredPatterns = data?.filter(item => batikSvgMap[item.style_type]) || [];
+        
+        setPatterns(filteredPatterns);
       } catch (err: any) {
         handleSupabaseError(err, "CustomBatikPage.fetchPatterns");
-        // Use fallback patterns on error
-        const fallback: BatikItem[] = [
-          {
-            id: 1,
-            name: "Parang Klasik",
-            category: "tradisional",
-            price: 0,
-            description: "Motif parang klasik dengan garis diagonal khas batik Jawa",
-            origin: "Jawa Tengah",
-            primary_color: "#8B6F47",
-            secondary_color: "#D4B88B",
-            bg_color: "#f3f3f3",
-            rating: 5,
-            sold: 0,
-            style_type: "parang",
-          },
-          {
-            id: 2,
-            name: "Parang Baru",
-            category: "tradisional",
-            price: 0,
-            description: "Motif parang baru dengan detail yang lebih kompleks",
-            origin: "Jawa Tengah",
-            primary_color: "#8B6F47",
-            secondary_color: "#D4B88B",
-            bg_color: "#f3f3f3",
-            rating: 5,
-            sold: 0,
-            style_type: "parang-new",
-          },
-          {
-            id: 3,
-            name: "Kawung",
-            category: "tradisional",
-            price: 0,
-            description: "Motif kawung yang terinspirasi dari buah aren",
-            origin: "Jawa Tengah",
-            primary_color: "#8B6F47",
-            secondary_color: "#D4B88B",
-            bg_color: "#f3f3f3",
-            rating: 5,
-            sold: 0,
-            style_type: "kawung",
-          },
-          {
-            id: 4,
-            name: "Mega Mendung",
-            category: "tradisional",
-            price: 0,
-            description: "Motif mega mendung yang terinspirasi dari awan",
-            origin: "Cirebon",
-            primary_color: "#8B6F47",
-            secondary_color: "#D4B88B",
-            bg_color: "#f3f3f3",
-            rating: 5,
-            sold: 0,
-            style_type: "mega",
-          },
-        ];
-        setPatterns(fallback);
+        setPatterns([]);
       } finally {
         setLoading(false);
       }
@@ -1073,6 +1060,33 @@ export function CustomBatikPage() {
     });
     fabricCanvasRef.current = canvas;
 
+    // Helper untuk detect tipe objek
+    const detectObjectType = (target: fabric.Object): "pattern" | "shape" | "text" | null => {
+      console.log("=== detectObjectType ===");
+      console.log("target:", target);
+      console.log("target.constructor.name:", target?.constructor?.name);
+      console.log("All properties on target:", Object.keys(target || {}));
+      if (!target) return null;
+      // Try constructor name first
+      const ctorName = target.constructor?.name?.toLowerCase();
+      if (ctorName?.includes("text")) return "text";
+      if (ctorName?.includes("image")) return "pattern";
+      if (ctorName?.includes("rect") || ctorName?.includes("ellipse") || ctorName?.includes("polygon") || ctorName?.includes("line") || ctorName?.includes("circle")) return "shape";
+      // Fallback to type property
+      if (target.type === "i-text" || target.type === "text") return "text";
+      if (target.type === "image") return "pattern";
+      // Shape: Rect, Ellipse, Polygon, Line
+      if (
+        target.type === "rect" ||
+        target.type === "ellipse" ||
+        target.type === "polygon" ||
+        target.type === "line" ||
+        target.type === "circle"
+      ) return "shape";
+      console.log("Unknown type:", target.type, "constructor:", ctorName);
+      return null;
+    };
+
     // Custom delete control
     fabric.Object.prototype.controls.deleteControl = new fabric.Control({
       x: 0.5,
@@ -1116,7 +1130,20 @@ export function CustomBatikPage() {
     });
 
     canvas.on("object:selected", (e) => {
+      console.log("=== object:selected event! ===");
+      console.log("full event object:", e);
       const target = (e as any).target;
+      console.log("target:", target);
+      console.log("target.type:", target?.type);
+      if (!target) {
+        setSelectedObject(null);
+        setSelectedObjectType(null);
+        return;
+      }
+      setSelectedObject(target);
+      const type = detectObjectType(target);
+      console.log("setting selectedObjectType to:", type);
+      setSelectedObjectType(type);
       if (target?.data?.layerId) {
         setSelectedLayerId(target.data.layerId);
         // Auto-switch ke tab Layer dan scroll ke layer tersebut
@@ -1133,7 +1160,19 @@ export function CustomBatikPage() {
     });
     // selection:updated terjadi ketika user pindah klik dari satu objek ke objek lain
     canvas.on("selection:updated", (e) => {
+      console.log("=== selection:updated event! ===");
+      console.log("full event object:", e);
       const target = (e as any).target;
+      console.log("selection:updated target:", target);
+      console.log("target.type:", target?.type);
+      if (!target) {
+        setSelectedObject(null);
+        setSelectedObjectType(null);
+        return;
+      }
+      setSelectedObject(target);
+      const type = detectObjectType(target);
+      setSelectedObjectType(type);
       if (target?.data?.layerId) {
         setSelectedLayerId(target.data.layerId);
         setActiveTab("layer");
@@ -1146,6 +1185,9 @@ export function CustomBatikPage() {
       }
     });
     canvas.on("selection:cleared", () => {
+      console.log("selection:cleared!");
+      setSelectedObject(null);
+      setSelectedObjectType(null);
       // Hanya clear selection jika mousedown terjadi di dalam canvas
       // Mencegah klik di sidebar/UI luar menghapus selection
       if (lastMousedownInCanvasRef.current) {
@@ -1153,12 +1195,71 @@ export function CustomBatikPage() {
       }
     });
 
+    canvas.on("mouse:down", (e) => {
+      console.log("=== canvas mouse:down! ===");
+      console.log("e:", e);
+      console.log("e.target:", e.target);
+      
+      // Manually handle object selection here
+      if (e.target) {
+        console.log("Manually selecting object via mouse:down!");
+        setSelectedObject(e.target);
+        
+        // Determine the type
+        const detectObjectType = (target: fabric.Object): "pattern" | "shape" | "text" | null => {
+          const ctorName = target.constructor?.name?.toLowerCase();
+          if (ctorName?.includes("text")) return "text";
+          if (ctorName?.includes("image")) return "pattern";
+          if (
+            ctorName?.includes("rect") ||
+            ctorName?.includes("ellipse") ||
+            ctorName?.includes("polygon") ||
+            ctorName?.includes("line") ||
+            ctorName?.includes("circle")
+          ) return "shape";
+          if (target.type === "i-text" || target.type === "text") return "text";
+          if (target.type === "image") return "pattern";
+          if (
+            target.type === "rect" ||
+            target.type === "ellipse" ||
+            target.type === "polygon" ||
+            target.type === "line" ||
+            target.type === "circle"
+          ) return "shape";
+          return null;
+        };
+        
+        const type = detectObjectType(e.target);
+        console.log("Manually set selectedObjectType to:", type);
+        setSelectedObjectType(type);
+        
+        // Also set selectedLayerId if present
+        if (e.target.data?.layerId) {
+          setSelectedLayerId(e.target.data.layerId);
+          setActiveTab("layer");
+        }
+      } else {
+        console.log("No target hit, clearing selectedObject!");
+        setSelectedObject(null);
+        setSelectedObjectType(null);
+        setSelectedLayerId(null);
+      }
+    });
+
     // Track apakah mousedown terjadi di dalam canvas wrapper
     const handleGlobalMousedown = (e: MouseEvent) => {
+      console.log("=== Global mousedown! ===");
+      console.log("activeTool:", activeToolRef.current);
+      console.log("e.target:", e.target);
+      console.log("e.target element:", (e.target as HTMLElement)?.tagName);
       const target = e.target as Node;
       const fabricEl = canvas.getElement();
       const wrapper = fabricEl?.parentElement;
       const displayCanvas = displayCanvasRef.current;
+      console.log("fabricEl:", fabricEl);
+      console.log("wrapper:", wrapper);
+      console.log("displayCanvas:", displayCanvas);
+      
       // Klik dianggap "di dalam canvas" jika target adalah canvas fabric atau display canvas
       lastMousedownInCanvasRef.current = !!(
         (wrapper && wrapper.contains(target)) ||
@@ -1185,16 +1286,32 @@ export function CustomBatikPage() {
       }
 
       if (e.key === "Backspace" || e.key === "Delete") {
-        const active = canvas.getActiveObjects();
-        if (active.length > 0) {
-          active.forEach((obj) => {
-            if ((obj as any).data?.layerId) {
-              canvas.remove(obj);
-              setLayers((prev) => prev.filter((l) => l.id !== (obj as any).data.layerId));
-            }
-          });
-          canvas.discardActiveObject();
-          setSelectedLayerId(null);
+        // Skip delete if any active object is text in editing mode
+        let isEditingText = false;
+        const activeObj = canvas.getActiveObject();
+        if (activeObj) {
+          // Check if it's a text object and is in editing mode
+          const ctorName = activeObj.constructor?.name?.toLowerCase();
+          const isTextObj = ctorName?.includes("text") || activeObj.type === "i-text" || activeObj.type === "text";
+          if (isTextObj && (activeObj as any).isEditing) {
+            isEditingText = true;
+          }
+        }
+
+        if (!isEditingText) {
+          const active = canvas.getActiveObjects();
+          if (active.length > 0) {
+            active.forEach((obj) => {
+              if ((obj as any).data?.layerId) {
+                canvas.remove(obj);
+                setLayers((prev) => prev.filter((l) => l.id !== (obj as any).data.layerId));
+              }
+            });
+            canvas.discardActiveObject();
+            setSelectedLayerId(null);
+            setSelectedObject(null);
+            setSelectedObjectType(null);
+          }
         }
       }
     };
@@ -1202,6 +1319,7 @@ export function CustomBatikPage() {
 
     saveSnapshot();
     saveOffscreenSnapshot();
+    syncDisplay();
 
     // Set initial size & zoom
     if (containerRef.current && displayCanvasRef.current) {
@@ -1319,7 +1437,8 @@ export function CustomBatikPage() {
     };
 
     const onMouseDown = (e: any) => {
-      if (activeToolRef.current !== "shape") return;
+    if (activeToolRef.current !== "shape") return; 
+      if (e.target) return; // Don't create new shape if clicking on existing object
       const pos = getCanvasPos(e);
       shapeStartRef.current = pos;
 
@@ -1409,6 +1528,7 @@ export function CustomBatikPage() {
         selectable: true,
         evented: true,
         objectCaching: false,
+        hasControls: true,
       };
 
       let finalShape: fabric.Object;
@@ -1438,6 +1558,8 @@ export function CustomBatikPage() {
           evented: true,
           fill: "",
           opacity: shapeOpacityRef.current / 100,
+          objectCaching: false,
+          hasControls: true,
         });
       }
 
@@ -1485,42 +1607,176 @@ export function CustomBatikPage() {
     };
   }, [saveSnapshot, applyZoom]);
 
+  // ─── Text tool event listener ─────────────────────────────────────────────
+  useEffect(() => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    const onMouseDown = (e: any) => {
+      if (activeToolRef.current !== "text") return;
+      // Don't create new text if clicking on an existing object
+      if (e.target) return;
+
+      const pointer = fc.getPointer(e.e);
+      const text = new fabric.IText("Ketik teks di sini", {
+        left: pointer.x,
+        top: pointer.y,
+        fontFamily: fontFamilyRef.current,
+        fontSize: fontSizeRef.current,
+        fill: textColorRef.current,
+        selectable: true,
+        evented: true,
+        hasControls: true,
+        editable: true,
+        objectCaching: false,
+      });
+
+      const newLayerId = Date.now().toString();
+      (text as any).data = { layerId: newLayerId, layerName: "Teks" };
+
+      fc.add(text);
+      fc.setActiveObject(text);
+      text.enterEditing();
+      text.selectAll();
+      fc.requestRenderAll();
+
+      setLayers((prev) => [...prev, {
+        id: newLayerId,
+        type: "drawing" as const,
+        name: "Teks",
+        visible: true,
+        locked: false,
+        fabricObject: text,
+      }]);
+      setSelectedLayerId(newLayerId);
+      setActiveTab("layer");
+      // After user finishes editing, save snapshot
+      text.on("editing:exited", () => {
+        // Remove if empty
+        if (!text.text?.trim()) {
+          fc.remove(text);
+          setLayers((prev) => prev.filter((l) => l.id !== newLayerId));
+          setSelectedLayerId(null);
+        } else {
+          saveSnapshot();
+        }
+      });
+    };
+
+    fc.on("mouse:down", onMouseDown);
+    return () => { fc.off("mouse:down", onMouseDown); };
+  }, [saveSnapshot]);
+
   // ─── Switch tool ───────────────────────────────────────────────────────────
   useEffect(() => {
+    console.log("=== Switch tool useEffect triggered! ===");
+    console.log("activeTool:", activeTool);
     const canvas = fabricCanvasRef.current;
     const display = displayCanvasRef.current;
-    const fabricEl = canvas?.getElement()?.parentElement;
-    if (!canvas || !display) return;
+    const fabricWrapper = (fabricCanvasRef as any).wrapper;
+    console.log("canvas:", canvas);
+    console.log("display:", display);
+    console.log("fabricWrapper:", fabricWrapper);
+    if (!canvas || !display || !fabricWrapper) return;
+
+    // Always sync display canvas from offscreen to ensure brush strokes are visible!
+    syncDisplay();
 
     if (activeTool === "select") {
+      console.log("Setting SELECT mode");
       canvas.isDrawingMode = false;
       canvas.selection = true;
       canvas.defaultCursor = "default";
       canvas.hoverCursor = "move";
-      canvas.forEachObject((obj) => { obj.evented = true; });
+      // PENTING: restore evented and selectable
+      canvas.forEachObject((obj) => {
+        const layerId = (obj as any).data?.layerId;
+        if (!layerId) return;
+        obj.evented = true;
+        obj.selectable = true;
+      });
       canvas.renderAll();
-      display.style.cssText = `position:absolute;top:0;left:0;pointer-events:none!important;z-index:2;`;
-      if (fabricEl) {
-        (fabricEl as HTMLElement).style.cssText = "position:absolute;top:0;left:0;z-index:1;";
-      }
+      
+      // Force z-index by setting style properties directly
+      console.log("Setting display style: z-index 2, pointer-events none");
+      display.style.position = "absolute";
+      display.style.top = "0";
+      display.style.left = "0";
+      display.style.pointerEvents = "none";
+      display.style.zIndex = "2";
+      display.style.width = "100%";
+      display.style.height = "100%";
+      
+      console.log("Setting fabricWrapper style: z-index 1");
+      fabricWrapper.style.position = "absolute";
+      fabricWrapper.style.top = "0";
+      fabricWrapper.style.left = "0";
+      fabricWrapper.style.zIndex = "1";
+      fabricWrapper.style.width = "100%";
+      fabricWrapper.style.height = "100%";
+
+      // Log computed styles
+      setTimeout(() => {
+        console.log("=== Computed styles after 100ms ===");
+        console.log("display.style:", display.style);
+        console.log("display computedStyle:", window.getComputedStyle(display));
+        console.log("fabricWrapper.style:", fabricWrapper.style);
+        console.log("fabricWrapper computedStyle:", window.getComputedStyle(fabricWrapper));
+      }, 100);
+    } else if (activeTool === "text") {
+      console.log("Setting TEXT mode");
+      canvas.isDrawingMode = false;
+      canvas.selection = true;
+      canvas.defaultCursor = "text";
+      canvas.hoverCursor = "text";
+      canvas.forEachObject((obj) => { obj.evented = true; obj.selectable = true; });
+      canvas.renderAll();
+      
+      display.style.position = "absolute";
+      display.style.top = "0";
+      display.style.left = "0";
+      display.style.pointerEvents = "none";
+      display.style.zIndex = "2";
+      display.style.width = "100%";
+      display.style.height = "100%";
+      
+      fabricWrapper.style.position = "absolute";
+      fabricWrapper.style.top = "0";
+      fabricWrapper.style.left = "0";
+      fabricWrapper.style.zIndex = "1";
+      fabricWrapper.style.width = "100%";
+      fabricWrapper.style.height = "100%";
     } else if (activeTool === "shape") {
       // Shape: Fabric aktif (pointer events ON) tapi tidak bisa select objek lama
+      console.log("Setting SHAPE mode");
       canvas.isDrawingMode = false;
       canvas.selection = false;
       canvas.defaultCursor = "crosshair";
       canvas.hoverCursor = "crosshair";
-      canvas.forEachObject((obj) => { obj.evented = false; });
+      canvas.forEachObject((obj) => { obj.evented = false; obj.selectable = false; });
       canvas.renderAll();
-      display.style.cssText = `position:absolute;top:0;left:0;pointer-events:none!important;z-index:2;`;
-      if (fabricEl) {
-        (fabricEl as HTMLElement).style.cssText = "position:absolute;top:0;left:0;z-index:3;";
-      }
+      
+      display.style.position = "absolute";
+      display.style.top = "0";
+      display.style.left = "0";
+      display.style.pointerEvents = "none";
+      display.style.zIndex = "2";
+      display.style.width = "100%";
+      display.style.height = "100%";
+      
+      fabricWrapper.style.position = "absolute";
+      fabricWrapper.style.top = "0";
+      fabricWrapper.style.left = "0";
+      fabricWrapper.style.zIndex = "1";
+      fabricWrapper.style.width = "100%";
+      fabricWrapper.style.height = "100%";
     } else {
       // brush, eraser, fill — display canvas di atas
+      console.log("Setting BRUSH/ERASER/FILL mode");
       canvas.isDrawingMode = false;
       canvas.selection = false;
       canvas.discardActiveObject();
-      canvas.forEachObject((obj) => { obj.evented = false; });
+      canvas.forEachObject((obj) => { obj.evented = false; obj.selectable = false; });
       canvas.renderAll();
 
       let cursor = "crosshair";
@@ -1534,12 +1790,24 @@ export function CustomBatikPage() {
             : `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${size / 2}' cy='${size / 2}' r='${size / 2 - 1}' fill='${brushColorRef.current.replace("#", "%23")}' opacity='0.7'/></svg>`;
         cursor = `url("data:image/svg+xml,${cursorSvg}") ${size / 2} ${size / 2}, crosshair`;
       }
-      display.style.cssText = `position:absolute;top:0;left:0;pointer-events:auto!important;z-index:2;cursor:${cursor};`;
-      if (fabricEl) {
-        (fabricEl as HTMLElement).style.cssText = "position:absolute;top:0;left:0;z-index:1;";
-      }
+      
+      display.style.position = "absolute";
+      display.style.top = "0";
+      display.style.left = "0";
+      display.style.pointerEvents = "auto";
+      display.style.zIndex = "2";
+      display.style.cursor = cursor;
+      display.style.width = "100%";
+      display.style.height = "100%";
+      
+      fabricWrapper.style.position = "absolute";
+      fabricWrapper.style.top = "0";
+      fabricWrapper.style.left = "0";
+      fabricWrapper.style.zIndex = "1";
+      fabricWrapper.style.width = "100%";
+      fabricWrapper.style.height = "100%";
     }
-  }, [activeTool, brushSize, brushColor]);
+  }, [activeTool, brushSize, brushColor, syncDisplay]);
 
   // ─── Resize ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1830,41 +2098,36 @@ export function CustomBatikPage() {
   }, []);
 
   const moveLayer = useCallback((layerId: string, direction: "up" | "down") => {
-    const fc = fabricCanvasRef.current;
-    if (!fc) return;
+  const fc = fabricCanvasRef.current;
+  if (!fc) return;
 
-    const index = layers.findIndex((l) => l.id === layerId);
-    if (index === -1) return;
+  const index = layers.findIndex((l) => l.id === layerId);
+  if (index === -1) return;
+  const layer = layers[index];
+  if (!layer.fabricObject) return;
 
-    const layer = layers[index];
-    if (!layer.fabricObject) return;
+  // Cek batas
+  if (direction === "up" && index === layers.length - 1) return;
+  if (direction === "down" && index === 0) return;
 
-    if (direction === "up") {
-      fc.bringForward(layer.fabricObject);
-      if (index === layers.length - 1) {
-        fc.renderAll();
-        return;
-      }
-      const newLayers = [...layers];
-      const temp = newLayers[index];
-      newLayers[index] = newLayers[index + 1];
-      newLayers[index + 1] = temp;
-      setLayers(newLayers);
-    } else {
-      fc.sendBackwards(layer.fabricObject);
-      if (index === 0) {
-        fc.renderAll();
-        return;
-      }
-      const newLayers = [...layers];
-      const temp = newLayers[index];
-      newLayers[index] = newLayers[index - 1];
-      newLayers[index - 1] = temp;
-      setLayers(newLayers);
-    }
-    fc.renderAll();
-    saveSnapshot();
-  }, [layers, saveSnapshot]);
+  // Update Fabric z-order
+  if (direction === "up") {
+    fc.bringForward(layer.fabricObject, false);
+  } else {
+    fc.sendBackwards(layer.fabricObject, false);
+  }
+  fc.requestRenderAll();
+
+  // Sync React state agar sidebar ikut update
+  setLayers((prev) => {
+    const next = [...prev];
+    const swapIndex = direction === "up" ? index + 1 : index - 1;
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+    return next;
+  });
+
+  saveSnapshot();
+}, [layers, saveSnapshot]);
 
   const duplicateLayer = useCallback((layerId: string) => {
     const layer = layers.find((l) => l.id === layerId);
@@ -2083,14 +2346,7 @@ export function CustomBatikPage() {
           designId = await saveDesign();
           if (!designId) { setIsAddingToCart(false); return; }
         }
-        // Cek existing
-        const { data: existing } = await supabase.from("cart_items").select("id").eq("user_id", user!.id).eq("custom_design_id", designId).single();
-        if (existing) {
-          await supabase.from("cart_items").update({ quantity: 1 }).eq("id", existing.id);
-        } else {
-          await supabase.from("cart_items").insert([{ user_id: user!.id, custom_design_id: designId, quantity: 1 }]);
-        }
-        
+        await addToCartFromContext({ customDesignId: designId, quantity: 1 });
         setShowSuccessModal("cart");
       } catch (err) {
         console.error(err);
@@ -2107,11 +2363,7 @@ export function CustomBatikPage() {
           designId = await saveDesign();
           if (!designId) { setIsAddingToCart(false); return; }
         }
-        // Cek existing
-        const { data: existing } = await supabase.from("cart_items").select("id").eq("user_id", user!.id).eq("custom_design_id", designId).single();
-        if (!existing) {
-          await supabase.from("cart_items").insert([{ user_id: user!.id, custom_design_id: designId, quantity: 1 }]);
-        }
+        await addToCartFromContext({ customDesignId: designId, quantity: 1 });
         navigate("/cart");
       } catch (err) {
         console.error(err);
@@ -2193,6 +2445,7 @@ export function CustomBatikPage() {
                       { tool: "eraser" as Tool, icon: Eraser, label: "Hapus" },
                       { tool: "fill" as Tool, icon: PaintBucket, label: "Isi" },
                       { tool: "shape" as Tool, icon: Square, label: "Bentuk" },
+                      { tool: "text" as Tool, icon: Type, label: "Teks" },
                     ] as const).map(({ tool, icon: Icon, label }) => {
                       const isActive = activeTool === tool;
                       return (
@@ -2354,17 +2607,117 @@ export function CustomBatikPage() {
                   {/* MODE: SELECT */}
                   {activeTool === "select" && (
                     <div className="flex items-center gap-2 py-2.5">
-                      <div
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
-                        style={{
-                          background: "rgba(139,111,71,0.07)",
-                          border: "1px solid rgba(212,184,139,0.25)",
-                          color: "#8B6F47",
-                        }}
-                      >
-                        <MousePointer2 style={{ width: "12px", height: "12px", flexShrink: 0 }} />
-                        <span>Klik motif di kanvas untuk memilih, lalu geser, putar, atau ubah ukurannya</span>
-                      </div>
+                      {!selectedObject ? (
+                        // Hint text — tidak ada yang dipilih
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+                          style={{ background: "rgba(139,111,71,0.07)", border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}>
+                          <MousePointer2 style={{ width: "12px", height: "12px", flexShrink: 0 }} />
+                          <span>Klik objek di kanvas untuk memilih, lalu geser, putar, atau ubah ukurannya</span>
+                        </div>
+                      ) : selectedObjectType === "shape" ? (
+                        // ─── Edit Shape Controls ───
+                        <div className="flex items-center gap-3">
+                          {/* Fill Color — sembunyikan untuk Line */}
+                          {!(selectedObject instanceof fabric.Line) && (
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Isi</span>
+                              <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105"
+                                style={{ background: shapeFill, border: "2px solid rgba(255,255,255,0.8)",
+                                  boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", width: "24px", height: "24px" }}>
+                                <input type="color" value={shapeFill}
+                                  onChange={(e) => setShapeFill(e.target.value)}
+                                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                              </div>
+                            </div>
+                          )}
+                          {/* Stroke Color + Width */}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Garis</span>
+                            <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105"
+                              style={{ background: shapeStroke, border: "2px solid rgba(255,255,255,0.8)",
+                                boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", width: "24px", height: "24px" }}>
+                              <input type="color" value={shapeStroke}
+                                onChange={(e) => setShapeStroke(e.target.value)}
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                            </div>
+                            <input type="range" min="1" max="20" step="1"
+                              value={shapeStrokeWidth}
+                              onChange={(e) => setShapeStrokeWidth(Number(e.target.value))}
+                              className="h-1.5 rounded-full appearance-none cursor-pointer"
+                              style={{ width: "64px", accentColor: "#8B6F47",
+                                background: `linear-gradient(to right, #8B6F47 ${(shapeStrokeWidth / 20) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
+                            <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "26px" }}>
+                              {shapeStrokeWidth}px
+                            </span>
+                          </div>
+                          {/* Opacity */}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Opasitas</span>
+                            <input type="range" min="10" max="100" step="10"
+                              value={shapeOpacity}
+                              onChange={(e) => setShapeOpacity(Number(e.target.value))}
+                              className="h-1.5 rounded-full appearance-none cursor-pointer"
+                              style={{ width: "64px", accentColor: "#8B6F47",
+                                background: `linear-gradient(to right, #8B6F47 ${shapeOpacity}%, rgba(139,111,71,0.15) 0%)` }} />
+                            <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "32px" }}>
+                              {shapeOpacity}%
+                            </span>
+                          </div>
+                        </div>
+                      ) : selectedObjectType === "text" ? (
+                        // ─── Edit Text Controls ───
+                        <div className="flex items-center gap-3">
+                          <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)}
+                            className="h-8 px-2 rounded-lg text-xs font-semibold border cursor-pointer"
+                            style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}>
+                            <option value="serif">Serif</option>
+                            <option value="sans-serif">Sans-serif</option>
+                            <option value="'Playfair Display', serif">Playfair Display</option>
+                            <option value="monospace">Monospace</option>
+                          </select>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Ukuran</span>
+                            <button onClick={() => setFontSize(s => Math.max(8, s - 4))}
+                              className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white"
+                              style={{ borderColor: "rgba(212,184,139,0.25)", color: "#8B6F47" }}>
+                              <Minus style={{ width: "10px", height: "10px" }} />
+                            </button>
+                            <span className="text-xs font-bold font-mono w-8 text-center" style={{ color: "#3D2B1F" }}>{fontSize}</span>
+                            <button onClick={() => setFontSize(s => Math.min(120, s + 4))}
+                              className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white"
+                              style={{ borderColor: "rgba(212,184,139,0.25)", color: "#8B6F47" }}>
+                              <Plus style={{ width: "10px", height: "10px" }} />
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Warna</span>
+                            <div className="relative rounded-lg cursor-pointer hover:scale-105 transition-all"
+                              style={{ background: textColor, width: "26px", height: "26px",
+                                border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)" }}>
+                              <input type="color" value={textColor}
+                                onChange={(e) => setTextColor(e.target.value)}
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                            </div>
+                            <div className="flex gap-1.5">
+                              {["#3D2B1F","#8B6F47","#D4B88B","#2A4B7C","#2D5A2D","#8B2A2A","#ffffff"].map((c) => (
+                                <button key={c} onClick={() => setTextColor(c)}
+                                  className="rounded-full transition-all hover:scale-110 cursor-pointer"
+                                  style={{ width: textColor === c ? "20px" : "16px", height: textColor === c ? "20px" : "16px",
+                                    background: c, border: `${textColor === c ? "2.5" : "1.5"}px solid ${textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)"}` }} />
+                              ))}
+                            </div>
+                          </div>
+                          {/* Double-click hint */}
+                          <span className="text-[10px] text-[#A89B8F] italic flex-shrink-0">Klik 2x untuk edit teks</span>
+                        </div>
+                      ) : selectedObjectType === "pattern" ? (
+                        // ─── Pattern selected — hint untuk recolor ───
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+                          style={{ background: "rgba(139,111,71,0.07)", border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}>
+                          <Palette style={{ width: "12px", height: "12px", flexShrink: 0 }} />
+                          <span>Motif dipilih — ganti warna via tab Preset di sidebar kanan</span>
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
@@ -2687,6 +3040,65 @@ export function CustomBatikPage() {
                     </div>
                   )}
 
+                  {/* MODE: TEXT */}
+                  {activeTool === "text" && (
+                    <div className="flex items-center gap-3 py-2">
+                      {/* Font Family */}
+                      <select
+                        value={fontFamily}
+                        onChange={(e) => setFontFamily(e.target.value)}
+                        className="h-8 px-2 rounded-lg text-xs font-semibold border cursor-pointer"
+                        style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}
+                      >
+                        <option value="serif">Serif</option>
+                        <option value="sans-serif">Sans-serif</option>
+                        <option value="'Playfair Display', serif">Playfair Display</option>
+                        <option value="monospace">Monospace</option>
+                      </select>
+
+                      {/* Font Size */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Ukuran</span>
+                        <button onClick={() => setFontSize(s => Math.max(8, s - 4))}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white"
+                          style={{ borderColor: "rgba(212,184,139,0.25)", color: "#8B6F47" }}>
+                          <Minus style={{ width: "10px", height: "10px" }} />
+                        </button>
+                        <span className="text-xs font-bold font-mono w-8 text-center" style={{ color: "#3D2B1F" }}>{fontSize}</span>
+                        <button onClick={() => setFontSize(s => Math.min(120, s + 4))}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white"
+                          style={{ borderColor: "rgba(212,184,139,0.25)", color: "#8B6F47" }}>
+                          <Plus style={{ width: "10px", height: "10px" }} />
+                        </button>
+                      </div>
+
+                      {/* Text Color */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Warna</span>
+                        <div className="relative rounded-lg cursor-pointer hover:scale-105 transition-all"
+                          style={{ background: textColor, width: "26px", height: "26px",
+                            border: "2px solid rgba(255,255,255,0.8)",
+                            boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)" }}>
+                          <input type="color" value={textColor}
+                            onChange={(e) => setTextColor(e.target.value)}
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                        </div>
+                        <div className="flex gap-1.5">
+                          {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#ffffff"].map((c) => (
+                            <button key={c} onClick={() => setTextColor(c)}
+                              className="rounded-full border transition-all hover:scale-110 cursor-pointer"
+                              style={{ width: textColor === c ? "20px" : "16px", height: textColor === c ? "20px" : "16px",
+                                background: c, borderColor: textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)",
+                                border: `${textColor === c ? "2.5" : "1.5"}px solid ${textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)"}` }} />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="h-6 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
+                      <span className="text-[10px] text-[#A89B8F] italic">Klik area kosong di kanvas untuk menambah teks</span>
+                    </div>
+                  )}
+
                 </div>
               </div>
 
@@ -2701,19 +3113,25 @@ export function CustomBatikPage() {
                       ref={displayCanvasRef}
                       width={800}
                       height={600}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        pointerEvents: "none",
-                        zIndex: 0,
-                        width: "100%",
-                        height: "100%",
-                      }}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'auto' }}
                     />
 
                     {/* Layer 2: Fabric canvas wrapper */}
-                    <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 1 }}>
+                    <div
+                      ref={(el) => {
+                        // Store this element in a new ref to access it!
+                        (fabricCanvasRef as any).wrapper = el;
+                        // Also add a click listener directly here
+                        if (el) {
+                          el.addEventListener("click", (e) => {
+                            console.log("=== Fabric wrapper directly clicked! ===");
+                            console.log("e:", e);
+                            console.log("e.target:", e.target);
+                          });
+                        }
+                      }}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}
+                    >
                       <canvas ref={canvasRef} />
                     </div>
 
@@ -2906,10 +3324,27 @@ export function CustomBatikPage() {
                             key={layer.id}
                             ref={(el) => { layerItemRefs.current[layer.id] = el; }}
                             onClick={() => {
+                              console.log("=== Layer clicked! ===");
+                              console.log("layer:", layer);
                               if (layer.fabricObject && fabricCanvasRef.current) {
                                 fabricCanvasRef.current.setActiveObject(layer.fabricObject);
                                 fabricCanvasRef.current.renderAll();
                                 setSelectedLayerId(layer.id);
+                                console.log("Setting selectedObject manually");
+                                setSelectedObject(layer.fabricObject);
+                                const type = (() => {
+                                  const target = layer.fabricObject;
+                                  const ctorName = target.constructor?.name?.toLowerCase();
+                                  if (ctorName?.includes("text")) return "text";
+                                  if (ctorName?.includes("image")) return "pattern";
+                                  if (ctorName?.includes("rect") || ctorName?.includes("ellipse") || ctorName?.includes("polygon") || ctorName?.includes("line") || ctorName?.includes("circle")) return "shape";
+                                  if (target.type === "i-text" || target.type === "text") return "text";
+                                  if (target.type === "image") return "pattern";
+                                  if (target.type === "rect" || target.type === "ellipse" || target.type === "polygon" || target.type === "line" || target.type === "circle") return "shape";
+                                  return null;
+                                })();
+                                console.log("Setting selectedObjectType manually to:", type);
+                                setSelectedObjectType(type);
                               }
                             }}
                             className={`p-3 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col gap-2.5 ${isSelected

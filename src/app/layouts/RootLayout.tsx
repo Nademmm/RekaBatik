@@ -1,12 +1,12 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
 import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BatikBackground } from "../components/BatikBackground";
 import logoImg from "../../imports/rekabatik-logo.png";
 import { Toaster, toast } from "sonner";
 import { useAuth } from "../../lib/AuthContext";
-import { supabase } from "../../lib/supabase";
+import { useCart } from "../../lib/CartContext";
 
 /** Derive initials from full_name or email */
 function getInitials(user: { user_metadata?: { full_name?: string }; email?: string }) {
@@ -24,32 +24,11 @@ export function RootLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuth();
+  const { cartCount } = useCart();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
   const userMenuRef = useRef<HTMLDivElement>(null);
-
-  const fetchCartCount = useCallback(async () => {
-    if (!user) { setCartCount(0); return; }
-    const { data } = await supabase
-      .from("cart_items")
-      .select("quantity")
-      .eq("user_id", user.id);
-    const totalQty = data?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-    setCartCount(totalQty);
-  }, [user]);
-
-  useEffect(() => {
-    fetchCartCount();
-    if (!user) return;
-    // Subscribe to cart changes in real-time
-    const channel = supabase
-      .channel("cart-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "cart_items", filter: `user_id=eq.${user.id}` }, fetchCartCount)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user, fetchCartCount]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
