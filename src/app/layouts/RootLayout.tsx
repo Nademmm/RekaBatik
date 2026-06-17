@@ -7,6 +7,17 @@ import logoImg from "../../imports/rekabatik-logo.png";
 import { Toaster, toast } from "sonner";
 import { useAuth } from "../../lib/AuthContext";
 import { useCart } from "../../lib/CartContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 
 /** Derive initials from full_name or email */
 function getInitials(user: { user_metadata?: { full_name?: string }; email?: string }) {
@@ -28,6 +39,7 @@ export function RootLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,6 +67,7 @@ export function RootLayout() {
   const handleSignOut = async () => {
     await signOut();
     setUserMenuOpen(false);
+    setIsLogoutDialogOpen(false);
     toast.success("Berhasil keluar. Sampai jumpa!");
     navigate("/");
   };
@@ -66,6 +79,7 @@ export function RootLayout() {
     { path: "/desain-histori", label: "Desainku" },
     { path: "/orders", label: "Pesanan" },
     { path: "/desa-jetis", label: "Tentang Kami" },
+    { path: "/chat", label: "Chat" },
   ];
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Pengguna";
@@ -141,7 +155,7 @@ export function RootLayout() {
               {/* Cart Icon */}
               <Link
                 to="/cart"
-                className="hidden md:flex items-center justify-center w-10 h-10 rounded-md transition-all hover:bg-gray-100 relative"
+                className="flex items-center justify-center w-10 h-10 rounded-md transition-all hover:bg-gray-100 relative"
                 style={{ color: "#3D2B1F" }}
               >
                 <ShoppingBag className="w-5 h-5" />
@@ -294,7 +308,10 @@ export function RootLayout() {
                           style={{ borderTop: "1px solid rgba(139,111,71,0.08)" }}
                         >
                           <button
-                            onClick={handleSignOut}
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              setIsLogoutDialogOpen(true);
+                            }}
                             className="flex items-center gap-3 w-full px-4 py-2.5 text-sm transition-colors"
                             style={{ color: "#ef4444" }}
                             onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.05)")}
@@ -389,37 +406,53 @@ export function RootLayout() {
                       }}
                     >
                       <span className="text-sm">{item.label}</span>
-                      {isActive && <ChevronRight className="w-4 h-4 opacity-50" />}
+                      <ChevronRight className="w-4 h-4 opacity-50" />
                     </Link>
                   );
                 })}
 
                 {/* Mobile Actions */}
-                <div className="pt-3 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      to="/cart"
-                      className="flex-1 flex items-center justify-center w-10 h-10 rounded-md border relative"
-                      style={{ color: "#3D2B1F", borderColor: "#E8E1DA" }}
-                    >
-                      <ShoppingBag className="w-5 h-5" />
-                      <AnimatePresence>
-                        {cartCount > 0 && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                            className="absolute -top-1 right-2 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                            style={{ background: "#D97706" }}
-                          >
-                            {cartCount > 9 ? "9+" : cartCount}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </Link>
+                <div className="pt-3 space-y-2">
+                  {loading ? (
+                    /* Skeleton while loading auth */
+                    <div className="px-4 py-3 rounded-md animate-pulse" style={{ background: "rgba(139,111,71,0.1)" }} />
+                  ) : user ? (
+                    /* Logged in */
+                    <div className="space-y-2">
+                      {/* User info */}
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-md" style={{ background: "rgba(139,111,71,0.06)" }}>
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
+                          style={{
+                            background: "linear-gradient(135deg, #3D2B1F, #8B6F47)",
+                            color: "#FAF8F5",
+                            letterSpacing: "0.05em",
+                          }}
+                        >
+                          {initials}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: "#3D2B1F" }}>{displayName}</p>
+                          <p className="text-xs truncate" style={{ color: "#9E8E82" }}>{user.email}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setMobileOpen(false);
+                            setIsLogoutDialogOpen(true);
+                          }}
+                          className="w-10 h-10 rounded-md flex items-center justify-center"
+                          style={{ color: "#ef4444" }}
+                        >
+                          <LogOut className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Not logged in */
                     <Link
                       to="/auth"
-                      className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-md"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-md"
                       style={{
                         background: "#3D2B1F",
                         color: "#FFFFFF",
@@ -429,7 +462,7 @@ export function RootLayout() {
                       <User className="w-4 h-4" />
                       Login
                     </Link>
-                  </div>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -640,6 +673,27 @@ export function RootLayout() {
           </motion.div>
         </div>
       </footer>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Keluar dari Akun?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin keluar dari akun Anda?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSignOut}
+              style={{ background: "#ef4444", color: "#FFFFFF" }}
+            >
+              Keluar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
