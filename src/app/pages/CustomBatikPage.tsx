@@ -157,6 +157,41 @@ const recolorSVG = (svgString: string, preset: typeof colorPresets[0]) => {
   return result;
 };
 
+// Helper function to convert hex to RGB
+const hexToRgb = (hex: string) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+};
+
+// Helper function to convert RGB to hex
+const rgbToHex = (r: number, g: number, b: number) => {
+  return "#" + [r, g, b].map(x => {
+    const hex = Math.round(Math.max(0, Math.min(255, x))).toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  }).join("");
+};
+
+// Generate color shades from primary color
+const generatePresetFromPrimary = (primaryColor: string) => {
+  const rgb = hexToRgb(primaryColor);
+  if (!rgb) return colorPresets[0];
+
+  // Generate light, mid, dark shades
+  const light = rgbToHex(rgb.r + 60, rgb.g + 60, rgb.b + 60);
+  const mid = primaryColor;
+  const dark = rgbToHex(rgb.r - 50, rgb.g - 50, rgb.b - 50);
+
+  return {
+    name: "Custom",
+    colors: { primary: mid, secondary: light, accent: light, background: "transparent" },
+    batik: { background: "#f3f3f3", light: light, mid: mid, dark: dark }
+  };
+};
+
 // ─── Helper: Buat titik polygon bintang ─────────────────────────────────────
 function makeStarPoints(cx: number, cy: number, numPoints: number, outerR: number, innerR: number) {
   const points: { x: number; y: number }[] = [];
@@ -198,6 +233,8 @@ export function CustomBatikPage() {
   const [canRedo, setCanRedo] = useState(false);
   // State untuk preset warna yang dipilih
   const [selectedPreset, setSelectedPreset] = useState(colorPresets[0]);
+  // State untuk warna custom (hanya primary)
+  const [customColor, setCustomColor] = useState(colorPresets[0].colors.primary);
   // State untuk tab sidebar aktif
   const [activeTab, setActiveTab] = useState("pattern");
   // State untuk warna latar belakang kanvas
@@ -1926,6 +1963,7 @@ export function CustomBatikPage() {
           layerName: pattern.name || 'Motif',
           styleType: pattern.style_type,
           colorPresetName: selectedPreset.name,
+          customColor: customColor,
           originalSvg:
             pattern.style_type && batikSvgMap[pattern.style_type]
               ? batikSvgMap[pattern.style_type]
@@ -1970,8 +2008,12 @@ export function CustomBatikPage() {
     if (!activeObj) return;
 
     const data = (activeObj as any).data;
-    // Skip update jika presetnya sudah sama agar tidak render berulang
-    if (data.colorPresetName === selectedPreset.name) return;
+    // Skip update jika presetnya sudah sama DAN warna custom juga sama
+    if (data.colorPresetName === selectedPreset.name) {
+      // If it's a custom preset, check if color actually changed
+      if (selectedPreset.name !== "Custom") return;
+      if (data.customColor === customColor) return;
+    }
 
     let recoloredSvg = "";
     if (data.originalSvg) {
@@ -2003,6 +2045,7 @@ export function CustomBatikPage() {
       // Update image source in-place
       (activeObj as fabric.Image).setSrc(pngUrl, () => {
         data.colorPresetName = selectedPreset.name;
+        data.customColor = customColor; // Store custom color in data
         activeObj.setCoords();
         fabricCanvasRef.current?.requestRenderAll();
         // Update layers list to reflect the new color in the sidebar
@@ -2016,7 +2059,7 @@ export function CustomBatikPage() {
     };
 
     htmlImg.src = blobUrl;
-  }, [selectedPreset, saveSnapshot, renderPatternSVGString, patterns]);
+  }, [selectedPreset, customColor, saveSnapshot, renderPatternSVGString, patterns]);
 
   // Jalankan recolor ketika preset berubah
   useEffect(() => {
@@ -3228,13 +3271,41 @@ export function CustomBatikPage() {
                     <p style={{ color: "#7A6B5E", fontSize: "0.8rem", fontWeight: 500 }}>Pilih palet warna (klik motif di kanvas dulu):</p>
                   </div>
 
+                  {/* Custom Color Picker Section */}
+                  <div className="mb-6 p-4 rounded-2xl border bg-[#FAF8F5]" style={{ borderColor: "rgba(139,111,71,0.12)" }}>
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <Brush className="w-4 h-4 text-[#8B6F47]" />
+                      <p style={{ color: "#3D2B1F", fontSize: "0.85rem", fontWeight: 700 }}>Warna Custom</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold" style={{ color: "#8E7F72" }}>Warna Utama</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customColor}
+                          onChange={(e) => {
+                            const newColor = e.target.value;
+                            setCustomColor(newColor);
+                            setSelectedPreset(generatePresetFromPrimary(newColor));
+                          }}
+                          className="w-12 h-10 rounded-lg border cursor-pointer"
+                          style={{ borderColor: "rgba(139,111,71,0.12)" }}
+                        />
+                        <span className="text-xs font-mono" style={{ color: "#7A6B5E" }}>{customColor}</span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-3 pr-1">
                     {colorPresets.map((preset, i) => {
                       const isActive = selectedPreset.name === preset.name;
                       return (
                         <button
                           key={i}
-                          onClick={() => setSelectedPreset(preset)}
+                          onClick={() => {
+                            setSelectedPreset(preset);
+                            setCustomColor(preset.colors.primary);
+                          }}
                           className={`w-full p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${isActive
                             ? "bg-[rgba(139,111,71,0.06)] border-[#8B6F47] border-2 shadow-sm"
                             : "bg-[#FAF8F5] hover:bg-[#FFFFFF] hover:border-[#8B6F47]/30 border border-[rgba(139,111,71,0.12)] hover:shadow-sm"
