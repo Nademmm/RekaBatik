@@ -55,6 +55,11 @@ import bunga1Svg from "../../assets/batik-svgs/bunga1.svg?raw";
 import bunga2Svg from "../../assets/batik-svgs/bunga2.svg?raw";
 import ceplokSvg from "../../assets/batik-svgs/ceplok.svg?raw";
 import sidomuktiSvg from "../../assets/batik-svgs/sidomukti.svg?raw";
+import bunga3Svg from "../../assets/batik-svgs/bunga3.svg?raw";
+import tiesSvg from "../../assets/batik-svgs/ties.svg?raw";
+import terataiSvg from "../../assets/batik-svgs/teratai.svg?raw";
+import urangSvg from "../../assets/batik-svgs/urang.svg?raw";
+import iwakSvg from "../../assets/batik-svgs/iwak.svg?raw";
 
 // Mapping style_type ke SVG
 const batikSvgMap: Record<string, string> = {
@@ -65,6 +70,11 @@ const batikSvgMap: Record<string, string> = {
   bunga1: bunga1Svg,
   bunga2: bunga2Svg,
   ceplok: ceplokSvg,
+  bunga3: bunga3Svg,
+  ties: tiesSvg,
+  teratai: terataiSvg,
+  urang: urangSvg,
+  iwak: iwakSvg,
 };
 
 type Tool = "select" | "brush" | "eraser" | "fill" | "shape" | "text";
@@ -278,55 +288,36 @@ export function CustomBatikPage() {
   useEffect(() => { fontSizeRef.current = fontSize; }, [fontSize]);
   useEffect(() => { fontFamilyRef.current = fontFamily; }, [fontFamily]);
 
-  // Log selectedObject and selectedObjectType changes
-  useEffect(() => {
-    console.log("selectedObject changed:", selectedObject);
-    console.log("selectedObjectType changed:", selectedObjectType);
-  }, [selectedObject, selectedObjectType]);
-
   // Sync state when selected object changes
   useEffect(() => {
-    console.log("Sync state when selected object changes!");
-    console.log("selectedObject:", selectedObject);
-    console.log("selectedObjectType:", selectedObjectType);
-
     if (!selectedObject) return;
 
     // Check if it's a shape (has fill, stroke, etc.)
     if (selectedObjectType === "shape") {
-      console.log("Syncing shape state!");
       if (typeof selectedObject.fill === 'string') {
-        console.log("Setting shapeFill to:", selectedObject.fill);
         setShapeFill(selectedObject.fill);
       }
       if (typeof selectedObject.stroke === 'string') {
-        console.log("Setting shapeStroke to:", selectedObject.stroke);
         setShapeStroke(selectedObject.stroke);
       }
       if (typeof selectedObject.strokeWidth === 'number') {
-        console.log("Setting shapeStrokeWidth to:", selectedObject.strokeWidth);
         setShapeStrokeWidth(selectedObject.strokeWidth);
       }
       if (typeof selectedObject.opacity === 'number') {
-        console.log("Setting shapeOpacity to:", selectedObject.opacity * 100);
         setShapeOpacity(selectedObject.opacity * 100);
       }
     }
 
     // Check if it's a text object
     if (selectedObjectType === "text") {
-      console.log("Syncing text state!");
       const textObj = selectedObject as fabric.IText;
       if (typeof textObj.fill === 'string') {
-        console.log("Setting textColor to:", textObj.fill);
         setTextColor(textObj.fill);
       }
       if (typeof textObj.fontSize === 'number') {
-        console.log("Setting fontSize to:", textObj.fontSize);
         setFontSize(textObj.fontSize);
       }
       if ((textObj as any).fontFamily) {
-        console.log("Setting fontFamily to:", (textObj as any).fontFamily);
         setFontFamily((textObj as any).fontFamily);
       }
     }
@@ -334,14 +325,9 @@ export function CustomBatikPage() {
 
   // Update selected shape when shape state changes
   useEffect(() => {
-    console.log("Update shape effect triggered!");
-    console.log("selectedObjectType:", selectedObjectType);
     if (!selectedObject || selectedObjectType !== "shape") {
-      console.log("Not a shape, returning early");
       return;
     }
-
-    console.log("Updating shape with:", { shapeFill, shapeStroke, shapeStrokeWidth, shapeOpacity });
 
     let needsRender = false;
     const obj = selectedObject;
@@ -365,19 +351,14 @@ export function CustomBatikPage() {
     }
 
     if (needsRender) {
-      console.log("Rendering canvas!");
       obj.setCoords();
       fabricCanvasRef.current?.requestRenderAll();
-      fabricCanvasRef.current?.renderAll(); // Force a render
     }
   }, [shapeFill, shapeStroke, shapeStrokeWidth, shapeOpacity, selectedObject, selectedObjectType]);
 
   // Update selected text when text state changes
   useEffect(() => {
-    console.log("Update text effect triggered!");
-    console.log("selectedObjectType:", selectedObjectType);
     if (!selectedObject || selectedObjectType !== "text") {
-      console.log("Not text, returning early");
       return;
     }
 
@@ -400,36 +381,62 @@ export function CustomBatikPage() {
     if (needsRender) {
       textObj.setCoords();
       fabricCanvasRef.current?.requestRenderAll();
-      fabricCanvasRef.current?.renderAll();
     }
   }, [textColor, fontSize, fontFamily, selectedObject, selectedObjectType]);
 
-  // ─── Sync canvas background color ke Fabric (langsung, no debounce) ──────
+  // ─── State untuk preview warna langsung di UI & DOM ───────────────────
+  const [bgColorPickerValue, setBgColorPickerValue] = useState(canvasBackground);
+  
+  // ─── Ref untuk debounce update Fabric ──────────────────────────────────
+  const bgFabricUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // ─── Sync bgColorPickerValue saat canvasBackground berubah (undo/redo) ────
+  useEffect(() => {
+    setBgColorPickerValue(canvasBackground);
+  }, [canvasBackground]);
+  
+  // ─── Sync Fabric background hanya ketika user berhenti mengubah warna ─────
   const isApplyingBgUndoRef = useRef(false);
   useEffect(() => {
     const fc = fabricCanvasRef.current;
     if (!fc) return;
-    // Terapkan warna ke kanvas seketika untuk live preview
-    fc.setBackgroundColor(canvasBackground, () => {
-      fc.requestRenderAll();
-    });
 
-    // Jika sedang undo/redo, jangan schedule debounce — sudah ditangani di committedBg
+    // Batalkan timer sebelumnya jika ada
+    if (bgFabricUpdateTimerRef.current !== null) {
+      clearTimeout(bgFabricUpdateTimerRef.current);
+    }
+
+    // Update canvasBackground state untuk download dan undo/redo
+    setCanvasBackground(bgColorPickerValue);
+
+    // Jika sedang undo/redo, update Fabric segera!
     if (isApplyingBgUndoRef.current) {
       isApplyingBgUndoRef.current = false;
+      fc.setBackgroundColor(bgColorPickerValue, () => {
+        fc.requestRenderAll();
+      });
       return;
     }
 
     // Jangan jadwalkan debounce saat inisialisasi awal
     if (isInitRef.current) return;
 
-    // Debounce: baru push ke history setelah 600ms user berhenti menggeser
-    if (bgDebounceTimerRef.current) clearTimeout(bgDebounceTimerRef.current);
-    bgDebounceTimerRef.current = setTimeout(() => {
-      setCommittedBg(canvasBackground);
-    }, 600);
-  }, [canvasBackground]);
-
+    // Debounce: baru update Fabric dan push ke history setelah 300ms user berhenti
+    bgFabricUpdateTimerRef.current = setTimeout(() => {
+      fc.setBackgroundColor(bgColorPickerValue, () => {
+        fc.requestRenderAll();
+      });
+      setCommittedBg(bgColorPickerValue);
+    }, 300);
+    
+    // Cleanup timer saat unmount atau perubahan dependencies
+    return () => {
+      if (bgFabricUpdateTimerRef.current !== null) {
+        clearTimeout(bgFabricUpdateTimerRef.current);
+      }
+    };
+  }, [bgColorPickerValue]);
+  
   // ─── Push committed background ke history (hanya saat nilai benar-benar settle) ─
   useEffect(() => {
     if (isInitRef.current) return;
@@ -1053,7 +1060,7 @@ export function CustomBatikPage() {
     const canvas = new fabric.Canvas(canvasRef.current, {
       width: 800,
       height: 600,
-      backgroundColor: "#ffffff",
+      backgroundColor: canvasBackground,
       selection: true,
       preserveObjectStacking: true,
       targetFindTolerance: 10,
@@ -1062,10 +1069,6 @@ export function CustomBatikPage() {
 
     // Helper untuk detect tipe objek
     const detectObjectType = (target: fabric.Object): "pattern" | "shape" | "text" | null => {
-      console.log("=== detectObjectType ===");
-      console.log("target:", target);
-      console.log("target.constructor.name:", target?.constructor?.name);
-      console.log("All properties on target:", Object.keys(target || {}));
       if (!target) return null;
       // Try constructor name first
       const ctorName = target.constructor?.name?.toLowerCase();
@@ -1083,7 +1086,6 @@ export function CustomBatikPage() {
         target.type === "line" ||
         target.type === "circle"
       ) return "shape";
-      console.log("Unknown type:", target.type, "constructor:", ctorName);
       return null;
     };
 
@@ -1130,11 +1132,7 @@ export function CustomBatikPage() {
     });
 
     canvas.on("object:selected", (e) => {
-      console.log("=== object:selected event! ===");
-      console.log("full event object:", e);
       const target = (e as any).target;
-      console.log("target:", target);
-      console.log("target.type:", target?.type);
       if (!target) {
         setSelectedObject(null);
         setSelectedObjectType(null);
@@ -1142,7 +1140,6 @@ export function CustomBatikPage() {
       }
       setSelectedObject(target);
       const type = detectObjectType(target);
-      console.log("setting selectedObjectType to:", type);
       setSelectedObjectType(type);
       if (target?.data?.layerId) {
         setSelectedLayerId(target.data.layerId);
@@ -1160,11 +1157,7 @@ export function CustomBatikPage() {
     });
     // selection:updated terjadi ketika user pindah klik dari satu objek ke objek lain
     canvas.on("selection:updated", (e) => {
-      console.log("=== selection:updated event! ===");
-      console.log("full event object:", e);
       const target = (e as any).target;
-      console.log("selection:updated target:", target);
-      console.log("target.type:", target?.type);
       if (!target) {
         setSelectedObject(null);
         setSelectedObjectType(null);
@@ -1185,7 +1178,6 @@ export function CustomBatikPage() {
       }
     });
     canvas.on("selection:cleared", () => {
-      console.log("selection:cleared!");
       setSelectedObject(null);
       setSelectedObjectType(null);
       // Hanya clear selection jika mousedown terjadi di dalam canvas
@@ -1196,13 +1188,8 @@ export function CustomBatikPage() {
     });
 
     canvas.on("mouse:down", (e) => {
-      console.log("=== canvas mouse:down! ===");
-      console.log("e:", e);
-      console.log("e.target:", e.target);
-      
       // Manually handle object selection here
       if (e.target) {
-        console.log("Manually selecting object via mouse:down!");
         setSelectedObject(e.target);
         
         // Determine the type
@@ -1230,7 +1217,6 @@ export function CustomBatikPage() {
         };
         
         const type = detectObjectType(e.target);
-        console.log("Manually set selectedObjectType to:", type);
         setSelectedObjectType(type);
         
         // Also set selectedLayerId if present
@@ -1239,7 +1225,6 @@ export function CustomBatikPage() {
           setActiveTab("layer");
         }
       } else {
-        console.log("No target hit, clearing selectedObject!");
         setSelectedObject(null);
         setSelectedObjectType(null);
         setSelectedLayerId(null);
@@ -1248,17 +1233,10 @@ export function CustomBatikPage() {
 
     // Track apakah mousedown terjadi di dalam canvas wrapper
     const handleGlobalMousedown = (e: MouseEvent) => {
-      console.log("=== Global mousedown! ===");
-      console.log("activeTool:", activeToolRef.current);
-      console.log("e.target:", e.target);
-      console.log("e.target element:", (e.target as HTMLElement)?.tagName);
       const target = e.target as Node;
       const fabricEl = canvas.getElement();
       const wrapper = fabricEl?.parentElement;
       const displayCanvas = displayCanvasRef.current;
-      console.log("fabricEl:", fabricEl);
-      console.log("wrapper:", wrapper);
-      console.log("displayCanvas:", displayCanvas);
       
       // Klik dianggap "di dalam canvas" jika target adalah canvas fabric atau display canvas
       lastMousedownInCanvasRef.current = !!(
@@ -1669,21 +1647,15 @@ export function CustomBatikPage() {
 
   // ─── Switch tool ───────────────────────────────────────────────────────────
   useEffect(() => {
-    console.log("=== Switch tool useEffect triggered! ===");
-    console.log("activeTool:", activeTool);
     const canvas = fabricCanvasRef.current;
     const display = displayCanvasRef.current;
     const fabricWrapper = (fabricCanvasRef as any).wrapper;
-    console.log("canvas:", canvas);
-    console.log("display:", display);
-    console.log("fabricWrapper:", fabricWrapper);
     if (!canvas || !display || !fabricWrapper) return;
 
     // Always sync display canvas from offscreen to ensure brush strokes are visible!
     syncDisplay();
 
     if (activeTool === "select") {
-      console.log("Setting SELECT mode");
       canvas.isDrawingMode = false;
       canvas.selection = true;
       canvas.defaultCursor = "default";
@@ -1698,7 +1670,6 @@ export function CustomBatikPage() {
       canvas.renderAll();
       
       // Force z-index by setting style properties directly
-      console.log("Setting display style: z-index 2, pointer-events none");
       display.style.position = "absolute";
       display.style.top = "0";
       display.style.left = "0";
@@ -1707,24 +1678,13 @@ export function CustomBatikPage() {
       display.style.width = "100%";
       display.style.height = "100%";
       
-      console.log("Setting fabricWrapper style: z-index 1");
       fabricWrapper.style.position = "absolute";
       fabricWrapper.style.top = "0";
       fabricWrapper.style.left = "0";
       fabricWrapper.style.zIndex = "1";
       fabricWrapper.style.width = "100%";
       fabricWrapper.style.height = "100%";
-
-      // Log computed styles
-      setTimeout(() => {
-        console.log("=== Computed styles after 100ms ===");
-        console.log("display.style:", display.style);
-        console.log("display computedStyle:", window.getComputedStyle(display));
-        console.log("fabricWrapper.style:", fabricWrapper.style);
-        console.log("fabricWrapper computedStyle:", window.getComputedStyle(fabricWrapper));
-      }, 100);
     } else if (activeTool === "text") {
-      console.log("Setting TEXT mode");
       canvas.isDrawingMode = false;
       canvas.selection = true;
       canvas.defaultCursor = "text";
@@ -1748,7 +1708,6 @@ export function CustomBatikPage() {
       fabricWrapper.style.height = "100%";
     } else if (activeTool === "shape") {
       // Shape: Fabric aktif (pointer events ON) tapi tidak bisa select objek lama
-      console.log("Setting SHAPE mode");
       canvas.isDrawingMode = false;
       canvas.selection = false;
       canvas.defaultCursor = "crosshair";
@@ -1772,7 +1731,6 @@ export function CustomBatikPage() {
       fabricWrapper.style.height = "100%";
     } else {
       // brush, eraser, fill — display canvas di atas
-      console.log("Setting BRUSH/ERASER/FILL mode");
       canvas.isDrawingMode = false;
       canvas.selection = false;
       canvas.discardActiveObject();
@@ -2518,13 +2476,13 @@ export function CustomBatikPage() {
                       >
                         <div
                           className="w-3.5 h-3.5 rounded border"
-                          style={{ background: canvasBackground, borderColor: "rgba(0,0,0,0.1)" }}
+                          style={{ background: bgColorPickerValue, borderColor: "rgba(0,0,0,0.1)" }}
                         />
                         <span className="text-[10px] font-bold text-[#A89B8F] uppercase select-none hidden sm:inline">Latar</span>
                         <input
                           type="color"
-                          value={canvasBackground}
-                          onChange={(e) => setCanvasBackground(e.target.value)}
+                          value={bgColorPickerValue}
+                          onChange={(e) => setBgColorPickerValue(e.target.value)}
                           className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                           title="Ubah warna latar kanvas"
                         />
@@ -3107,7 +3065,7 @@ export function CustomBatikPage() {
                 <div className="relative rounded-2xl overflow-hidden shadow-inner border border-stone-200/50" style={{ boxShadow: "inset 0 4px 20px rgba(61,43,31,0.05)" }}>
 
                   {/* Aspect Ratio Canvas Container */}
-                  <div ref={containerRef} className="aspect-[4/3] relative overflow-hidden select-none" style={{ background: canvasBackground }}>
+                  <div ref={containerRef} className="aspect-[4/3] relative overflow-hidden select-none" style={{ background: bgColorPickerValue }}>
                     {/* Layer 1: Display canvas untuk brush/eraser */}
                     <canvas
                       ref={displayCanvasRef}
