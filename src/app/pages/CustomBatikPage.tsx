@@ -3391,7 +3391,28 @@ export function CustomBatikPage() {
                                     )
                                   ) : (
                                     <div className="flex items-center justify-center w-full h-full">
-                                      <Brush className="w-5 h-5 opacity-60" style={{ color: layer.brushColor || "#8B6F47" }} />
+                                      {(() => {
+                                        const obj = layer.fabricObject;
+                                        if (!obj) return <Brush className="w-5 h-5 opacity-60" style={{ color: layer.brushColor || "#8B6F47" }} />;
+                                        if (obj.type === "i-text" || obj.type === "text" || obj.constructor?.name?.toLowerCase().includes("text")) {
+                                          return <Type className="w-5 h-5 opacity-60" style={{ color: (obj as any).fill || "#3D2B1F" }} />;
+                                        }
+                                        if (obj.type === "rect" || obj.type === "ellipse" || obj.type === "polygon" || obj.type === "line" || obj.type === "circle" ||
+                                            obj.constructor?.name?.toLowerCase().includes("rect") || obj.constructor?.name?.toLowerCase().includes("ellipse") ||
+                                            obj.constructor?.name?.toLowerCase().includes("polygon") || obj.constructor?.name?.toLowerCase().includes("line") ||
+                                            obj.constructor?.name?.toLowerCase().includes("circle")) {
+                                          if (obj.type === "line" || obj.constructor?.name?.toLowerCase().includes("line")) {
+                                            return <Slash className="w-5 h-5 opacity-60" style={{ color: (obj as any).stroke || "#3D2B1F" }} />;
+                                          } else if (obj.type === "ellipse" || obj.constructor?.name?.toLowerCase().includes("ellipse") || obj.type === "circle") {
+                                            return <Circle className="w-5 h-5 opacity-60" style={{ color: (obj as any).fill || (obj as any).stroke || "#3D2B1F" }} />;
+                                          } else if (obj.type === "polygon" || obj.constructor?.name?.toLowerCase().includes("polygon")) {
+                                            return <Star className="w-5 h-5 opacity-60" style={{ color: (obj as any).fill || (obj as any).stroke || "#3D2B1F" }} />;
+                                          } else {
+                                            return <Square className="w-5 h-5 opacity-60" style={{ color: (obj as any).fill || (obj as any).stroke || "#3D2B1F" }} />;
+                                          }
+                                        }
+                                        return <Brush className="w-5 h-5 opacity-60" style={{ color: layer.brushColor || "#8B6F47" }} />;
+                                      })()}
                                     </div>
                                   )}
                                 </div>
@@ -3402,7 +3423,20 @@ export function CustomBatikPage() {
                                   {layer.name}
                                 </p>
                                 <p className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: "#8B6F47" }}>
-                                  {layer.type === "pattern" ? "Motif" : "Gambar Bebas"}
+                                  {layer.type === "pattern" ? "Motif" : (() => {
+                                    const obj = layer.fabricObject;
+                                    if (!obj) return "Gambar Bebas";
+                                    if (obj.type === "i-text" || obj.type === "text" || obj.constructor?.name?.toLowerCase().includes("text")) {
+                                      return "Teks";
+                                    }
+                                    if (obj.type === "rect" || obj.type === "ellipse" || obj.type === "polygon" || obj.type === "line" || obj.type === "circle" ||
+                                        obj.constructor?.name?.toLowerCase().includes("rect") || obj.constructor?.name?.toLowerCase().includes("ellipse") ||
+                                        obj.constructor?.name?.toLowerCase().includes("polygon") || obj.constructor?.name?.toLowerCase().includes("line") ||
+                                        obj.constructor?.name?.toLowerCase().includes("circle")) {
+                                      return "Bentuk";
+                                    }
+                                    return "Gambar Bebas";
+                                  })()}
                                 </p>
                               </div>
                             </div>
