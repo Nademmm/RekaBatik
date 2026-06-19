@@ -275,6 +275,7 @@ export function CustomBatikPage() {
   const brushOpacityRef = useRef(80);
   const offscreenHistoryRef = useRef<ImageData[]>([]);
   const offscreenHistoryIndexRef = useRef<number>(-1);
+  const copiedObjectsRef = useRef<fabric.Object[]>([]);
 
   // Refs for undo/redo functions to avoid stale closures
   const undoBrushRef = useRef<() => void>(() => { });
@@ -1291,15 +1292,228 @@ export function CustomBatikPage() {
       const isMac = navigator.platform.toUpperCase().includes("MAC");
       const ctrl = isMac ? e.metaKey : e.ctrlKey;
 
+      // Undo
       if (ctrl && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         undoAllRef.current(); // unified undo — menghormati urutan aksi
       }
+      // Redo
       if (ctrl && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
         e.preventDefault();
         redoAllRef.current(); // unified redo
       }
+      // Copy
+      if (ctrl && e.key === "c") {
+        e.preventDefault();
+        const active = canvas.getActiveObjects();
+        if (active.length > 0) {
+          copiedObjectsRef.current = active.map(obj => fabric.util.object.clone(obj));
+        }
+      }
+      // Paste
+      if (ctrl && e.key === "v") {
+        e.preventDefault();
+        if (copiedObjectsRef.current.length > 0) {
+          const newObjects = copiedObjectsRef.current.map(original => {
+            const clone = fabric.util.object.clone(original);
+            const newLayerId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+            (clone as any).data = { ...(original as any).data, layerId: newLayerId, layerName: `${(original as any).data?.layerName || 'Objek'} (copy)` };
+            clone.set({
+              left: (clone.left || 0) + 20,
+              top: (clone.top || 0) + 20,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true
+            });
+            clone.setCoords();
+            return clone;
+          });
 
+          newObjects.forEach(obj => {
+            canvas.add(obj);
+            const newLayer = {
+              id: (obj as any).data.layerId,
+              type: ((obj as any).data?.patternId ? "pattern" : "drawing") as "pattern" | "drawing",
+              name: (obj as any).data.layerName,
+              visible: true,
+              locked: false,
+              fabricObject: obj
+            };
+            setLayers(prev => [...prev, newLayer]);
+          });
+
+          canvas.discardActiveObject();
+          // Create ActiveSelection for new objects
+          if (newObjects.length > 1) {
+            const sel = new fabric.ActiveSelection(newObjects, { canvas });
+            canvas.setActiveObject(sel);
+          } else if (newObjects.length === 1) {
+            canvas.setActiveObject(newObjects[0]);
+          }
+          canvas.requestRenderAll();
+          saveSnapshot();
+        }
+      }
+      // Select All
+      if (ctrl && e.key === "a") {
+        e.preventDefault();
+        canvas.discardActiveObject();
+        const allObjects = canvas.getObjects();
+        if (allObjects.length > 0) {
+          const sel = new fabric.ActiveSelection(allObjects, { canvas });
+          canvas.setActiveObject(sel);
+          canvas.requestRenderAll();
+        }
+      }
+      // Duplicate
+      if (ctrl && e.key === "d") {
+        e.preventDefault();
+        const active = canvas.getActiveObjects();
+        if (active.length > 0) {
+          const newObjects = active.map(original => {
+            const clone = fabric.util.object.clone(original);
+            const newLayerId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+            (clone as any).data = { ...(original as any).data, layerId: newLayerId, layerName: `${(original as any).data?.layerName || 'Objek'} (copy)` };
+            clone.set({
+              left: (clone.left || 0) + 20,
+              top: (clone.top || 0) + 20,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true
+            });
+            clone.setCoords();
+            return clone;
+          });
+
+          newObjects.forEach(obj => {
+            canvas.add(obj);
+            const newLayer = {
+              id: (obj as any).data.layerId,
+              type: ((obj as any).data?.patternId ? "pattern" : "drawing") as "pattern" | "drawing",
+              name: (obj as any).data.layerName,
+              visible: true,
+              locked: false,
+              fabricObject: obj
+            };
+            setLayers(prev => [...prev, newLayer]);
+          });
+
+          canvas.discardActiveObject();
+          // Create ActiveSelection for new objects
+          if (newObjects.length > 1) {
+            const sel = new fabric.ActiveSelection(newObjects, { canvas });
+            canvas.setActiveObject(sel);
+          } else if (newObjects.length === 1) {
+            canvas.setActiveObject(newObjects[0]);
+          }
+          canvas.requestRenderAll();
+          saveSnapshot();
+        }
+      }
+      // Group
+      if (ctrl && e.key === "g") {
+        e.preventDefault();
+        const active = canvas.getActiveObjects();
+        if (active.length > 1) {
+          // Create group from active objects
+          const group = new fabric.Group([], { 
+            selectable: true, 
+            evented: true,
+            hasControls: true,
+            hasBorders: true
+          });
+          const newLayerId = Date.now().toString();
+          (group as any).data = { layerId: newLayerId, layerName: 'Grup' };
+
+          // Discard active selection first
+          canvas.discardActiveObject();
+          
+          // Add each object to group and remove from canvas
+          active.forEach(obj => {
+            canvas.remove(obj);
+            group.addWithUpdate(obj);
+          });
+
+          // Add group to canvas
+          canvas.add(group);
+          
+          // Remove individual layers and add group layer
+          const layerIdsToRemove = active.map(obj => (obj as any).data?.layerId).filter(Boolean);
+          setLayers(prev => prev.filter(l => !layerIdsToRemove.includes(l.id)));
+          setLayers(prev => [...prev, {
+            id: newLayerId,
+            type: 'drawing',
+            name: 'Grup',
+            visible: true,
+            locked: false,
+            fabricObject: group
+          }]);
+
+          // Select the new group
+          canvas.setActiveObject(group);
+          group.setCoords();
+          canvas.requestRenderAll();
+          saveSnapshot();
+        }
+      }
+      // Ungroup
+      if (ctrl && e.shiftKey && e.key === "g") {
+        e.preventDefault();
+        const active = canvas.getActiveObject();
+        if (active && active.type === 'group') {
+          const group = active as fabric.Group;
+          const items = group.getObjects();
+
+          // Ungroup
+          canvas.discardActiveObject();
+          group._restoreObjectsState();
+          canvas.remove(group);
+          items.forEach(obj => {
+            canvas.add(obj);
+            obj.setCoords();
+            // Create new layer for each ungrouped object
+            const newLayerId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+            (obj as any).data = { ...(obj as any).data, layerId: newLayerId };
+            setLayers(prev => [...prev, {
+              id: newLayerId,
+              type: ((obj as any).data?.patternId ? "pattern" : "drawing") as "pattern" | "drawing",
+              name: (obj as any).data?.layerName || 'Objek',
+              visible: true,
+              locked: false,
+              fabricObject: obj
+            }]);
+          });
+          canvas.requestRenderAll();
+          saveSnapshot();
+
+          // Remove group layer
+          setLayers(prev => prev.filter(l => l.id !== (group as any).data?.layerId));
+        }
+      }
+      // Bring to Front
+      if (ctrl && e.key === "]") {
+        e.preventDefault();
+        const active = canvas.getActiveObject();
+        if (active) {
+          canvas.bringToFront(active);
+          canvas.requestRenderAll();
+          saveSnapshot();
+        }
+      }
+      // Send to Back
+      if (ctrl && e.key === "[") {
+        e.preventDefault();
+        const active = canvas.getActiveObject();
+        if (active) {
+          canvas.sendToBack(active);
+          canvas.requestRenderAll();
+          saveSnapshot();
+        }
+      }
+
+      // Delete / Backspace
       if (e.key === "Backspace" || e.key === "Delete") {
         // Skip delete if any active object is text in editing mode
         let isEditingText = false;
@@ -1316,16 +1530,14 @@ export function CustomBatikPage() {
         if (!isEditingText) {
           const active = canvas.getActiveObjects();
           if (active.length > 0) {
-            active.forEach((obj) => {
-              if ((obj as any).data?.layerId) {
-                canvas.remove(obj);
-                setLayers((prev) => prev.filter((l) => l.id !== (obj as any).data.layerId));
-              }
-            });
+            const layerIdsToRemove = active.map(obj => (obj as any).data?.layerId).filter(Boolean);
+            setLayers(prev => prev.filter(l => !layerIdsToRemove.includes(l.id)));
+            active.forEach(obj => canvas.remove(obj));
             canvas.discardActiveObject();
             setSelectedLayerId(null);
             setSelectedObject(null);
             setSelectedObjectType(null);
+            saveSnapshot();
           }
         }
       }

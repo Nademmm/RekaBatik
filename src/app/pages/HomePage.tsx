@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 const MotionLink = motion(Link);
 import {
   Palette, Sparkles, Clock, Award, Star, ChevronRight,
-  Users, Package, MapPin, TrendingUp, ShoppingBag, Heart, Grid3x3
+  Users, Package, MapPin, TrendingUp, ShoppingBag, Heart, Grid3x3, BookOpen
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { BatikBackground } from "../components/BatikBackground";
@@ -838,6 +838,153 @@ export function HomePage() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="h-1.5" style={{ background: "#95613eff" }} />
+
+      {/* ======================== BELAJAR BATIK ======================== */}
+      <section className="py-24 relative overflow-hidden" style={{ background: "#FAF8F5" }}>
+        <BatikBackground opacity={0.03} patternType="floral" />
+        <div className="container mx-auto px-6 relative z-10 max-w-7xl">
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+              className="lg:col-span-6"
+            >
+              
+              <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700, marginBottom: "1.5rem", lineHeight: "1.2" }}>
+                Pelajari Makna<br/>
+                <span style={{ color: "#8B6F47" }}>Motif Batik Indonesia</span>
+              </h2>
+              <p style={{ color: "#7A6B5E", fontSize: "1.05rem", lineHeight: "1.8", marginBottom: "2rem" }}>
+                Setiap motif batik bukan hanya sekadar hiasan, melainkan simbol budaya yang sarat makna filosofis dan cerita nenek moyang.
+              </p>
+              <MotionLink
+                to="/belajar-batik"
+                className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                style={{
+                  background: "linear-gradient(135deg, #8B6F47, #A88967)",
+                  color: "#FFFFFF",
+                  fontWeight: 700,
+                  boxShadow: "0 8px 24px rgba(139,111,71,0.3)"
+                }}
+              >
+                <span>Mau Belajar</span>
+                <ChevronRight className="w-5 h-5" />
+              </MotionLink>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              viewport={{ once: true }}
+              className="lg:col-span-6 relative"
+            >
+              <div className="relative z-10">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <div
+                      className="h-48 rounded-3xl overflow-hidden"
+                      style={{
+                        background: "white",
+                        boxShadow: "0 4px 24px rgba(61,43,31,0.1)",
+                        border: "1px solid #E8E1DA"
+                      }}
+                    >
+                      <div className="h-full" style={{ background: "#FAF8F5" }}>
+                        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                          <defs>
+                            <pattern id="preview-parang" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+                              <rect fill="#FAF8F5" width="40" height="40"/>
+                              <path d="M0,20 Q10,10 20,20 Q30,30 40,20" stroke="#8B4513" strokeWidth="2.5" fill="none"/>
+                              <path d="M0,30 Q10,20 20,30 Q30,40 40,30" stroke="#D4B88B" strokeWidth="1.5" fill="none"/>
+                              <path d="M0,10 Q10,0 20,10 Q30,20 40,10" stroke="#D4B88B" strokeWidth="1.5" fill="none"/>
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill="url(#preview-parang)"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div
+                      className="h-56 rounded-3xl overflow-hidden"
+                      style={{
+                        background: "white",
+                        boxShadow: "0 4px 24px rgba(61,43,31,0.1)",
+                        border: "1px solid #E8E1DA"
+                      }}
+                    >
+                      <div className="h-full" style={{ background: "#FFF8E1" }}>
+                        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                          <defs>
+                            <pattern id="preview-kawung" x="0" y="0" width="50" height="50" patternUnits="userSpaceOnUse">
+                              <rect fill="#FFF8E1" width="50" height="50"/>
+                              <ellipse cx="25" cy="14" rx="6" ry="10" fill="none" stroke="#5D4037" strokeWidth="1.5"/>
+                              <ellipse cx="25" cy="36" rx="6" ry="10" fill="none" stroke="#5D4037" strokeWidth="1.5"/>
+                              <ellipse cx="14" cy="25" rx="10" ry="6" fill="none" stroke="#5D4037" strokeWidth="1.5"/>
+                              <ellipse cx="36" cy="25" rx="10" ry="6" fill="none" stroke="#5D4037" strokeWidth="1.5"/>
+                              <circle cx="25" cy="25" r="3" fill="#A1887F"/>
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill="url(#preview-kawung)"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-4 pt-8">
+                    <div
+                      className="h-56 rounded-3xl overflow-hidden"
+                      style={{
+                        background: "white",
+                        boxShadow: "0 4px 24px rgba(61,43,31,0.1)",
+                        border: "1px solid #E8E1DA"
+                      }}
+                    >
+                      <div className="h-full" style={{ background: "#E3F2FD" }}>
+                        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                          <defs>
+                            <pattern id="preview-mega" x="0" y="0" width="80" height="40" patternUnits="userSpaceOnUse">
+                              <rect fill="#E3F2FD" width="80" height="40"/>
+                              <path d="M0,20 Q10,8 20,20 Q30,32 40,20 Q50,8 60,20 Q70,32 80,20" stroke="#1565C0" strokeWidth="3" fill="none"/>
+                              <path d="M0,20 Q10,8 20,20 Q30,32 40,20 Q50,8 60,20 Q70,32 80,20" stroke="#90CAF9" strokeWidth="1.5" fill="none" transform="translate(0,-7)"/>
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill="url(#preview-mega)"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div
+                      className="h-48 rounded-3xl overflow-hidden"
+                      style={{
+                        background: "white",
+                        boxShadow: "0 4px 24px rgba(61,43,31,0.1)",
+                        border: "1px solid #E8E1DA"
+                      }}
+                    >
+                      <div className="h-full" style={{ background: "#FCE4EC" }}>
+                        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                          <defs>
+                            <pattern id="preview-truntum" x="0" y="0" width="50" height="50" patternUnits="userSpaceOnUse">
+                              <rect fill="#FCE4EC" width="50" height="50"/>
+                              <polygon points="25,8 28,18 38,18 30,24 33,34 25,28 17,34 20,24 12,18 22,18" fill="#C2185B" stroke="#F8BBD9" strokeWidth="1"/>
+                              <circle cx="25" cy="25" r="3" fill="#F8BBD9"/>
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill="url(#preview-truntum)"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>

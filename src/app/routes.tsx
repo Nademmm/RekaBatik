@@ -9,6 +9,7 @@ import { AuthPage } from "./pages/AuthPage";
 import { CartPage } from "./pages/CartPage";
 import { DesainHistoriPage } from "./pages/DesainHistoriPage";
 import { ChatPage } from "./pages/ChatPage";
+import { BelajarBatikPage } from "./pages/BelajarBatikPage";
 import { RootLayout } from "./layouts/RootLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorPage } from "./components/ErrorPage";
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: "catalog", Component: CatalogPage },
       { path: "desa-jetis", Component: DesaJetisPage },
       { path: "desa-jetis/:storeId", Component: DesaJetisStoreDetailPage },
+      { path: "belajar-batik", Component: BelajarBatikPage },
       // Protected routes — require login
       {
         Component: ProtectedRoute,
