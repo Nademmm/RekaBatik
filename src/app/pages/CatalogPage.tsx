@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Search, Filter, ShoppingBag, Star, MapPin } from "lucide-react";
+import { Search, Filter, ShoppingBag, Star, MapPin, Heart } from "lucide-react";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase } from "../../lib/supabase";
 import { BatikItem } from "../../types/database";
@@ -45,6 +45,72 @@ export function CatalogPage() {
   
   const [selectedBatik, setSelectedBatik] = useState<BatikItem | null>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [favoriteBatikIds, setFavoriteBatikIds] = useState<number[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(true);
+
+  const fetchFavorites = async () => {
+    if (!user) {
+      setFavoriteBatikIds([]);
+      setLoadingFavorites(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("favorite_batik")
+        .select("batik_id")
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      setFavoriteBatikIds(data?.map(f => f.batik_id) || []);
+    } catch (err) {
+      console.error("Failed to fetch favorites:", err);
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
+  const toggleFavoriteBatik = async (batikId: number) => {
+    console.log("Toggling favorite for batikId:", batikId);
+    if (!user) {
+      toast.error("Silakan masuk (login) untuk menambahkan favorit.");
+      navigate("/auth");
+      return;
+    }
+
+    const isFavorite = favoriteBatikIds.includes(batikId);
+
+    try {
+      if (isFavorite) {
+        // Remove from favorites
+        console.log("Removing from favorites...");
+        const { error } = await supabase
+          .from("favorite_batik")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("batik_id", batikId);
+
+        if (error) throw error;
+
+        setFavoriteBatikIds(prev => prev.filter(id => id !== batikId));
+        toast.success("Dihapus dari favorit");
+      } else {
+        // Add to favorites
+        console.log("Adding to favorites...");
+        const { error } = await supabase
+          .from("favorite_batik")
+          .insert([{ user_id: user.id, batik_id: batikId }]);
+
+        if (error) throw error;
+
+        setFavoriteBatikIds(prev => [...prev, batikId]);
+        toast.success("Ditambahkan ke favorit");
+      }
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+      toast.error("Gagal memperbarui favorit.");
+    }
+  };
 
   useEffect(() => {
     async function fetchItems() {
@@ -66,7 +132,8 @@ export function CatalogPage() {
       }
     }
     fetchItems();
-  }, [category, search]);
+    fetchFavorites();
+  }, [category, search, user]);
 
   const handleAddToCart = async (batik: BatikItem, quantity: number) => {
     if (!user) {
@@ -189,6 +256,22 @@ export function CatalogPage() {
                       
                       {/* Overlay Gradient Soft */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
+
+                      {/* Favorite Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavoriteBatik(item.id);
+                        }}
+                        className="absolute top-4 right-4 p-2.5 rounded-full bg-white/90 shadow-sm hover:scale-110 transition-all z-10"
+                        title={favoriteBatikIds.includes(item.id) ? "Hapus dari favorit" : "Tambah ke favorit"}
+                      >
+                        <Heart
+                          className="w-5 h-5"
+                          fill={favoriteBatikIds.includes(item.id) ? "#EF4444" : "none"}
+                          style={{ color: favoriteBatikIds.includes(item.id) ? "#EF4444" : "#3D2B1F" }}
+                        />
+                      </button>
 
                       {/* Quick Action Overlay (Visible on Hover) */}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">

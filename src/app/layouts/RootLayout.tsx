@@ -82,10 +82,11 @@ export function RootLayout() {
     { path: "/orders", label: "Pesanan" },
     { path: "/desa-jetis", label: "Tentang Kami" },
     { path: "/chat", label: "Chat" },
+    { path: "/profile", label: "Profil" },
   ];
 
   const desktopNavItems = navItems.filter(item => 
-    !["Desainku", "Pesanan", "Chat"].includes(item.label)
+    !["Desainku", "Pesanan", "Chat", "Profil"].includes(item.label)
   );
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Pengguna";
@@ -263,6 +264,17 @@ export function RootLayout() {
 
                         {/* Menu items */}
                         <div className="py-1.5">
+                          <Link
+                            to="/profile"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            style={{ color: "#5A4A3E" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <User className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                            Profil Saya
+                          </Link>
                           <Link
                             to="/orders"
                             onClick={() => setUserMenuOpen(false)}

@@ -100,3 +100,19 @@ export interface CartItem {
   batik_items?: BatikItem;
   custom_designs?: CustomDesign;
 }
+
+export interface FavoriteBatik {
+  id: number;
+  user_id: string;
+  batik_id: number;
+  created_at: string;
+  batik_items?: BatikItem;
+}
+
+export interface FavoriteStore {
+  id: number;
+  user_id: string;
+  store_id: number;
+  created_at: string;
+  stores?: Store;
+}

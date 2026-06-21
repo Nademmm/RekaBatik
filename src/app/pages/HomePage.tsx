@@ -122,11 +122,68 @@ export function HomePage() {
 
   const [activeReview, setActiveReview] = useState(0);
   const [likedPatterns, setLikedPatterns] = useState<number[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(true);
 
-  const toggleLikePattern = (id: number) => {
-    setLikedPatterns((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+  const fetchFavorites = async () => {
+    if (!user) {
+      setLikedPatterns([]);
+      setLoadingFavorites(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("favorite_batik")
+        .select("batik_id")
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      setLikedPatterns(data?.map(f => f.batik_id) || []);
+    } catch (err) {
+      console.error("Failed to fetch favorites:", err);
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
+  const toggleLikePattern = async (id: number, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!user) {
+      toast.error("Silakan masuk (login) untuk menambahkan favorit.");
+      navigate("/auth");
+      return;
+    }
+
+    const isFavorite = likedPatterns.includes(id);
+
+    try {
+      if (isFavorite) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from("favorite_batik")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("batik_id", id);
+
+        if (error) throw error;
+
+        setLikedPatterns(prev => prev.filter(i => i !== id));
+        toast.success("Dihapus dari favorit");
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from("favorite_batik")
+          .insert([{ user_id: user.id, batik_id: id }]);
+
+        if (error) throw error;
+
+        setLikedPatterns(prev => [...prev, id]);
+        toast.success("Ditambahkan ke favorit");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Gagal memperbarui favorit.");
+    }
   };
 
   const [popularPatterns, setPopularPatterns] = useState<PopularPatternMapped[]>([]);
@@ -183,7 +240,8 @@ export function HomePage() {
       }
     }
     fetchData();
-  }, []);
+    fetchFavorites();
+  }, [user]);
 
   const handleAddToCart = async (batik: BatikItem, quantity: number) => {
     if (!user) {
@@ -516,8 +574,7 @@ export function HomePage() {
                     <div className="absolute top-4 right-4">
                       <motion.button
                         onClick={(e) => {
-                          e.stopPropagation();
-                          toggleLikePattern(p.id);
+                          toggleLikePattern(p.id, e);
                         }}
                         whileHover={{ scale: 1.15 }}
                         transition={{ duration: 0.3, ease: "easeOut" }}
@@ -530,8 +587,8 @@ export function HomePage() {
                       >
                         <Heart
                           className="w-5 h-5"
-                          fill={likedPatterns.includes(p.id) ? "#8B6F47" : "none"}
-                          color={likedPatterns.includes(p.id) ? "#8B6F47" : "#7A6B5E"}
+                          fill={likedPatterns.includes(p.id) ? "#EF4444" : "none"}
+                          color={likedPatterns.includes(p.id) ? "#EF4444" : "#7A6B5E"}
                         />
                       </motion.button>
                     </div>
@@ -575,14 +632,14 @@ export function HomePage() {
                         }}
                         whileHover={{ scale: 1.02 }}
                         transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold"
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg"
                         style={{ 
-                          background: "linear-gradient(135deg, #8B6F47, #A88967)", 
+                          background: "linear-gradient(135deg, #3D2B1F, #5A3D2B)", 
                           color: "#FFFFFF"
                         }}
                       >
                         <ShoppingBag className="w-4 h-4" />
-                        Pesan
+                        Masukkan Keranjang
                       </motion.button>
                     </div>
                   </div>

@@ -4,12 +4,14 @@ import {
   MapPin, Phone, Clock, Star, ChevronRight, Users, Award,
   ShoppingBag, Heart, ExternalLink, Camera, Info, Car, Bus, Bike, Watch, Wallet, Sparkles, Store
 } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 const MotionLink = motion(Link);
 import { BatikBackground, BatikDivider } from "../components/BatikBackground";
-import { supabase, handleSupabaseError } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase";
 import { Skeleton } from "../components/ui/skeleton";
+import { useAuth } from "../../lib/AuthContext";
+import { toast } from "sonner";
 
 type BatikStore = {
   id: number;
@@ -65,97 +67,87 @@ const timeline = [
 ];
 
 export function DesaJetisPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [stores, setStores] = useState<BatikStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTag, setFilterTag] = useState<string>("all");
+  const [favoriteStoreIds, setFavoriteStoreIds] = useState<number[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(true);
+
+  const fetchStores = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from("stores").select("*");
+      if (error) throw error;
+      setStores(data || []);
+    } catch (error) {
+      console.error("Error fetching stores:", error);
+      toast.error("Gagal memuat toko");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFavorites = async () => {
+    if (!user) {
+      setFavoriteStoreIds([]);
+      setLoadingFavorites(false);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from("favorite_stores")
+        .select("store_id")
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setFavoriteStoreIds(data?.map(f => f.store_id) || []);
+    } catch (error) {
+      console.error("Error fetching favorites:", error);
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
+  const toggleFavoriteStore = async (storeId: number, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!user) {
+      toast.error("Silakan masuk (login) untuk menambahkan favorit");
+      navigate("/auth");
+      return;
+    }
+    const isFavorite = favoriteStoreIds.includes(storeId);
+    try {
+      if (isFavorite) {
+        const { error } = await supabase
+          .from("favorite_stores")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("store_id", storeId);
+        if (error) throw error;
+        setFavoriteStoreIds(prev => prev.filter(id => id !== storeId));
+        toast.success("Dihapus dari favorit");
+      } else {
+        const { error } = await supabase
+          .from("favorite_stores")
+          .insert([{ user_id: user.id, store_id: storeId }]);
+        if (error) throw error;
+        setFavoriteStoreIds(prev => [...prev, storeId]);
+        toast.success("Ditambahkan ke favorit");
+      }
+    } catch (error) {
+      toast.error("Gagal memperbarui favorit");
+    }
+  };
 
   useEffect(() => {
-    // Gunakan mock data secara langsung untuk memastikan konten muncul
-    const mockStores: BatikStore[] = [
-      {
-        id: 1,
-        name: "Batik Amri Jetis",
-        owner: "Pak Amri",
-        established: "1978",
-        specialty: "Batik Tulis Beras Utah",
-        address: "Jl. Raya Jetis No. 12",
-        phone: "+62 812-3456-7890",
-        hours: "08:00 - 17:00",
-        rating: 4.9,
-        review_count: 256,
-        price_range: "Rp 500.000 - Rp 3.000.000",
-        tags: ["Batik Tulis", "Custom", "Tradisional"],
-        image: artisanImg,
-        featured: true,
-        description: "Toko batik tertua di Jetis yang terkenal dengan motif Beras Utah asli, dibuat dengan tangan oleh pengrajin berpengalaman.",
-        motifs: ["Beras Utah", "Kawung", "Sidomukti"],
-      },
-      {
-        id: 2,
-        name: "Batik Siti Collection",
-        owner: "Bu Siti",
-        established: "1995",
-        specialty: "Batik Cap Modern",
-        address: "Jl. Batik Jetis No. 45",
-        phone: "+62 821-9876-5432",
-        hours: "07:30 - 18:00",
-        rating: 4.8,
-        review_count: 189,
-        price_range: "Rp 250.000 - Rp 1.500.000",
-        tags: ["Batik Cap", "Modern", "Wedding"],
-        image: shopImg,
-        featured: false,
-        description: "Koleksi batik cap modern dengan motif flora dan fauna yang fresh dan cocok untuk fashion sehari-hari.",
-        motifs: ["Mega Mendung", "Bunga Melati", "Burung Merak"],
-      },
-      {
-        id: 3,
-        name: "Rumah Batik Hartono",
-        owner: "Pak Hartono",
-        established: "1985",
-        specialty: "Batik Tulis Premium",
-        address: "Jl. Jetis Barat No. 28",
-        phone: "+62 819-8765-4321",
-        hours: "09:00 - 20:00",
-        rating: 5.0,
-        review_count: 312,
-        price_range: "Rp 1.000.000 - Rp 10.000.000",
-        tags: ["Batik Tulis", "Premium", "Custom"],
-        image: workshopImg,
-        featured: false,
-        description: "Studio batik premium yang menerima pesanan custom dengan detail dan kualitas terbaik untuk koleksi pribadi.",
-        motifs: ["Sido Mulyo", "Lereng", "Semen Gedhe"],
-      },
-      {
-        id: 4,
-        name: "Batik Jetis Muda",
-        owner: "Kak Dian",
-        established: "2015",
-        specialty: "Batik Kontemporer",
-        address: "Jl. Raya Jetis No. 67",
-        phone: "+62 856-7890-1234",
-        hours: "10:00 - 21:00",
-        rating: 4.7,
-        review_count: 98,
-        price_range: "Rp 300.000 - Rp 2.000.000",
-        tags: ["Modern", "Kontemporer", "Young"],
-        image: batikFabricImg,
-        featured: false,
-        description: "Wajah baru batik Indonesia dengan desain kontemporer yang cocok untuk anak muda dan fashion forward.",
-        motifs: ["Geometric", "Abstract", "Modern Kawung"],
-      },
-    ];
-    
-    setTimeout(() => {
-      setStores(mockStores);
-      setLoading(false);
-    }, 500);
-  }, []);
+    fetchStores();
+    fetchFavorites();
+  }, [user]);
 
   const allTags = ["all", ...Array.from(new Set(stores.flatMap(s => s.tags || [])))];
   const filteredStores = filterTag === "all" ? stores : stores.filter(s => s.tags?.includes(filterTag));
-
-  const [likedStores, setLikedStores] = useState<number[]>([]);
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF8F5" }}>
@@ -548,6 +540,17 @@ export function DesaJetisPage() {
                   <div className="h-48 relative overflow-hidden">
                     <img src={store.image} alt={store.name} className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(61, 43, 31, 0.9) 0%, rgba(61, 43, 31, 0.4) 60%, transparent 80%)" }} />
+                    <button
+                      onClick={(e) => toggleFavoriteStore(store.id, e)}
+                      className="absolute top-4 right-4 p-2 rounded-full bg-white/90 shadow-sm hover:scale-110 transition-all z-10"
+                      title={favoriteStoreIds.includes(store.id) ? "Hapus dari favorit" : "Tambah ke favorit"}
+                    >
+                      <Heart
+                        className="w-5 h-5"
+                        fill={favoriteStoreIds.includes(store.id) ? "#EF4444" : "none"}
+                        style={{ color: favoriteStoreIds.includes(store.id) ? "#EF4444" : "#3D2B1F" }}
+                      />
+                    </button>
                     <div className="absolute bottom-4 left-4 right-4">
                       <h3 style={{ color: "#FAF8F5", fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700 }}>
                         {store.name}

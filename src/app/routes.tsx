@@ -10,6 +10,7 @@ import { CartPage } from "./pages/CartPage";
 import { DesainHistoriPage } from "./pages/DesainHistoriPage";
 import { ChatPage } from "./pages/ChatPage";
 import { BelajarBatikPage } from "./pages/BelajarBatikPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { RootLayout } from "./layouts/RootLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorPage } from "./components/ErrorPage";
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
           { path: "cart", Component: CartPage },
           { path: "desain-histori", Component: DesainHistoriPage },
           { path: "chat", Component: ChatPage },
+          { path: "profile", Component: ProfilePage },
         ],
       },
     ],

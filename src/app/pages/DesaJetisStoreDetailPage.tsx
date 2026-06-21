@@ -2,10 +2,13 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   MapPin, Phone, Clock, Star, ChevronLeft, Users, Award,
-  ShoppingBag, Camera, Info, Heart, Share2, ArrowUpRight
+  ShoppingBag, Camera, Heart, Share2
 } from "lucide-react";
 import { Link, useParams, useNavigate } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../lib/AuthContext";
+import { toast } from "sonner";
 
 const villageImg = "https://images.unsplash.com/photo-1661011612361-4e0704509a58?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmFkaXRpb25hbCUyMEphdmFuZXNlJTIwaG91c2UlMjB2aWxsYWdlJTIwc3RyZWV0fGVufDF8fHx8MTc3NzUyMDI0MHww&ixlib=rb-4.1.0&q=80&w=1080";
 const artisanImg = "https://images.unsplash.com/photo-1527650003412-4c330a38fdf5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXRpayUyMGFydGlzYW4lMjBjcmFmdHNtYW4lMjBwYWludGluZyUyMHdheHxlbnwxfHx8fDE3Nzc1MjAyMjZ8MA&ixlib=rb-4.1.0&q=80&w=1080";
@@ -140,21 +143,142 @@ const MotionLink = motion(Link);
 export function DesaJetisStoreDetailPage() {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [loadingFavorite, setLoadingFavorite] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
   }, []);
 
+  // Fetch store from Supabase
   useEffect(() => {
-    const id = parseInt(storeId || "0");
-    const foundStore = mockStores.find(s => s.id === id);
-    setTimeout(() => {
-      setStore(foundStore || mockStores[0]);
-      setLoading(false);
-    }, 300);
+    const fetchStore = async () => {
+      setLoading(true);
+      try {
+        const id = parseInt(storeId || "0");
+        const { data, error } = await supabase
+          .from("stores")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (error) throw error;
+        
+        // If not found in Supabase, use mock (for testing)
+        if (!data) {
+          const foundStore = mockStores.find(s => s.id === id);
+          setStore(foundStore || mockStores[0]);
+        } else {
+          setStore(data as Store);
+        }
+      } catch (error) {
+        console.error("Failed to fetch store:", error);
+        toast.error("Gagal memuat data toko");
+        // Fallback to mock
+        const id = parseInt(storeId || "0");
+        const foundStore = mockStores.find(s => s.id === id);
+        setStore(foundStore || mockStores[0]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStore();
   }, [storeId]);
+
+  // Fetch favorite status
+  useEffect(() => {
+    const fetchFavorite = async () => {
+      if (!user) {
+        setIsFavorite(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("favorite_stores")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("store_id", storeId);
+
+        if (error) throw error;
+        setIsFavorite(data && data.length > 0);
+      } catch (error) {
+        console.error("Failed to check favorite:", error);
+      }
+    };
+    if (storeId && user) {
+      fetchFavorite();
+    }
+  }, [storeId, user]);
+
+  // Toggle favorite
+  const toggleFavorite = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!user) {
+      toast.error("Silakan login untuk menambahkan favorit");
+      navigate("/auth");
+      return;
+    }
+
+    setLoadingFavorite(true);
+    try {
+      const id = parseInt(storeId || "0");
+      if (isFavorite) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from("favorite_stores")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("store_id", id);
+
+        if (error) throw error;
+        setIsFavorite(false);
+        toast.success("Dihapus dari favorit");
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from("favorite_stores")
+          .insert([{ user_id: user.id, store_id: id }]);
+
+        if (error) throw error;
+        setIsFavorite(true);
+        toast.success("Ditambahkan ke favorit");
+      }
+    } catch (error) {
+      console.error("Failed to toggle favorite:", error);
+      toast.error("Gagal memperbarui favorit");
+    } finally {
+      setLoadingFavorite(false);
+    }
+  };
+
+  // Share function
+  const handleShare = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      const shareData = {
+        title: `${store?.name} - RekaBatik`,
+        text: `Lihat toko batik ${store?.name} di RekaBatik!`,
+        url: window.location.href,
+      };
+
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("Link disalin ke clipboard!");
+      }
+    } catch (error) {
+      console.error("Failed to share:", error);
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link disalin ke clipboard!");
+    }
+  };
 
   if (loading) {
     return (
@@ -426,17 +550,19 @@ export function DesaJetisStoreDetailPage() {
                       className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl text-sm font-bold transition-all"
                       whileHover={{ scale: 1.02 }}
                       transition={{ duration: 0.3, ease: "easeOut" }}
-                      style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "#FFFFFF", boxShadow: "0 4px 16px rgba(139, 111, 71, 0.25)" }}
+                      style={{ background: "linear-gradient(135deg, #3D2B1F, #5A3D2B)", color: "#FFFFFF", boxShadow: "0 4px 16px rgba(61, 43, 31, 0.25)" }}
                     >
                       <ShoppingBag className="w-5 h-5" />
                       Lihat Produk
                     </MotionLink>
                     <button
+                      onClick={toggleFavorite}
+                      disabled={loadingFavorite}
                       className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl text-sm font-bold transition-all border-2"
-                      style={{ borderColor: "#3D2B1F", color: "#3D2B1F", background: "transparent" }}
+                      style={{ borderColor: isFavorite ? "#EF4444" : "#3D2B1F", color: isFavorite ? "#EF4444" : "#3D2B1F", background: isFavorite ? "rgba(239, 68, 68, 0.05)" : "transparent" }}
                     >
-                      <Heart className="w-5 h-5" />
-                      Simpan Toko
+                      <Heart className="w-5 h-5" fill={isFavorite ? "#EF4444" : "none"} />
+                      {isFavorite ? "Hapus dari Favorit" : "Simpan Toko"}
                     </button>
                   </div>
 
@@ -447,15 +573,13 @@ export function DesaJetisStoreDetailPage() {
                       Bagikan toko ini
                     </div>
                     <div className="flex items-center justify-center gap-3">
-                      {[Share2, Heart, Camera].map((Icon, i) => (
-                        <button
-                          key={i}
-                          className="w-10 h-10 rounded-full flex items-center justify-center"
-                          style={{ background: "rgba(212, 184, 139, 0.15)" }}
-                        >
-                          <Icon className="w-5 h-5" style={{ color: "#8B6F47" }} />
-                        </button>
-                      ))}
+                      <button
+                        onClick={handleShare}
+                        className="w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                        style={{ background: "rgba(212, 184, 139, 0.15)" }}
+                      >
+                        <Share2 className="w-5 h-5" style={{ color: "#8B6F47" }} />
+                      </button>
                     </div>
                   </div>
                 </div>

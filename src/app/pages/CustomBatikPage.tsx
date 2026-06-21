@@ -225,9 +225,7 @@ async function svgStringToPngDataUrl(svgString: string): Promise<string> {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // [OPT-6] SidebarTabs — promoted to a proper memoized React component
-// ─────────────────────────────────────────────────────────────────────────────
 interface SidebarTabsProps {
   activeTab: string;
   setActiveTab: (v: string) => void;
@@ -236,7 +234,10 @@ interface SidebarTabsProps {
   selectedPreset: typeof colorPresets[0];
   setSelectedPreset: (p: typeof colorPresets[0]) => void;
   customColor: string;
-  setCustomColor: (c: string) => void;
+  // [OPT-1b] Only called on mouse-release (color input's onChange), not on every
+  // drag pixel — avoids re-rendering SidebarTabs (and triggering recolorActiveObject)
+  // on every frame while dragging the custom color picker.
+  onCustomColorCommit: (c: string, skipPresetRegen?: boolean) => void;
   addItemToCanvas: (pattern: BatikItem) => void;
   renderMiniPattern: (pattern: BatikItem, presetName?: string) => React.ReactNode;
   layers: CustomLayer[];
@@ -257,7 +258,7 @@ const SidebarTabs = memo(({
   activeTab, setActiveTab,
   patterns, loading,
   selectedPreset, setSelectedPreset,
-  customColor, setCustomColor,
+  customColor, onCustomColorCommit,
   addItemToCanvas,
   renderMiniPattern,
   layers, selectedLayerId, setSelectedLayerId,
@@ -266,6 +267,21 @@ const SidebarTabs = memo(({
   moveLayer, toggleLayerVisibility, toggleLayerLock, duplicateLayer, deleteSelectedLayer,
   layerItemRefs,
 }: SidebarTabsProps) => {
+  // [OPT-1b] Local refs for the custom color input — uncontrolled, so dragging
+  // the picker never triggers a SidebarTabs (or parent) re-render. Only the
+  // DOM text/swatch preview update on every drag tick; the actual commit
+  // (which updates React state, regenerates the preset, and triggers recolor)
+  // happens once on mouse-release via the input's onChange.
+  const customColorInputRef = useRef<HTMLInputElement>(null);
+  const customColorTextRef = useRef<HTMLSpanElement>(null);
+
+  // [OPT-1b] Keep the uncontrolled input in sync when customColor changes from
+  // elsewhere (e.g. user clicks a built-in preset, which also updates customColor).
+  useEffect(() => {
+    if (customColorInputRef.current) customColorInputRef.current.value = customColor;
+    if (customColorTextRef.current) customColorTextRef.current.textContent = customColor;
+  }, [customColor]);
+
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full flex-1 min-h-0">
       <div className="p-5 pb-3 border-b" style={{ borderColor: "rgba(139,111,71,0.08)", background: "linear-gradient(to bottom, #FAF8F5, #FFFFFF)" }}>
@@ -339,16 +355,19 @@ const SidebarTabs = memo(({
             <div className="flex items-center gap-2">
               <input
                 type="color"
-                value={customColor}
-                onChange={(e) => {
-                  const newColor = e.target.value;
-                  setCustomColor(newColor);
-                  setSelectedPreset(generatePresetFromPrimary(newColor));
+                ref={customColorInputRef}
+                defaultValue={customColor}
+                // [OPT-1b] onInput fires on every drag tick — update DOM text only, no setState
+                onInput={(e) => {
+                  const v = (e.target as HTMLInputElement).value;
+                  if (customColorTextRef.current) customColorTextRef.current.textContent = v;
                 }}
+                // [OPT-1b] onChange fires once on mouse-release — commit to React state here
+                onChange={(e) => onCustomColorCommit(e.target.value)}
                 className="w-12 h-10 rounded-lg border cursor-pointer"
                 style={{ borderColor: "rgba(139,111,71,0.12)" }}
               />
-              <span className="text-xs font-mono" style={{ color: "#7A6B5E" }}>{customColor}</span>
+              <span ref={customColorTextRef} className="text-xs font-mono" style={{ color: "#7A6B5E" }}>{customColor}</span>
             </div>
           </div>
         </div>
@@ -360,7 +379,11 @@ const SidebarTabs = memo(({
                 key={i}
                 onClick={() => {
                   setSelectedPreset(preset);
-                  setCustomColor(preset.colors.primary);
+                  // Sync the custom color picker's value to this preset's primary
+                  // color too, so switching back to "custom" mode starts from a
+                  // sensible value — but without triggering generatePresetFromPrimary
+                  // (that would just recompute the same preset we just set).
+                  onCustomColorCommit(preset.colors.primary, true);
                 }}
                 className={`w-full p-4 rounded-2xl border text-left transition-all duration-200 flex items-center justify-between cursor-pointer ${isActive
                   ? "bg-[rgba(139,111,71,0.06)] border-[#8B6F47] border-2 shadow-sm"
@@ -514,9 +537,7 @@ const SidebarTabs = memo(({
 });
 SidebarTabs.displayName = "SidebarTabs";
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Main Component
-// ─────────────────────────────────────────────────────────────────────────────
 export function CustomBatikPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -537,6 +558,7 @@ export function CustomBatikPage() {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState<"saved" | "cart" | "order" | null>(null);
   const [showProjectModal, setShowProjectModal] = useState<"save" | "cart" | "order" | null>(null);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   const [projectInfo, setProjectInfo] = useState({ name: "", description: "", fabric: "Katun Primisima" });
   const [savedDesignId, setSavedDesignId] = useState<number | null>(null);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -549,8 +571,7 @@ export function CustomBatikPage() {
   const [selectedPreset, setSelectedPreset] = useState(colorPresets[0]);
   const [customColor, setCustomColor] = useState(colorPresets[0].colors.primary);
   const [activeTab, setActiveTab] = useState("pattern");
-  // [OPT-1] canvasBackground is kept as React state for download/save logic,
-  // but color picker no longer drives re-renders on every pixel drag.
+
   const [canvasBackground, setCanvasBackground] = useState("#ffffff");
   const [committedBg, setCommittedBg] = useState("#ffffff");
   const [shapeType, setShapeType] = useState<ShapeType>("rect");
@@ -565,8 +586,8 @@ export function CustomBatikPage() {
   const [selectedObjectType, setSelectedObjectType] = useState<"pattern" | "shape" | "text" | null>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [showFloatingSidebar, setShowFloatingSidebar] = useState(true);
-  // [DRAG] Visual feedback while a motif card is being dragged over the canvas
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
+  const [canvasDisplaySize, setCanvasDisplaySize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     if (isFullMode) setShowFloatingSidebar(true);
@@ -636,6 +657,8 @@ export function CustomBatikPage() {
   const bgColorRef = useRef("#ffffff");
   const bgColorInputRef = useRef<HTMLInputElement>(null);
   const bgColorSwatchRef = useRef<HTMLDivElement>(null);
+  const bgColorInputRefFull = useRef<HTMLInputElement>(null);
+  const bgColorSwatchRefFull = useRef<HTMLDivElement>(null);
   const isApplyingBgUndoRef = useRef(false);
   // [DRAG] Ref to addItemToCanvas so handleCanvasDrop (defined earlier in source
   // order) can call the latest version without a temporal-dead-zone issue.
@@ -709,10 +732,12 @@ export function CustomBatikPage() {
   useEffect(() => {
     // Keep ref in sync
     bgColorRef.current = canvasBackground;
-    // Sync the uncontrolled input value
+    // Sync the uncontrolled input values
     if (bgColorInputRef.current) bgColorInputRef.current.value = canvasBackground;
-    // Sync the swatch preview
+    if (bgColorInputRefFull.current) bgColorInputRefFull.current.value = canvasBackground;
+    // Sync the swatch previews
     if (bgColorSwatchRef.current) bgColorSwatchRef.current.style.background = canvasBackground;
+    if (bgColorSwatchRefFull.current) bgColorSwatchRefFull.current.style.background = canvasBackground;
     // Sync the canvas container background preview
     if (containerRef.current) containerRef.current.style.background = canvasBackground;
 
@@ -775,6 +800,28 @@ export function CustomBatikPage() {
     ctx.clearRect(0, 0, 800, 600);
     ctx.drawImage(offscreen, 0, 0);
   }, []);
+
+  const syncDisplayTransform = useCallback(() => {
+    const display = displayCanvasRef.current;
+    const fc = fabricCanvasRef.current;
+    if (!display || !fc) return;
+    const vpt = fc.viewportTransform;
+    if (!vpt) return;
+    const baseScale = baseScaleRef.current || 1;
+    const zoom = fc.getZoom() || 1;
+    // Extra zoom on top of what CSS width/height already provides
+    const extraScale = zoom / baseScale;
+    // Pan offset converted from logical canvas px to CSS display px
+    const panXCss = (vpt[4] || 0) * baseScale;
+    const panYCss = (vpt[5] || 0) * baseScale;
+    display.style.transformOrigin = "0 0";
+    display.style.transform = `translate(${panXCss}px, ${panYCss}px) scale(${extraScale})`;
+  }, []);
+  // [PAN-FIX] Stable ref so this can be called from the Fabric "after:render"
+  // hook (registered once at canvas init) without needing to re-init Fabric
+  // every time the callback identity would otherwise change.
+  const syncDisplayTransformRef = useRef(syncDisplayTransform);
+  useEffect(() => { syncDisplayTransformRef.current = syncDisplayTransform; }, [syncDisplayTransform]);
 
   useEffect(() => {
     const offscreen = document.createElement("canvas");
@@ -1108,6 +1155,18 @@ export function CustomBatikPage() {
     ctx.restore();
   }, []);
 
+  useEffect(() => {
+    const hasUnsavedWork = layers.length > 0 || hasOffscreenContent;
+    if (!hasUnsavedWork) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [layers.length, hasOffscreenContent]);
+
   // Fetch patterns
   useEffect(() => {
     async function fetchPatterns() {
@@ -1221,8 +1280,6 @@ export function CustomBatikPage() {
         if (newObjects.length > 1) { const sel = new fabric.ActiveSelection(newObjects, { canvas }); canvas.setActiveObject(sel); }
         else if (newObjects.length === 1) { canvas.setActiveObject(newObjects[0]); }
         canvas.requestRenderAll();
-        // Save snapshot via ref-based call (saveSnapshot is stable via useCallback)
-        // We use the fabricCanvasRef approach since saveSnapshot is a useCallback
         const json = JSON.stringify(canvas.toJSON(["data"]));
         historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
         historyRef.current.push(json);
@@ -1368,6 +1425,9 @@ export function CustomBatikPage() {
       targetFindTolerance: 10,
     });
     fabricCanvasRef.current = canvas;
+    canvas.on("after:render", () => {
+      syncDisplayTransformRef.current?.();
+    });
 
     // Custom delete control
     fabric.Object.prototype.controls.deleteControl = new fabric.Control({
@@ -1477,11 +1537,10 @@ export function CustomBatikPage() {
       canvas.setWidth(containerWidth);
       canvas.setHeight(containerWidth * 0.75);
       canvas.setZoom(containerWidth / 800);
-      // [PANZOOM-FIX] Seed baseScaleRef so updateSize()'s resize-ratio math has a
-      // correct starting point instead of defaulting to 1.
       baseScaleRef.current = containerWidth / 800;
       displayCanvasRef.current.style.width = `${containerWidth}px`;
       displayCanvasRef.current.style.height = `${containerWidth * 0.75}px`;
+      setCanvasDisplaySize({ width: containerWidth, height: containerWidth * 0.75 });
     }
 
     isInitRef.current = false;
@@ -1730,22 +1789,24 @@ export function CustomBatikPage() {
     const fabricWrapper = (fabricCanvasRef as any).wrapper;
     if (!canvas || !display || !fabricWrapper) return;
     syncDisplay();
+
+    const sizeStyle = { width: `${canvas.getWidth()}px`, height: `${canvas.getHeight()}px` };
     if (activeTool === "select") {
       canvas.isDrawingMode = false; canvas.selection = true; canvas.defaultCursor = "default"; canvas.hoverCursor = "move";
       canvas.forEachObject((obj) => { const layerId = (obj as any).data?.layerId; if (!layerId) return; obj.evented = true; obj.selectable = true; });
       canvas.renderAll();
-      display.style.position = "absolute"; display.style.top = "0"; display.style.left = "0"; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = "100%"; display.style.height = "100%";
-      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = "0"; fabricWrapper.style.left = "0"; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = "100%"; fabricWrapper.style.height = "100%";
+      display.style.position = "absolute"; display.style.top = "0"; display.style.left = "0"; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
+      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = "0"; fabricWrapper.style.left = "0"; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
     } else if (activeTool === "text") {
       canvas.isDrawingMode = false; canvas.selection = true; canvas.defaultCursor = "text"; canvas.hoverCursor = "text";
       canvas.forEachObject((obj) => { obj.evented = true; obj.selectable = true; }); canvas.renderAll();
-      display.style.position = "absolute"; display.style.top = "0"; display.style.left = "0"; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = "100%"; display.style.height = "100%";
-      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = "0"; fabricWrapper.style.left = "0"; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = "100%"; fabricWrapper.style.height = "100%";
+      display.style.position = "absolute"; display.style.top = "0"; display.style.left = "0"; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
+      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = "0"; fabricWrapper.style.left = "0"; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
     } else if (activeTool === "shape") {
       canvas.isDrawingMode = false; canvas.selection = false; canvas.defaultCursor = "crosshair"; canvas.hoverCursor = "crosshair";
       canvas.forEachObject((obj) => { obj.evented = false; obj.selectable = false; }); canvas.renderAll();
-      display.style.position = "absolute"; display.style.top = "0"; display.style.left = "0"; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = "100%"; display.style.height = "100%";
-      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = "0"; fabricWrapper.style.left = "0"; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = "100%"; fabricWrapper.style.height = "100%";
+      display.style.position = "absolute"; display.style.top = "0"; display.style.left = "0"; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
+      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = "0"; fabricWrapper.style.left = "0"; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
     } else {
       canvas.isDrawingMode = false; canvas.selection = false; canvas.discardActiveObject();
       canvas.forEachObject((obj) => { obj.evented = false; obj.selectable = false; }); canvas.renderAll();
@@ -1758,8 +1819,8 @@ export function CustomBatikPage() {
           : `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${size / 2}' cy='${size / 2}' r='${size / 2 - 1}' fill='${brushColorRef.current.replace("#", "%23")}' opacity='0.7'/></svg>`;
         cursor = `url("data:image/svg+xml,${cursorSvg}") ${size / 2} ${size / 2}, crosshair`;
       }
-      display.style.position = "absolute"; display.style.top = "0"; display.style.left = "0"; display.style.pointerEvents = "auto"; display.style.zIndex = "2"; display.style.cursor = cursor; display.style.width = "100%"; display.style.height = "100%";
-      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = "0"; fabricWrapper.style.left = "0"; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = "100%"; fabricWrapper.style.height = "100%";
+      display.style.position = "absolute"; display.style.top = "0"; display.style.left = "0"; display.style.pointerEvents = "auto"; display.style.zIndex = "2"; display.style.cursor = cursor; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
+      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = "0"; fabricWrapper.style.left = "0"; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
     }
   }, [activeTool, brushSize, brushColor, syncDisplay]);
 
@@ -1768,23 +1829,17 @@ export function CustomBatikPage() {
     const display = displayCanvasRef.current;
     const fc = fabricCanvasRef.current;
     if (!container || !fc || !display) return;
-    const { width } = container.getBoundingClientRect();
-    if (width <= 0) return; // container not laid out yet (e.g. mid fullmode transition)
-
-    const newBaseScale = width / 800;
+    const { width: containerWidth } = container.getBoundingClientRect();
+    if (containerWidth <= 0) return; // container not laid out yet (e.g. mid fullmode transition)
+    const fitWidth = containerWidth;
+    const fitHeight = containerWidth * 0.75;
+    const newBaseScale = fitWidth / 800;
     const oldBaseScale = baseScaleRef.current || newBaseScale;
     const oldVpt = fc.viewportTransform || [oldBaseScale, 0, 0, oldBaseScale, 0, 0];
 
-    fc.setWidth(width);
-    fc.setHeight(width * 0.75);
+    fc.setWidth(fitWidth);
+    fc.setHeight(fitHeight);
 
-    // [PANZOOM-FIX] Recompose the viewport transform: scale the pan offset by the
-    // same ratio the base scale changed by, so whatever point the user was looking
-    // at (after their own zoom/pan) stays in view after a container resize —
-    // instead of calling fc.setZoom(newBaseScale) alone, which kept the *old*
-    // pixel-space pan offset unchanged while the scale jumped, throwing the
-    // visible region completely off (this caused items to appear to vanish or
-    // get shoved into a corner when toggling fullmode).
     const ratio = newBaseScale / oldBaseScale;
     const newScale = (oldVpt[0] || oldBaseScale) * ratio;
     const newPanX = (oldVpt[4] || 0) * ratio;
@@ -1792,8 +1847,9 @@ export function CustomBatikPage() {
     baseScaleRef.current = newBaseScale;
     fc.setViewportTransform([newScale, 0, 0, newScale, newPanX, newPanY]);
 
-    display.style.width = `${width}px`; display.style.height = `${width * 0.75}px`;
+    display.style.width = `${fitWidth}px`; display.style.height = `${fitHeight}px`;
     fc.requestRenderAll();
+    setCanvasDisplaySize({ width: fitWidth, height: fitHeight });
   }, []);
 
   const updateSizeRef = useRef(updateSize);
@@ -1806,19 +1862,12 @@ export function CustomBatikPage() {
   }, [updateSize]);
 
   useEffect(() => {
-    // [FIX] Double requestAnimationFrame ensures the DOM has fully settled
-    // (containerRef className transition between "fixed inset-0" <-> "aspect-[4/3]")
-    // before we read getBoundingClientRect(). A single setTimeout(50ms) could fire
-    // mid-transition, causing updateSize() to compute zoom from a stale/incorrect
-    // container size — which made newly-added motifs appear to "vanish" since their
-    // logical (800x600) position no longer matched the visible scaled area.
     let raf1 = 0, raf2 = 0;
     raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
         updateSizeRef.current?.();
       });
     });
-    // Fallback in case rAF fires before the transition class is fully applied
     const timer = setTimeout(() => { updateSizeRef.current?.(); }, 120);
     return () => {
       cancelAnimationFrame(raf1);
@@ -1889,36 +1938,22 @@ export function CustomBatikPage() {
     );
   }, [selectedPreset]);
 
-  // [OPT-7] addItemToCanvas uses svgStringToPngDataUrl helper
-  // [FIX] Compute a sensible spawn point for a new motif in *canvas logical
-  // coordinates* (the canvas internal space is always 800x600 regardless of
-  // zoom/display size). If dropCoords are given (drag-and-drop), use those.
-  // Otherwise, spawn at the center of whatever part of the canvas is currently
-  // visible on screen — accounting for zoom level and pan offset — instead of
-  // a hardcoded (80,60) which always lands in the same spot and ignores zoom/pan.
   const getSpawnPoint = useCallback((dropCoords?: { x: number; y: number }) => {
     if (dropCoords) return dropCoords;
     const fc = fabricCanvasRef.current;
     if (!fc) return { x: 80, y: 60 };
     const vpt = fc.viewportTransform;
     if (!vpt) return { x: 80, y: 60 };
-    // Visible center of the canvas element, converted from screen/display space
-    // back into logical canvas coordinates via the inverse viewport transform.
     const zoom = fc.getZoom() || 1;
     const displayCenterX = fc.getWidth() / 2;
     const displayCenterY = fc.getHeight() / 2;
     const logicalX = (displayCenterX - vpt[4]) / zoom;
     const logicalY = (displayCenterY - vpt[5]) / zoom;
-    // Clamp within the 800x600 logical canvas with a small margin so it never
-    // spawns fully off-canvas if heavily panned/zoomed.
     const clampedX = Math.max(60, Math.min(740, logicalX));
     const clampedY = Math.max(60, Math.min(540, logicalY));
     return { x: clampedX, y: clampedY };
   }, []);
 
-  // [DRAG] Convert a screen point (e.g. clientX/clientY from a drop event) into
-  // the canvas's logical 800x600 coordinate space, accounting for current zoom
-  // and pan (viewportTransform) — same math used by Fabric's own getPointer.
   const screenPointToCanvasCoords = useCallback((clientX: number, clientY: number) => {
     const fc = fabricCanvasRef.current;
     const canvasEl = canvasRef.current;
@@ -1926,11 +1961,8 @@ export function CustomBatikPage() {
     const rect = canvasEl.getBoundingClientRect();
     const vpt = fc.viewportTransform;
     const zoom = fc.getZoom() || 1;
-    // Position relative to the Fabric canvas element, in display pixels
     const displayX = clientX - rect.left;
     const displayY = clientY - rect.top;
-    // The Fabric <canvas> element's internal pixel size may differ from its
-    // CSS display size; normalize using the element's own width/height ratio.
     const scaleX = canvasEl.width / rect.width;
     const scaleY = canvasEl.height / rect.height;
     const fabricX = displayX * scaleX;
@@ -1944,9 +1976,6 @@ export function CustomBatikPage() {
     };
   }, []);
 
-  // [DRAG] Drop handler — reads the pattern id stashed in dataTransfer during
-  // dragStart on the sidebar card, resolves it against the loaded patterns list,
-  // and spawns it centered exactly at the drop point.
   const handleCanvasDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOverCanvas(false);
@@ -1970,8 +1999,6 @@ export function CustomBatikPage() {
         const rawH = img.height ?? 554;
         const maxSize = 280;
         const scale = rawW > 0 && rawH > 0 ? Math.min(maxSize / rawW, maxSize / rawH, 1) : 1;
-        // Center the image on the spawn point rather than using it as the top-left,
-        // so dropped/spawned motifs feel anchored where the user dropped/expected them.
         const displayW = rawW * scale;
         const displayH = rawH * scale;
         img.set({
@@ -1992,26 +2019,23 @@ export function CustomBatikPage() {
         setSelectedLayerId(newLayerId);
         setActiveTab("layer");
         saveSnapshot();
-        // NOTE: intentionally NOT calling updateSize()/setZoom() here — doing so
-        // previously caused a jarring "blink to fit-width zoom" every time a motif
-        // was added, discarding whatever custom zoom level the user had set.
       });
     }).catch(() => { toast.error('Gagal memuat motif SVG'); });
   }, [saveSnapshot, renderPatternSVGString, selectedPreset, customColor, getSpawnPoint]);
 
-  // [DRAG] Keep the ref pointing at the latest addItemToCanvas so handleCanvasDrop
-  // (declared earlier, before addItemToCanvas exists in source order) always calls
-  // the current version with up-to-date closures.
   useEffect(() => { addItemToCanvasRef.current = addItemToCanvas; }, [addItemToCanvas]);
+  const handleCustomColorCommit = useCallback((newColor: string, skipPresetRegen?: boolean) => {
+    setCustomColor(newColor);
+    if (!skipPresetRegen) {
+      setSelectedPreset(generatePresetFromPrimary(newColor));
+    }
+  }, []);
 
-
-  // [OPT-4] recolorActiveObject — single entry point, called only from useEffect below
   const recolorActiveObject = useCallback(() => {
     if (!fabricCanvasRef.current) return;
     const activeObj = fabricCanvasRef.current.getActiveObject();
     if (!activeObj) return;
     const data = (activeObj as any).data;
-    // [OPT-4] Guard: skip if nothing actually changed
     if (data.colorPresetName === selectedPreset.name && selectedPreset.name !== "Custom") return;
     if (selectedPreset.name === "Custom" && data.customColor === customColor) return;
 
@@ -2024,7 +2048,6 @@ export function CustomBatikPage() {
       recoloredSvg = renderPatternSVGString(pattern);
     }
 
-    // [OPT-7] recolorActiveObject uses svgStringToPngDataUrl helper
     svgStringToPngDataUrl(recoloredSvg).then((pngUrl) => {
       (activeObj as fabric.Image).setSrc(pngUrl, () => {
         data.colorPresetName = selectedPreset.name;
@@ -2037,12 +2060,9 @@ export function CustomBatikPage() {
     }).catch(() => { /* silent */ });
   }, [selectedPreset, customColor, saveSnapshot, renderPatternSVGString, patterns]);
 
-  // [OPT-4] recolor — single entry point useEffect
   useEffect(() => {
     recolorActiveObject();
   }, [selectedPreset, recolorActiveObject]);
-
-  // Layer actions
   const deleteSelectedLayer = useCallback(() => {
     if (!selectedLayerId || !fabricCanvasRef.current) return;
     const layer = layers.find((l) => l.id === selectedLayerId);
@@ -2153,6 +2173,10 @@ export function CustomBatikPage() {
   };
 
   const clearAll = () => {
+    setShowClearConfirmModal(true);
+  };
+
+  const confirmClearAll = () => {
     const fc = fabricCanvasRef.current;
     isInitRef.current = true;
     if (fc) { const objects = fc.getObjects(); objects.forEach(obj => fc.remove(obj)); fc.discardActiveObject(); fc.renderAll(); }
@@ -2167,6 +2191,7 @@ export function CustomBatikPage() {
     saveSnapshot(); saveOffscreenSnapshot();
     isInitRef.current = false;
     setLayers([]); setSelectedLayerId(null); setHasOffscreenContent(false); setCanUndo(false); setCanRedo(false); setSavedDesignId(null);
+    setShowClearConfirmModal(false);
   };
 
   const saveDesign = async (): Promise<number | null> => {
@@ -2229,7 +2254,6 @@ export function CustomBatikPage() {
     await executeAction(actionType);
   };
 
-  // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ background: "#FAF8F5" }}>
       <BatikBackground opacity={0.03} patternType="kawung" />
@@ -2311,17 +2335,13 @@ export function CustomBatikPage() {
                             defaultValue={canvasBackground}
                             className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
                             title="Ubah warna latar kanvas"
-                            // [OPT-1] onInput: update DOM preview without any setState
                             onInput={(e) => {
                               const color = (e.target as HTMLInputElement).value;
                               bgColorRef.current = color;
-                              // Update container background directly
                               if (containerRef.current) containerRef.current.style.background = color;
-                              // Update swatch directly
                               if (bgColorSwatchRef.current) bgColorSwatchRef.current.style.background = color;
                             }}
-                            // [OPT-1] onChange: only fires on mouse-up (browser behavior for color inputs)
-                            // — this is where we update Fabric and push to history
+
                             onChange={(e) => {
                               const color = e.target.value;
                               bgColorRef.current = color;
@@ -2576,39 +2596,69 @@ export function CustomBatikPage() {
                       ? "fixed inset-0 z-[100] w-full h-full overflow-hidden select-none flex items-center justify-center"
                       : "aspect-[4/3] relative overflow-hidden select-none"}
                     style={{
-                      background: isFullMode ? "#000000" : canvasBackground,
-                      // [DRAG] Subtle highlight ring while a motif is being dragged over the canvas
+                      background: isFullMode
+
+                        ? "radial-gradient(ellipse at center, #1a1a1a 0%, #000000 100%)"
+                        : canvasBackground,
                       boxShadow: isDragOverCanvas ? "inset 0 0 0 3px #8B6F47" : undefined,
                       transition: "box-shadow 0.15s ease",
                     }}
                     onDragOver={(e) => {
-                      // Required to allow dropping — browsers block drop by default
                       e.preventDefault();
                       e.dataTransfer.dropEffect = "copy";
                       if (!isDragOverCanvas) setIsDragOverCanvas(true);
                     }}
                     onDragLeave={(e) => {
-                      // Only clear the highlight when truly leaving the container
-                      // (not just moving between its children, which also fires dragleave)
                       if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
                         setIsDragOverCanvas(false);
                       }
                     }}
                     onDrop={handleCanvasDrop}
                   >
-                    <canvas ref={displayCanvasRef} width={800} height={600} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'auto' }} />
+                    {isFullMode && (
+                      <div
+                        className="fixed top-0 left-0 right-0 z-[99] flex items-center justify-around py-4 pointer-events-none"
+                        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 3%, rgba(0,0,0,0) 100%)" }}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-2 h-2 rounded-full" style={{ background: "#D4B88B" }} />
+                          <span className="text-white/90 text-xs font-semibold tracking-wide">Kanvas Karya</span>
+                        </div>
+                        <div className="hidden lg:flex items-center gap-4 text-white/55 text-[11px] mr-[400px]">
+                          <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Scroll</kbd> geser kanvas</span>
+                          <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Ctrl+Scroll</kbd> perbesar/perkecil</span>
+                          <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Space+Drag</kbd> geser kanvas</span>
+                          <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Esc</kbd> keluar</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <canvas ref={displayCanvasRef} width={800} height={600} style={{ position: 'absolute', top: 0, left: 0, zIndex: 2, pointerEvents: 'auto' }} />
                     <div
                       ref={(el) => {
                         (fabricCanvasRef as any).wrapper = el;
                       }}
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}
+                      style={{ position: 'absolute', top: 0, left: 0, zIndex: 1 }}
                     >
                       <canvas ref={canvasRef} />
                     </div>
+                    {isFullMode && (
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{
+                          zIndex: 3,
+                          left: 0, top: 0,
+                          width: canvasDisplaySize.width > 0 ? `${canvasDisplaySize.width}px` : '100%',
+                          height: canvasDisplaySize.height > 0 ? `${canvasDisplaySize.height}px` : '100%',
+                          border: "2px solid rgba(212,184,139,0.6)",
+                          boxShadow: "0 0 32px rgba(0,0,0,0.6)",
+                        }}
+                      />
+                    )}
                     {layers.length === 0 && !hasOffscreenContent && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ color: "#A89B8F", zIndex: 3 }}>
-                        <Layers className="w-14 h-14 mb-3 opacity-20 text-[#8B6F47]" />
-                        <p className="text-base font-semibold text-[#5A4A3E]">Kanvas Karya Kosong</p>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ color: isFullMode ? "rgba(255,255,255,0.45)" : "#A89B8F", zIndex: 3 }}>
+                        <Layers className="w-14 h-14 mb-3 opacity-20" style={{ color: isFullMode ? "#D4B88B" : "#8B6F47" }} />
+                        <p className="text-base font-semibold" style={{ color: isFullMode ? "rgba(255,255,255,0.75)" : "#5A4A3E" }}>Kanvas Karya Kosong</p>
                         <p className="text-xs opacity-75 mt-0.5">Pilih & klik motif di sidebar kanan, atau seret langsung ke kanvas</p>
                       </div>
                     )}
@@ -2655,7 +2705,7 @@ export function CustomBatikPage() {
                   selectedPreset={selectedPreset}
                   setSelectedPreset={setSelectedPreset}
                   customColor={customColor}
-                  setCustomColor={setCustomColor}
+                  onCustomColorCommit={handleCustomColorCommit}
                   addItemToCanvas={addItemToCanvas}
                   renderMiniPattern={renderMiniPattern}
                   layers={layers}
@@ -2791,9 +2841,59 @@ export function CustomBatikPage() {
                 })}
               </div>
               <div className="h-6 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-              <button onClick={zoomOut} disabled={zoomLevel <= 50} title="Perkecil" className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100" style={{ color: "#8B6F47" }}><ZoomOut style={{ width: 14, height: 14 }} /></button>
-              <button onClick={resetZoom} title="Reset Zoom" className="px-1.5 h-8 rounded-full text-[11px] font-bold font-mono cursor-pointer hover:bg-stone-100" style={{ color: "#3D2B1F", minWidth: 42 }}>{zoomLevel}%</button>
-              <button onClick={zoomIn} disabled={zoomLevel >= 300} title="Perbesar" className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100" style={{ color: "#8B6F47" }}><ZoomIn style={{ width: 14, height: 14 }} /></button>
+              <button
+                onClick={zoomOut} disabled={zoomLevel <= 50} title="Perkecil"
+                className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100"
+                style={{ color: "#8B6F47" }}
+              ><ZoomOut style={{ width: 14, height: 14 }} /></button>
+              <button
+                onClick={resetZoom}
+                title={zoomLevel === 100 ? "Tampilan sesuai layar" : "Klik untuk kembali ke 100%"}
+                className="px-2 h-8 rounded-full text-[11px] font-bold font-mono cursor-pointer hover:bg-stone-100 transition-colors"
+                style={{
+                  color: zoomLevel !== 100 ? "#8B6F47" : "#A89B8F",
+                  background: zoomLevel !== 100 ? "rgba(139,111,71,0.08)" : "transparent",
+                  minWidth: 46,
+                }}
+              >{zoomLevel}%</button>
+              <button
+                onClick={zoomIn} disabled={zoomLevel >= 300} title="Perbesar"
+                className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100"
+                style={{ color: "#8B6F47" }}
+              ><ZoomIn style={{ width: 14, height: 14 }} /></button>
+              <div className="h-6 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
+              {/* Background color picker for full mode */}
+              <div className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-full cursor-pointer hover:bg-stone-100 transition-all" title="Warna latar kanvas">
+                <div
+                  ref={bgColorSwatchRefFull}
+                  className="w-4 h-4 rounded-full border"
+                  style={{ background: canvasBackground, borderColor: "rgba(0,0,0,0.1)" }}
+                />
+                <input
+                  type="color"
+                  ref={bgColorInputRefFull}
+                  defaultValue={canvasBackground}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  title="Ubah warna latar kanvas"
+                  onInput={(e) => {
+                    const color = (e.target as HTMLInputElement).value;
+                    bgColorRef.current = color;
+                    if (containerRef.current) containerRef.current.style.background = color;
+                    if (bgColorSwatchRef.current) bgColorSwatchRef.current.style.background = color;
+                    if (bgColorSwatchRefFull.current) bgColorSwatchRefFull.current.style.background = color;
+                  }}
+                  onChange={(e) => {
+                    const color = e.target.value;
+                    bgColorRef.current = color;
+                    const fc = fabricCanvasRef.current;
+                    if (fc) {
+                      fc.setBackgroundColor(color, () => { fc.requestRenderAll(); });
+                    }
+                    setCanvasBackground(color);
+                    setCommittedBg(color);
+                  }}
+                />
+              </div>
               <div className="h-6 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
               <button onClick={undoAll} disabled={!canUndo} title="Undo (Ctrl+Z)" className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100" style={{ color: "#8B6F47" }}><RotateCcw style={{ width: 14, height: 14 }} /></button>
               <button onClick={redoAll} disabled={!canRedo} title="Redo (Ctrl+Y)" className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100" style={{ color: "#8B6F47" }}><RotateCw style={{ width: 14, height: 14 }} /></button>
@@ -2809,7 +2909,6 @@ export function CustomBatikPage() {
                 className="flex items-center gap-1.5 px-3 h-8 rounded-full font-semibold text-xs cursor-pointer hover:opacity-90"
                 style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)", color: "white" }}>
                 <Minimize2 style={{ width: 13, height: 13 }} />
-
               </button>
             </motion.div>
 
@@ -2836,7 +2935,7 @@ export function CustomBatikPage() {
                       selectedPreset={selectedPreset}
                       setSelectedPreset={setSelectedPreset}
                       customColor={customColor}
-                      setCustomColor={setCustomColor}
+                      onCustomColorCommit={handleCustomColorCommit}
                       addItemToCanvas={addItemToCanvas}
                       renderMiniPattern={renderMiniPattern}
                       layers={layers}
@@ -2925,6 +3024,32 @@ export function CustomBatikPage() {
                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 {showProjectModal === "save" ? "Simpan Desain" : showProjectModal === "cart" ? "Simpan & Masukkan Keranjang" : "Simpan & Pesan Sekarang"}
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Clear Canvas Confirmation Modal */}
+      <AnimatePresence>
+        {showClearConfirmModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowClearConfirmModal(false)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-2xl" style={{ border: "1px solid rgba(212,184,139,0.3)" }}>
+              <button onClick={() => setShowClearConfirmModal(false)} className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #DC2626, #EF4444)" }}>
+                <Trash2 className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+                Bersihkan Kanvas?
+              </h3>
+              <p className="text-[#7A6B5E] mb-8 text-sm">
+                Semua desain, layer, dan riwayat edit akan dihapus. Tindakan ini tidak bisa dibatalkan.
+              </p>
+              <div className="space-y-3">
+                <button onClick={confirmClearAll} className="w-full py-3.5 rounded-xl font-bold text-white transition-all hover:opacity-95" style={{ background: "linear-gradient(135deg, #DC2626, #EF4444)" }}>Ya, Bersihkan</button>
+                <button onClick={() => setShowClearConfirmModal(false)} className="w-full py-3.5 rounded-xl font-bold transition-all" style={{ color: "#8B6F47", border: "1.5px solid rgba(139,111,71,0.2)", background: "rgba(139,111,71,0.04)" }}>Batal</button>
+              </div>
             </motion.div>
           </div>
         )}
