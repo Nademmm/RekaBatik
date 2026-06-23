@@ -639,7 +639,6 @@ export function HomePage() {
                         }}
                       >
                         <ShoppingBag className="w-4 h-4" />
-                        Masukkan Keranjang
                       </motion.button>
                     </div>
                   </div>

@@ -11,6 +11,8 @@ import { DesainHistoriPage } from "./pages/DesainHistoriPage";
 import { ChatPage } from "./pages/ChatPage";
 import { BelajarBatikPage } from "./pages/BelajarBatikPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { AdminPage } from "./pages/AdminPage";
+import { SuperAdminPage } from "./pages/SuperAdminPage";
 import { RootLayout } from "./layouts/RootLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorPage } from "./components/ErrorPage";
@@ -41,6 +43,8 @@ export const router = createBrowserRouter([
           { path: "desain-histori", Component: DesainHistoriPage },
           { path: "chat", Component: ChatPage },
           { path: "profile", Component: ProfilePage },
+          { path: "admin", Component: AdminPage },
+          { path: "super-admin", Component: SuperAdminPage },
         ],
       },
     ],

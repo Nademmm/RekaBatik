@@ -32,7 +32,7 @@ export interface Order {
   date: string;
   delivered_date?: string;
   estimated_date?: string;
-  status: "delivered" | "shipping" | "processing";
+  status: "delivered" | "shipping" | "processing" | "negotiating" | "cancelled";
   total: number;
   type: string;
   primary_color: string;
@@ -43,10 +43,15 @@ export interface Order {
   reviewed: boolean;
   // New fields
   payment_method?: "transfer_bca" | "transfer_mandiri" | "gopay" | "ovo" | "cod";
-  payment_status?: "pending" | "paid" | "failed";
+  payment_status?: "pending" | "awaiting_verification" | "paid" | "failed";
   shipping_address?: ShippingAddress;
   quantity?: number;
   notes?: string;
+  tracking_number?: string;
+  courier?: string;
+  review_rating?: number;
+  review_comment?: string;
+  custom_design_id?: number;
 }
 
 export interface Store {
@@ -66,6 +71,8 @@ export interface Store {
   featured: boolean;
   description: string;
   motifs: string[];
+  status?: "pending" | "approved" | "rejected";
+  owner_id?: string;
 }
 
 export interface Review {
@@ -97,6 +104,7 @@ export interface CartItem {
   custom_design_id?: number;
   quantity: number;
   created_at: string;
+  notes?: string | null;
   batik_items?: BatikItem;
   custom_designs?: CustomDesign;
 }

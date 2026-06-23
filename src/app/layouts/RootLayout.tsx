@@ -1,13 +1,14 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { BatikBackground } from "../components/BatikBackground";
 import logoImg from "../../imports/rekabatik-logo.png";
 import { Toaster, toast } from "sonner";
 import { useAuth } from "../../lib/AuthContext";
 import { useCart } from "../../lib/CartContext";
 import { useFullscreen } from "../../lib/FullscreenContext";
+import { supabase } from "../../lib/supabase";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +36,7 @@ function getInitials(user: { user_metadata?: { full_name?: string }; email?: str
 export function RootLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, userRole } = useAuth();
   const { cartCount } = useCart();
   const { isFullMode } = useFullscreen();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -43,6 +44,50 @@ export function RootLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const [notifications, setNotifications] = useState({ unpaidCount: 0, negotiatingCount: 0, awaitingVerificationCount: 0 });
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+    try {
+      if (userRole === "artisan") {
+        const { data: storeData } = await supabase.from("stores").select("name").eq("owner_id", user.id).single();
+        if (storeData?.name) {
+          const { data: orders } = await supabase.from("orders").select("status, payment_status").eq("artisan", storeData.name);
+          if (orders) {
+            const awaiting = orders.filter(o => o.payment_status === "awaiting_verification").length;
+            const nego = orders.filter(o => o.status === "negotiating").length;
+            setNotifications({ unpaidCount: 0, negotiatingCount: nego, awaitingVerificationCount: awaiting });
+          }
+        }
+      } else {
+        const { data: orders } = await supabase.from("orders").select("status, payment_status, total, date").eq("user_id", user.id);
+        if (orders) {
+          const unpaid = orders.filter(o => o.payment_status === "pending" && o.total > 0 && o.status !== "negotiating" && (new Date(o.date).getTime() + 86400000 > Date.now())).length;
+          const nego = orders.filter(o => o.status === "negotiating").length;
+          setNotifications({ unpaidCount: unpaid, negotiatingCount: nego, awaitingVerificationCount: 0 });
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching navbar notifications:", err);
+    }
+  }, [user, userRole]);
+
+  useEffect(() => {
+    fetchNotifications();
+    if (!user) return;
+    const channel = supabase
+      .channel("navbar-orders-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchNotifications]);
+
+  const totalNotif = notifications.unpaidCount + notifications.negotiatingCount + notifications.awaitingVerificationCount;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -204,7 +249,7 @@ export function RootLayout() {
                   >
                     {/* Avatar */}
                     <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 relative"
                       style={{
                         background: "linear-gradient(135deg, #3D2B1F, #8B6F47)",
                         color: "#FAF8F5",
@@ -212,6 +257,9 @@ export function RootLayout() {
                       }}
                     >
                       {initials}
+                      {totalNotif > 0 && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-white animate-pulse" />
+                      )}
                     </div>
                     <span
                       className="text-sm font-medium max-w-[100px] truncate"
@@ -264,6 +312,39 @@ export function RootLayout() {
 
                         {/* Menu items */}
                         <div className="py-1.5">
+                          {/* Super Admin Dashboard — super_admin only */}
+                          {userRole === "super_admin" && (
+                            <Link
+                              to="/super-admin"
+                              onClick={() => setUserMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors"
+                              style={{ color: "#1D4ED8" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(29,78,216,0.07)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
+                              <ShieldCheck className="w-4 h-4" style={{ color: "#1D4ED8" }} />
+                              Portal Super Admin
+                            </Link>
+                          )}
+                          {/* Admin Dashboard — artisan only */}
+                          {userRole === "artisan" && (
+                            <Link
+                              to="/admin"
+                              onClick={() => setUserMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors"
+                              style={{ color: "#8B6F47" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.07)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
+                              <LayoutDashboard className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                              <span className="flex-1">Dashboard Admin</span>
+                              {(notifications.awaitingVerificationCount + notifications.negotiatingCount) > 0 && (
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white bg-red-500">
+                                  {notifications.awaitingVerificationCount + notifications.negotiatingCount}
+                                </span>
+                              )}
+                            </Link>
+                          )}
                           <Link
                             to="/profile"
                             onClick={() => setUserMenuOpen(false)}
@@ -284,7 +365,17 @@ export function RootLayout() {
                             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             <Package className="w-4 h-4" style={{ color: "#8B6F47" }} />
-                            Pesanan Saya
+                            <span className="flex-1">Pesanan Saya</span>
+                            {userRole === "customer" && notifications.unpaidCount > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white bg-red-500">
+                                {notifications.unpaidCount}
+                              </span>
+                            )}
+                            {userRole === "artisan" && notifications.awaitingVerificationCount > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white bg-amber-500">
+                                {notifications.awaitingVerificationCount}
+                              </span>
+                            )}
                           </Link>
                           <Link
                             to="/desain-histori"
@@ -306,7 +397,12 @@ export function RootLayout() {
                             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             <MessageCircle className="w-4 h-4" style={{ color: "#8B6F47" }} />
-                            Chat Toko
+                            <span className="flex-1">Chat Toko</span>
+                            {notifications.negotiatingCount > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white bg-amber-500">
+                                {notifications.negotiatingCount}
+                              </span>
+                            )}
                           </Link>
                           <Link
                             to="/custom"
@@ -412,8 +508,60 @@ export function RootLayout() {
               style={{ background: "#FFFFFF", borderColor: "#E8E1DA" }}
             >
               <div className="px-8 py-4 space-y-2">
-                {navItems.map((item, index) => {
+                {/* Super Admin Dashboard link */}
+                {userRole === "super_admin" && (
+                  <Link
+                    to="/super-admin"
+                    className="flex items-center justify-between px-4 py-3 rounded-md transition-all"
+                    style={{
+                      color: location.pathname === "/super-admin" ? "#1E3A8A" : "#1D4ED8",
+                      fontWeight: 600,
+                      background: "rgba(29,78,216,0.06)",
+                    }}
+                  >
+                    <span className="text-sm flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4" />Portal Super Admin
+                    </span>
+                    <ChevronRight className="w-4 h-4 opacity-50" />
+                  </Link>
+                )}
+                {/* Admin Dashboard link — artisan only */}
+                {userRole === "artisan" && (
+                  <Link
+                    to="/admin"
+                    className="flex items-center justify-between px-4 py-3 rounded-md transition-all"
+                    style={{
+                      color: location.pathname === "/admin" ? "#3D2B1F" : "#8B6F47",
+                      fontWeight: 600,
+                      background: "rgba(139,111,71,0.06)",
+                    }}
+                  >
+                    <span className="text-sm flex items-center gap-2 flex-1">
+                      <LayoutDashboard className="w-4 h-4" />Dashboard Admin
+                    </span>
+                    {(notifications.awaitingVerificationCount + notifications.negotiatingCount) > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold text-white bg-red-500 mr-2">
+                        {notifications.awaitingVerificationCount + notifications.negotiatingCount}
+                      </span>
+                    )}
+                    <ChevronRight className="w-4 h-4 opacity-50" />
+                  </Link>
+                )}
+                {navItems.map((item) => {
                   const isActive = location.pathname === item.path;
+                  let badgeCount = 0;
+                  let badgeColor = "bg-red-500";
+                  if (item.label === "Pesanan") {
+                    if (userRole === "customer") {
+                      badgeCount = notifications.unpaidCount;
+                    } else if (userRole === "artisan") {
+                      badgeCount = notifications.awaitingVerificationCount;
+                      badgeColor = "bg-amber-500";
+                    }
+                  } else if (item.label === "Chat") {
+                    badgeCount = notifications.negotiatingCount;
+                    badgeColor = "bg-amber-500";
+                  }
                   return (
                     <Link
                       key={item.path}
@@ -424,7 +572,12 @@ export function RootLayout() {
                         fontWeight: isActive ? 600 : 400,
                       }}
                     >
-                      <span className="text-sm">{item.label}</span>
+                      <span className="text-sm flex-1">{item.label}</span>
+                      {badgeCount > 0 && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold text-white ${badgeColor} mr-2`}>
+                          {badgeCount}
+                        </span>
+                      )}
                       <ChevronRight className="w-4 h-4 opacity-50" />
                     </Link>
                   );

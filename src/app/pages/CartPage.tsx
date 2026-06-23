@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, ChevronLeft,
   MapPin, CreditCard, CheckCircle2, Package, ChevronRight, User, Phone,
-  Building2, Navigation, Hash, StickyNote, BadgeCheck, Palette, Store, MessageCircle
+  Building2, Navigation, Hash, StickyNote, BadgeCheck, Palette, Store, MessageCircle, X,
+  BookUser, Check
 } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useLocation } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
 import { useAuth } from "../../lib/AuthContext";
 import { useCart } from "../../lib/CartContext";
@@ -37,13 +38,13 @@ const PROVINCES = [
   "Papua Barat", "Papua", "NTB", "NTT", "Aceh",
 ];
 
-// ─── Toko Pengrajin Batik ──────────────────────────────────────────────────
-const BATIK_STORES = [
-  { id: 1, name: "Batik Amri Jetis", owner: "Pak Amri", avatar: "BA", color: "#8B6F47", specialty: "Batik Tulis Beras Utah", rating: 4.9 },
-  { id: 2, name: "Batik Siti Collection", owner: "Bu Siti", avatar: "BS", color: "#5A7C8B", specialty: "Batik Cap Modern", rating: 4.7 },
-  { id: 3, name: "Rumah Batik Hartono", owner: "Pak Hartono", avatar: "RB", color: "#6B3A8B", specialty: "Batik Tulis Premium", rating: 4.8 },
-  { id: 4, name: "Batik Jetis Muda", owner: "Kak Dian", avatar: "BJ", color: "#2D5A2D", specialty: "Batik Kontemporer", rating: 4.6 },
-];
+// ─── Store Helper ────────────────────────────────────────────────────────────
+const STORE_COLORS = ["#8B6F47", "#5A7C8B", "#6B3A8B", "#2D5A2D", "#8B475D"];
+function getStoreUI(id: number, name: string) {
+  const initials = name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase() || "TK";
+  const color = STORE_COLORS[id % STORE_COLORS.length];
+  return { avatar: initials, color };
+}
 
 // ─── SVG Pattern Mini ──────────────────────────────────────────────────────
 function PatternThumb({ bg, primary }: { bg: string; primary: string }) {
@@ -137,15 +138,21 @@ export function CartPage() {
   const { user } = useAuth();
   const { fetchFullCart, updateQuantity: updateCartQuantity, removeItem: removeCartItem, refreshCart } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [approvedStores, setApprovedStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<CheckoutStep>(1);
+  const [step, setStep] = useState<CheckoutStep>(((location.state as any)?.step) || 1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
+  
+  // Dari penolakan negosiasi - paksa flow ke Pilih Toko
+  const forceCustomStep = !!(location.state as any)?.forceCustomStep;
+  const restoredItem = (location.state as any)?.restoredItem || null;
 
   // Step 2 — Alamat
-  const [address, setAddress] = useState<ShippingAddress>({
+  const [address, setAddress] = useState<ShippingAddress>(((location.state as any)?.address) || {
     name: user?.user_metadata?.full_name || "",
     phone: "",
     street: "",
@@ -155,6 +162,54 @@ export function CartPage() {
   });
   const [addressErrors, setAddressErrors] = useState<Partial<ShippingAddress>>({});
   const [notes, setNotes] = useState("");
+
+  // Address Book state in Cart
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [showAddressSelectModal, setShowAddressSelectModal] = useState(false);
+  const [showNewAddressModal, setShowNewAddressModal] = useState(false);
+  const [saveToAddressBook, setSaveToAddressBook] = useState(false);
+  
+  const [newAddressForm, setNewAddressForm] = useState({
+    label: "Rumah",
+    recipient_name: "",
+    phone: "",
+    street: "",
+    city: "",
+    province: "",
+    postal_code: "",
+  });
+
+  const fetchSavedAddresses = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoadingAddresses(true);
+      const { data, error } = await supabase
+        .from("user_addresses")
+        .select("*")
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setSavedAddresses(data || []);
+      
+      // Auto-select default address
+      if (data && data.length > 0) {
+        const defaultAddr = data.find((a: any) => a.is_default) || data[0];
+        setAddress({
+          name: defaultAddr.recipient_name,
+          phone: defaultAddr.phone,
+          street: defaultAddr.street,
+          city: defaultAddr.city,
+          province: defaultAddr.province,
+          postal_code: defaultAddr.postal_code,
+        });
+      }
+    } catch (err) {
+      console.error("Gagal memuat alamat tersimpan:", err);
+    } finally {
+      setLoadingAddresses(false);
+    }
+  }, [user]);
 
   // Step 3 — Pembayaran
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer_bca");
@@ -178,7 +233,19 @@ export function CartPage() {
     }
   }, [user, fetchFullCart]);
 
-  useEffect(() => { fetchCartItems(); }, [fetchCartItems]);
+  useEffect(() => { 
+    fetchCartItems();
+    fetchSavedAddresses();
+    const fetchStores = async () => {
+      try {
+        const { data } = await supabase.from("stores").select("*").eq("status", "approved");
+        if (data) setApprovedStores(data);
+      } catch (err) {
+        console.error("Gagal memuat toko:", err);
+      }
+    };
+    fetchStores();
+  }, [fetchCartItems, fetchSavedAddresses]);
 
   // ── Quantity ──────────────────────────────────────────────────────────────
   const updateQuantity = async (id: string, currentQty: number, delta: number) => {
@@ -222,52 +289,121 @@ export function CartPage() {
 
   // ── Checkout ──────────────────────────────────────────────────────────────
   const handleCheckout = async () => {
-    if (!user || cartItems.length === 0) return;
+    if (!user) return;
+    // Allow proceeding if forceCustomStep+restoredItem (empty cart due to missing notes column)
+    if (cartItems.length === 0 && !(forceCustomStep && restoredItem)) return;
     if (hasCustomItems && !selectedStoreId) {
       toast.error("Silakan pilih toko pengrajin terlebih dahulu.");
       return;
     }
     setIsSubmitting(true);
     try {
-      const store = BATIK_STORES.find(s => s.id === selectedStoreId);
+      const store = approvedStores.find(s => s.id === selectedStoreId);
 
-      const ordersToInsert = cartItems.map(item => {
-        const bItem = item.batik_items;
-        const cItem = item.custom_designs;
-        let cData = null;
-        try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
+      // Build orders from cart items OR from restoredItem if cart is empty
+      let ordersToInsert: any[] = [];
+
+      if (cartItems.length > 0) {
+        ordersToInsert = cartItems.map(item => {
+          const bItem = item.batik_items;
+          const cItem = item.custom_designs;
+          
+          let restoredData: any = null;
+          try { if (item.notes) { const n = JSON.parse(item.notes); if (n.restored_from_order) restoredData = n; } } catch {}
+
+          let cData = null;
+          try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
+          const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 999).toString().padStart(3, "0")}`;
+          
+          const isCustom = !bItem && (!!cItem || !!restoredData);
+          const price = bItem ? bItem.price : 0;
+          const name = bItem ? bItem.name : (cData?.projectInfo?.name || (restoredData ? restoredData.item : "Desain Batik Kustom"));
+          const desc = bItem ? bItem.description : "Karya seni batik kustom buatan Anda sendiri.";
+
+          return {
+            id: orderId,
+            user_id: user.id,
+            item: name,
+            description: desc,
+            status: isCustom ? "negotiating" : "processing",
+            total: bItem ? ((price * item.quantity) + SHIPPING_COST) : 0,
+            type: bItem?.category || "custom",
+            primary_color: bItem?.primary_color || "#3D2B1F",
+            secondary_color: bItem?.secondary_color || "#D4B88B",
+            bg_color: bItem?.bg_color || cData?.canvasThumbnail || cData?.canvasBackground || restoredData?.bg_color || "#FAF8F5",
+            artisan: hasCustomItems && store ? store.name : "RekaBatik Artisan",
+            can_review: false,
+            reviewed: false,
+            date: new Date().toISOString(),
+            quantity: item.quantity,
+            payment_method: hasCustomItems ? "cod" : paymentMethod,
+            payment_status: "pending",
+            shipping_address: address,
+            notes: notes || null,
+          };
+        });
+      } else if (forceCustomStep && restoredItem) {
+        // Cart is empty — restored item from rejected negotiation (notes column missing)
         const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 999).toString().padStart(3, "0")}`;
-        
-        const isCustom = !bItem && !!cItem;
-        const price = bItem ? bItem.price : 0;
-        const name = bItem ? bItem.name : "Desain Batik Kustom";
-        const desc = bItem ? bItem.description : "Karya seni batik kustom buatan Anda sendiri.";
-
-        return {
+        ordersToInsert = [{
           id: orderId,
           user_id: user.id,
-          item: name,
-          description: desc,
-          status: "processing",
-          total: bItem ? ((price * item.quantity) + SHIPPING_COST) : 0,
-          type: bItem?.category || "custom",
-          primary_color: bItem?.primary_color || "#3D2B1F",
-          secondary_color: bItem?.secondary_color || "#D4B88B",
-          bg_color: bItem?.bg_color || cData?.canvasThumbnail || cData?.canvasBackground || "#FAF8F5",
-          artisan: hasCustomItems && store ? store.name : "RekaBatik Artisan",
+          item: restoredItem.item || "Desain Batik Kustom",
+          description: "Karya seni batik kustom buatan Anda sendiri.",
+          status: "negotiating",
+          total: 0,
+          type: "custom",
+          primary_color: "#3D2B1F",
+          secondary_color: "#D4B88B",
+          bg_color: restoredItem.bg_color || "#FAF8F5",
+          artisan: store ? store.name : "RekaBatik Artisan",
           can_review: false,
           reviewed: false,
           date: new Date().toISOString(),
-          quantity: item.quantity,
-          payment_method: hasCustomItems ? "cod" : paymentMethod,
+          quantity: restoredItem.quantity || 1,
+          payment_method: "cod",
           payment_status: "pending",
           shipping_address: address,
-          notes: notes || null,
-        };
-      });
+          notes: null,
+        }];
+      }
 
       const { error: insertError } = await supabase.from("orders").insert(ordersToInsert).select();
       if (insertError) throw insertError;
+
+      // Auto-send template message for custom orders
+      const customOrders = ordersToInsert.filter(o => o.status === "negotiating");
+      if (customOrders.length > 0) {
+        const templateMessages = customOrders.map(order => ({
+          order_id: order.id,
+          sender_id: user.id,
+          sender_role: "user",
+          message: `Halo Min, saya ingin membuat batik dengan desain seperti gambar yang saya lampirkan.\n\nDetail Pesanan:\n- Item: ${order.item}\n- Jumlah: ${order.quantity} pcs\n\nApakah desain ini bisa dikerjakan? Mohon estimasi harga dan waktunya ya. Terima kasih!`,
+          status: "sent",
+          attachment: order.bg_color?.startsWith("data:image") ? order.bg_color : null
+        }));
+        await supabase.from("messages").insert(templateMessages);
+      }
+
+      // Save address to book if user checked the option
+      if (saveToAddressBook && user) {
+        try {
+          const isFirst = savedAddresses.length === 0;
+          await supabase.from("user_addresses").insert([{
+            user_id: user.id,
+            label: "Rumah",
+            recipient_name: address.name,
+            phone: address.phone,
+            street: address.street,
+            city: address.city,
+            province: address.province,
+            postal_code: address.postal_code,
+            is_default: isFirst,
+          }]);
+        } catch (err) {
+          console.error("Gagal simpan alamat ke buku alamat:", err);
+        }
+      }
 
       // Clear cart
       await supabase.from("cart_items").delete().eq("user_id", user.id);
@@ -276,16 +412,23 @@ export function CartPage() {
 
       if (hasCustomItems && store) {
         // Collect custom design thumbnails for the chat opening message
-        const customThumbnails = cartItems
-          .filter(i => i.custom_designs && !i.batik_items)
-          .map(i => {
-            if (!i.custom_designs?.drawing_data) return null;
-            try {
-              const d = JSON.parse(i.custom_designs.drawing_data);
-              return d?.canvasThumbnail || null;
-            } catch { return null; }
-          })
-          .filter(Boolean);
+        const customThumbnails = [
+          ...cartItems
+            .filter(i => (i.custom_designs && !i.batik_items) || (i.notes && i.notes.includes("restored_from_order")))
+            .map(i => {
+              if (i.notes && i.notes.includes("restored_from_order")) {
+                 try { const n = JSON.parse(i.notes); return n.bg_color || null; } catch { return null; }
+              }
+              if (!i.custom_designs?.drawing_data) return null;
+              try {
+                const d = JSON.parse(i.custom_designs.drawing_data);
+                return d?.canvasThumbnail || null;
+              } catch { return null; }
+            })
+            .filter(Boolean),
+          // Include restoredItem thumbnail if cart was empty
+          ...(forceCustomStep && restoredItem && cartItems.length === 0 && restoredItem.bg_color ? [restoredItem.bg_color] : []),
+        ];
 
         // Redirect to chat with store info and custom design data
         navigate("/chat", {
@@ -308,17 +451,18 @@ export function CartPage() {
     }
   };
 
+
   // ── Computed ──────────────────────────────────────────────────────────────
   const subtotal = cartItems.reduce((sum, item) => {
     const price = item.batik_items ? item.batik_items.price : 0;
     return sum + (price * item.quantity);
   }, 0);
   const hasRegularItems = cartItems.some(item => item.batik_items);
-  const hasCustomItems = cartItems.some(item => item.custom_designs && !item.batik_items);
+  const hasCustomItems = forceCustomStep || cartItems.some(item => (item.custom_designs && !item.batik_items) || (item.notes && item.notes.includes("restored_from_order")));
   const total = hasRegularItems ? subtotal + SHIPPING_COST : 0;
   const totalQty = cartItems.reduce((s, i) => s + i.quantity, 0);
   const selectedPayment = PAYMENT_OPTIONS.find(p => p.id === paymentMethod)!;
-  const selectedStore = BATIK_STORES.find(s => s.id === selectedStoreId);
+  const selectedStore = approvedStores.find(s => s.id === selectedStoreId);
   const checkoutSteps = hasCustomItems ? STEPS_CUSTOM : STEPS_NORMAL;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -447,7 +591,7 @@ export function CartPage() {
             </div>
             <Skeleton className="h-64 w-full rounded-2xl" />
           </div>
-        ) : cartItems.length === 0 && step === 1 ? (
+        ) : cartItems.length === 0 && step === 1 && !forceCustomStep ? (
           // ── EMPTY ───────────────────────────────────────────────────────
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -478,17 +622,45 @@ export function CartPage() {
                 {/* STEP 1: Cart Items */}
                 {step === 1 && (
                   <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
+                    {/* Restored item from rejected negotiation (when notes column not yet added) */}
+                    {forceCustomStep && restoredItem && cartItems.length === 0 && (
+                      <div className="flex gap-4 p-4 sm:p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}>
+                        <div className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center">
+                          {restoredItem.bg_color?.startsWith("data:image") ? (
+                            <img src={restoredItem.bg_color} alt="Desain" className="w-full h-full object-cover" />
+                          ) : (
+                            <Palette className="w-8 h-8 text-stone-300" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate" style={{ color: "#3D2B1F" }}>{restoredItem.item || "Desain Batik Kustom"}</h3>
+                          <p className="text-xs mb-1" style={{ color: "#A89B8F" }}>RekaBatik Studio</p>
+                          <span className="text-sm font-semibold" style={{ color: "#8B6F47" }}>Rp xxx.xxx <span className="font-normal text-xs">(harga via negosiasi)</span></span>
+                        </div>
+                      </div>
+                    )}
                     <AnimatePresence>
                       {cartItems.map(item => {
                         const bItem = item.batik_items;
                         const cItem = item.custom_designs;
-                        if (!bItem && !cItem) return null;
                         
+                        let restoredData: any = null;
+                        if (!bItem && !cItem) {
+                          try {
+                            if (item.notes) {
+                              const n = JSON.parse(item.notes);
+                              if (n.restored_from_order) restoredData = n;
+                            }
+                          } catch {}
+                        }
+                        
+                        if (!bItem && !cItem && !restoredData) return null;
+
                         let cData = null;
                         try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
 
                         const price = bItem ? bItem.price : 0;
-                        const name = bItem ? bItem.name : "Desain Batik Kustom";
+                        const name = bItem ? bItem.name : (cData?.projectInfo?.name || (restoredData ? restoredData.item : "Desain Batik Kustom"));
                         const origin = bItem ? bItem.origin : "RekaBatik Studio";
 
                         return (
@@ -501,8 +673,8 @@ export function CartPage() {
                             <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center">
                               {bItem ? (
                                 <PatternThumb bg={bItem.bg_color} primary={bItem.primary_color} />
-                              ) : cData?.canvasThumbnail ? (
-                                <img src={cData.canvasThumbnail} alt="Custom Design" className="w-full h-full object-cover" />
+                              ) : (cData?.canvasThumbnail || restoredData?.bg_color) ? (
+                                <img src={cData?.canvasThumbnail || restoredData?.bg_color} alt="Custom Design" className="w-full h-full object-cover" />
                               ) : (
                                 <Palette className="w-8 h-8 text-stone-300" />
                               )}
@@ -544,7 +716,49 @@ export function CartPage() {
                     className="p-6 rounded-2xl bg-white space-y-5"
                     style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
                   >
-                    <h2 className="font-bold text-lg" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Alamat Pengiriman</h2>
+                    <div className="flex items-center justify-between">
+                      <h2 className="font-bold text-lg" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Alamat Pengiriman</h2>
+                      {savedAddresses.length > 0 && (
+                        <button
+                          onClick={() => setShowAddressSelectModal(true)}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all hover:opacity-80"
+                          style={{ background: "rgba(139,111,71,0.08)", color: "#8B6F47", border: "1px solid rgba(139,111,71,0.2)" }}
+                        >
+                          <BookUser className="w-3.5 h-3.5" />
+                          Pilih Alamat Tersimpan
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Selected address from book banner */}
+                    {savedAddresses.length > 0 && address.name && (
+                      <div
+                        className="flex items-start gap-3 p-3.5 rounded-xl"
+                        style={{ background: "rgba(139,111,71,0.05)", border: "1.5px solid rgba(139,111,71,0.2)" }}
+                      >
+                        <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "#8B6F47" }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold" style={{ color: "#3D2B1F" }}>{address.name} · {address.phone}</p>
+                          <p className="text-xs mt-0.5" style={{ color: "#7A6B5E" }}>{address.street}, {address.city}, {address.province} {address.postal_code}</p>
+                        </div>
+                        <button
+                          onClick={() => setShowAddressSelectModal(true)}
+                          className="text-xs font-semibold flex-shrink-0"
+                          style={{ color: "#8B6F47" }}
+                        >
+                          Ubah
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Divider when address book exists */}
+                    {savedAddresses.length > 0 && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px" style={{ background: "rgba(212,184,139,0.25)" }} />
+                        <span className="text-xs" style={{ color: "#A89B8F" }}>atau isi manual</span>
+                        <div className="flex-1 h-px" style={{ background: "rgba(212,184,139,0.25)" }} />
+                      </div>
+                    )}
 
                     {[
                       { key: "name", label: "Nama Penerima", icon: User, placeholder: "Nama lengkap" },
@@ -558,7 +772,7 @@ export function CartPage() {
                         <div className="relative">
                           <field.icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#B8A898" }} />
                           <input
-                            type={field.key === "postal_code" ? "text" : "text"}
+                            type="text"
                             value={(address as any)[field.key]}
                             onChange={e => { setAddress(prev => ({ ...prev, [field.key]: e.target.value })); setAddressErrors(prev => ({ ...prev, [field.key]: undefined })); }}
                             placeholder={field.placeholder}
@@ -592,6 +806,28 @@ export function CartPage() {
                       {addressErrors.province && <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{addressErrors.province}</p>}
                     </div>
 
+                    {/* Save to address book */}
+                    <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl transition-all" style={{ background: saveToAddressBook ? "rgba(139,111,71,0.06)" : "transparent", border: `1px solid ${saveToAddressBook ? "rgba(139,111,71,0.25)" : "rgba(212,184,139,0.15)"}` }}>
+                      <div className="relative mt-0.5">
+                        <input
+                          type="checkbox"
+                          checked={saveToAddressBook}
+                          onChange={e => setSaveToAddressBook(e.target.checked)}
+                          className="sr-only"
+                        />
+                        <div
+                          className="w-4 h-4 rounded flex items-center justify-center transition-all"
+                          style={{ background: saveToAddressBook ? "#8B6F47" : "transparent", border: `1.5px solid ${saveToAddressBook ? "#8B6F47" : "rgba(139,111,71,0.4)"}` }}
+                        >
+                          {saveToAddressBook && <Check className="w-2.5 h-2.5 text-white" />}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>Simpan alamat ini ke Buku Alamat</p>
+                        <p className="text-xs" style={{ color: "#A89B8F" }}>Alamat akan tersimpan dan bisa dipilih saat checkout berikutnya</p>
+                      </div>
+                    </label>
+
                     {/* Notes */}
                     <div>
                       <label className="block text-sm font-medium mb-1.5" style={{ color: "#5A4A3E" }}>
@@ -619,29 +855,31 @@ export function CartPage() {
                       <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Pilih Toko Pengrajin</h2>
                       <p className="text-sm mb-6" style={{ color: "#7A6B5E" }}>Pilih toko pengrajin batik yang ingin Anda ajak berdiskusi tentang desain dan harga.</p>
                       <div className="space-y-3">
-                        {BATIK_STORES.map(store => (
+                        {approvedStores.map(store => {
+                          const ui = getStoreUI(store.id, store.name);
+                          return (
                           <motion.button
                             key={store.id}
                             onClick={() => setSelectedStoreId(store.id)}
                             whileTap={{ scale: 0.99 }}
                             className="w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all"
                             style={{
-                              border: selectedStoreId === store.id ? `2px solid ${store.color}` : "1.5px solid rgba(139,111,71,0.2)",
-                              background: selectedStoreId === store.id ? `rgba(${parseInt(store.color.slice(1,3),16)},${parseInt(store.color.slice(3,5),16)},${parseInt(store.color.slice(5,7),16)},0.05)` : "#FAFAF8",
+                              border: selectedStoreId === store.id ? `2px solid ${ui.color}` : "1.5px solid rgba(139,111,71,0.2)",
+                              background: selectedStoreId === store.id ? `rgba(${parseInt(ui.color.slice(1,3),16)},${parseInt(ui.color.slice(3,5),16)},${parseInt(ui.color.slice(5,7),16)},0.05)` : "#FAFAF8",
                             }}
                           >
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold text-white flex-shrink-0" style={{ background: store.color }}>
-                              {store.avatar}
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold text-white flex-shrink-0" style={{ background: ui.color }}>
+                              {ui.avatar}
                             </div>
                             <div className="flex-1">
                               <p className="font-semibold" style={{ color: "#3D2B1F" }}>{store.name}</p>
-                              <p className="text-xs" style={{ color: "#A89B8F" }}>{store.specialty}</p>
+                              <p className="text-xs" style={{ color: "#A89B8F" }}>{store.specialty || "Pengrajin Batik"}</p>
                             </div>
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0`} style={{ borderColor: selectedStoreId === store.id ? store.color : "rgba(139,111,71,0.3)" }}>
-                              {selectedStoreId === store.id && <div className="w-2.5 h-2.5 rounded-full" style={{ background: store.color }} />}
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0`} style={{ borderColor: selectedStoreId === store.id ? ui.color : "rgba(139,111,71,0.3)" }}>
+                              {selectedStoreId === store.id && <div className="w-2.5 h-2.5 rounded-full" style={{ background: ui.color }} />}
                             </div>
                           </motion.button>
-                        ))}
+                        )})}
                       </div>
                     </motion.div>
                   ) : (
@@ -693,20 +931,31 @@ export function CartPage() {
                       {cartItems.map(item => {
                         const bItem = item.batik_items;
                         const cItem = item.custom_designs;
-                        if (!bItem && !cItem) return null;
+                        
+                        let restoredData: any = null;
+                        if (!bItem && !cItem) {
+                          try {
+                            if (item.notes) {
+                              const n = JSON.parse(item.notes);
+                              if (n.restored_from_order) restoredData = n;
+                            }
+                          } catch {}
+                        }
+                        
+                        if (!bItem && !cItem && !restoredData) return null;
                         
                         let cData = null;
                         try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
 
                         const price = bItem ? bItem.price : 0;
-                        const name = bItem ? bItem.name : "Desain Batik Kustom";
+                        const name = bItem ? bItem.name : (cData?.projectInfo?.name || (restoredData ? restoredData.item : "Desain Batik Kustom"));
                         return (
                           <div key={item.id} className="flex items-center gap-3 py-2.5 border-b last:border-0" style={{ borderColor: "rgba(212,184,139,0.15)" }}>
                             <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-stone-100 flex items-center justify-center">
                               {bItem ? (
                                 <PatternThumb bg={bItem.bg_color} primary={bItem.primary_color} />
-                              ) : cData?.canvasThumbnail ? (
-                                <img src={cData.canvasThumbnail} alt="Custom" className="w-full h-full object-cover" />
+                              ) : (cData?.canvasThumbnail || restoredData?.bg_color) ? (
+                                <img src={cData?.canvasThumbnail || restoredData?.bg_color} alt="Custom" className="w-full h-full object-cover" />
                               ) : (
                                 <Palette className="w-5 h-5 text-stone-300" />
                               )}
@@ -819,7 +1068,9 @@ export function CartPage() {
                     const cItem = item.custom_designs;
                     if (!bItem && !cItem) return null;
                     const price = bItem ? bItem.price : 0;
-                    const name = bItem ? bItem.name : "Desain Batik Kustom";
+                    let cData = null;
+                    try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
+                    const name = bItem ? bItem.name : (cData?.projectInfo?.name || "Desain Batik Kustom");
                     return (
                       <div key={item.id} className="flex justify-between text-sm">
                         <span className="truncate max-w-[140px]" style={{ color: "#7A6B5E" }}>{name} ×{item.quantity}</span>
@@ -856,6 +1107,123 @@ export function CartPage() {
           </div>
         )}
       </div>
+
+      {/* ── Address Select Modal ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showAddressSelectModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.45)" }}
+            onClick={() => setShowAddressSelectModal(false)}
+          >
+            <motion.div
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-md rounded-3xl bg-white overflow-hidden"
+              style={{ boxShadow: "0 30px 80px rgba(61,43,31,0.2)", maxHeight: "85vh" }}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(212,184,139,0.2)" }}>
+                <div className="flex items-center gap-2">
+                  <BookUser className="w-5 h-5" style={{ color: "#8B6F47" }} />
+                  <h3 className="font-bold" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Pilih Alamat</h3>
+                </div>
+                <button
+                  onClick={() => setShowAddressSelectModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-stone-100 transition-colors"
+                  style={{ color: "#7A6B5E" }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Address List */}
+              <div className="overflow-y-auto" style={{ maxHeight: "calc(85vh - 130px)" }}>
+                {loadingAddresses ? (
+                  <div className="p-6 space-y-3">
+                    {[1, 2].map(i => (
+                      <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: "rgba(212,184,139,0.15)" }} />
+                    ))}
+                  </div>
+                ) : savedAddresses.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <MapPin className="w-10 h-10 mx-auto mb-2 opacity-20" style={{ color: "#8B6F47" }} />
+                    <p className="text-sm font-semibold mb-1" style={{ color: "#3D2B1F" }}>Belum Ada Alamat Tersimpan</p>
+                    <p className="text-xs" style={{ color: "#9B8C80" }}>Simpan alamat Anda melalui halaman Profil &gt; Alamat Saya</p>
+                  </div>
+                ) : (
+                  <div className="p-4 space-y-3">
+                    {savedAddresses.map((addr: any) => {
+                      const isSelected =
+                        address.name === addr.recipient_name &&
+                        address.phone === addr.phone &&
+                        address.street === addr.street;
+                      return (
+                        <button
+                          key={addr.id}
+                          onClick={() => {
+                            setAddress({
+                              name: addr.recipient_name,
+                              phone: addr.phone,
+                              street: addr.street,
+                              city: addr.city,
+                              province: addr.province,
+                              postal_code: addr.postal_code,
+                            });
+                            setSaveToAddressBook(false);
+                            setShowAddressSelectModal(false);
+                          }}
+                          className="w-full text-left p-4 rounded-2xl transition-all relative overflow-hidden"
+                          style={{
+                            border: isSelected ? "2px solid #8B6F47" : "1.5px solid rgba(212,184,139,0.2)",
+                            background: isSelected ? "rgba(139,111,71,0.05)" : "#FAFAF8",
+                          }}
+                        >
+                          {/* Corner badge for default */}
+                          {addr.is_default && (
+                            <span className="absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#8B6F47] text-white uppercase tracking-wider">Utama</span>
+                          )}
+                          <div className="flex items-start gap-3">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5`} style={{ borderColor: isSelected ? "#8B6F47" : "rgba(139,111,71,0.3)" }}>
+                              {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-[#8B6F47]" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: "rgba(139,111,71,0.1)", color: "#8B6F47" }}>{addr.label}</span>
+                              </div>
+                              <p className="text-sm font-semibold" style={{ color: "#3D2B1F" }}>{addr.recipient_name} · {addr.phone}</p>
+                              <p className="text-xs mt-0.5" style={{ color: "#7A6B5E" }}>{addr.street}, {addr.city}, {addr.province} {addr.postal_code}</p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 py-3 border-t" style={{ borderColor: "rgba(212,184,139,0.2)" }}>
+                <button
+                  onClick={() => {
+                    setShowAddressSelectModal(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl font-semibold text-sm"
+                  style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)", color: "#fff" }}
+                >
+                  Selesai
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
