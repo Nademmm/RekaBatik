@@ -363,7 +363,12 @@ export function ChatPage() {
     const { error } = await supabase.from("orders")
       .update({ total: price, status: "processing", payment_status: "pending" })
       .eq("id", orderId).eq("user_id", user.id);
-    if (error) { toast.error("Gagal menyetujui harga"); setAcceptingMsgId(null); return; }
+    if (error) { 
+      console.error("Supabase Error Accept Offer:", error);
+      toast.error(`Gagal menyetujui harga: ${error.message || "Kesalahan database"}`); 
+      setAcceptingMsgId(null); 
+      return; 
+    }
     await supabase.from("messages").insert([{
       order_id: orderId, sender_id: user.id, sender_role: "user",
       message: `✅ Saya setuju dengan harga ${formatCurrency(price)}. Terima kasih!`, status: "sent",
@@ -389,7 +394,8 @@ export function ChatPage() {
       .eq("id", orderId).eq("user_id", user.id);
 
     if (error) {
-      toast.error("Gagal membatalkan pesanan");
+      console.error("Supabase Error Reject Offer:", error);
+      toast.error(`Gagal membatalkan pesanan: ${error.message || "Kesalahan database"}`);
       setRejectLoading(false);
       setPendingRejectMsg(null);
       return;

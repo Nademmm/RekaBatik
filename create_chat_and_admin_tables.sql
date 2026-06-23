@@ -12,7 +12,7 @@ UPDATE stores SET status = 'approved' WHERE status = 'pending' AND owner_id IS N
 
 -- 2. Tambah kolom info pembayaran ke tabel orders (jika belum ada)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'pending'
-  CHECK (payment_status IN ('pending', 'paid', 'failed'));
+  CHECK (payment_status IN ('pending', 'awaiting_verification', 'paid', 'failed'));
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_address JSONB;

@@ -9,7 +9,7 @@ ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'transfer_bca' 
     CHECK (payment_method IN ('transfer_bca', 'transfer_mandiri', 'gopay', 'ovo', 'cod') OR payment_method IS NULL),
   ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'pending' 
-    CHECK (payment_status IN ('pending', 'paid', 'failed') OR payment_status IS NULL),
+    CHECK (payment_status IN ('pending', 'awaiting_verification', 'paid', 'failed') OR payment_status IS NULL),
   ADD COLUMN IF NOT EXISTS shipping_address JSONB,
   ADD COLUMN IF NOT EXISTS quantity INT DEFAULT 1,
   ADD COLUMN IF NOT EXISTS notes TEXT;

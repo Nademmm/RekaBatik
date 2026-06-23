@@ -62,7 +62,7 @@ type TabId = "account" | "favorites" | "orders" | "support" | "addresses";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "account", label: "Akun", icon: <User className="w-4 h-4" /> },
-  { id: "addresses", label: "Alamat Saya", icon: <MapPin className="w-4 h-4" /> },
+  { id: "addresses", label: "Alamat", icon: <MapPin className="w-4 h-4" /> },
   { id: "favorites", label: "Favorit", icon: <Heart className="w-4 h-4" /> },
   { id: "orders", label: "Pesanan", icon: <Package className="w-4 h-4" /> },
   { id: "support", label: "Bantuan", icon: <MessageCircle className="w-4 h-4" /> },

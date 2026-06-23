@@ -666,7 +666,7 @@ export function OrdersPage() {
   useEffect(() => {
     if (location.state?.openPaymentFor && orders.length > 0) {
       const order = orders.find(o => o.id === location.state.openPaymentFor);
-      if (order && order.payment_status === "pending") {
+      if (order && order.payment_status === "pending" && order.status !== "cancelled") {
         setPayingOrder(order);
         // Clear history state to avoid reopening on refresh
         navigate(location.pathname, { replace: true, state: {} });
