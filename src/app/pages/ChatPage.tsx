@@ -12,9 +12,6 @@ import { useAuth } from "../../lib/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { toast } from "sonner";
 
-// Platform fee multiplier — 15% added invisibly to buyer price
-const PLATFORM_FEE_MULTIPLIER = 1.15;
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DBMessage {
   id: string;
@@ -359,7 +356,6 @@ export function ChatPage() {
     setAcceptingMsgId(msgId);
     await supabase.from("messages").update({ negotiation_status: "accepted" }).eq("id", msgId);
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, negotiation_status: "accepted" } : m));
-    // Stored price already includes the 15% platform fee
     const buyerPrice = price;
     const { error } = await supabase.from("orders")
       .update({ total: buyerPrice, status: "processing", payment_status: "pending" })

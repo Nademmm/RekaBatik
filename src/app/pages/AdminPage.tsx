@@ -13,8 +13,8 @@ import { useAuth } from "../../lib/AuthContext";
 import { toast, Toaster } from "sonner";
 import { BatikBackground } from "../components/BatikBackground";
 
-// Platform fee multiplier — 15% added for platform earnings
-const PLATFORM_FEE_MULTIPLIER = 1.15;
+// Biaya layanan platform per transaksi (ditampilkan ke user)
+const SERVICE_FEE = 1_000;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface StoreInfo {
@@ -258,7 +258,7 @@ function PriceOfferModal({ onClose, onSubmit }: { onClose: () => void; onSubmit:
             </div>
             {price && (
               <p className="text-[11px] font-medium mt-1.5 text-[#8B6F47]">
-                Harga ke Pembeli (+15% Fee): <strong>Rp {Math.ceil(parseFloat(price.replace(/[^0-9]/g, "")) * 1.15).toLocaleString("id-ID")}</strong>
+                Total ke Pembeli (+ biaya layanan Rp 1.000): <strong>Rp {(parseFloat(price.replace(/[^0-9]/g, "")) + 1000).toLocaleString("id-ID")}</strong>
               </p>
             )}
           </div>
@@ -677,7 +677,7 @@ export function AdminPage() {
   // ── Send price offer ───────────────────────────────────────────────────────
   const sendPriceOffer = async (price: number, estimatedDate: string, note: string) => {
     if (!priceModalOrderId || !user) return;
-    const finalPrice = Math.ceil(price * PLATFORM_FEE_MULTIPLIER);
+    const finalPrice = Math.round(price) + SERVICE_FEE;
     const text = `${note ? note + "\n\n" : ""}💰 *Penawaran Harga: ${formatCurrency(finalPrice)}*\n📅 *Estimasi Selesai: ${formatDate(estimatedDate)}*\n\nSilakan balas dengan Setuju atau Tidak Setuju untuk melanjutkan.`;
     
     // 1. Kirim pesan penawaran
@@ -1691,31 +1691,6 @@ export function AdminPage() {
                          >
                            <Paperclip className="w-4 h-4" />
                          </motion.button>
-
-                         {/* Price Offer Button — hanya muncul jika ada order negotiating */}
-                         {(() => {
-                           const negotiatingOrder = orders.find(
-                             o => activeUserOrderIds.includes(o.id) && o.status === "negotiating"
-                           );
-                           if (!negotiatingOrder) return null;
-                           return (
-                             <motion.button
-                               key="price-offer-btn"
-                               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                               onClick={() => setPriceModalOrderId(negotiatingOrder.id)}
-                               className="flex items-center gap-1.5 px-3 h-11 rounded-2xl text-xs font-semibold transition-all flex-shrink-0 border"
-                               style={{
-                                 background: "linear-gradient(135deg, rgba(139,111,71,0.12), rgba(61,43,31,0.08))",
-                                 borderColor: "rgba(139,111,71,0.4)",
-                                 color: "#8B6F47",
-                               }}
-                               title="Beri Penawaran Harga"
-                             >
-                               <Tag className="w-3.5 h-3.5" />
-                               <span className="hidden sm:inline whitespace-nowrap">Beri Penawaran</span>
-                             </motion.button>
-                           );
-                         })()}
 
                          {/* Input Text */}
                          <input
