@@ -549,7 +549,12 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
               <motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 disabled={confirming}
-                onClick={async () => { setConfirming(true); await onConfirmReceived(order.id); setConfirming(false); onClose(); }}
+                onClick={async () => {
+                  setConfirming(true);
+                  const ok = await onConfirmReceived(order.id);
+                  setConfirming(false);
+                  if (ok) onClose();
+                }}
                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white disabled:opacity-70 cursor-pointer"
                 style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}
               >
@@ -674,7 +679,9 @@ export function OrdersPage() {
     }
   }, [location, orders, navigate]);
 
-  const handleConfirmReceived = async (orderId: string) => {
+  const handleConfirmReceived = async (orderId: string): Promise<boolean> => {
+    const confirm = window.confirm("Apakah Anda yakin barang ini telah sampai dengan baik dan ingin menyelesaikan pesanan?");
+    if (!confirm) return false;
     try {
       const { error } = await supabase.from("orders")
         .update({ status: "delivered", delivered_date: new Date().toISOString(), can_review: true })
@@ -682,7 +689,11 @@ export function OrdersPage() {
       if (error) throw error;
       toast.success("Pesanan dikonfirmasi diterima! Silakan berikan ulasan Anda. 🎉");
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "delivered", delivered_date: new Date().toISOString(), can_review: true } : o));
-    } catch { toast.error("Gagal mengkonfirmasi pesanan"); }
+      return true;
+    } catch { 
+      toast.error("Gagal mengkonfirmasi pesanan"); 
+      return false;
+    }
   };
 
   const handleBuyAgain = async (order: Order) => {

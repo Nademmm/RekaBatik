@@ -5,12 +5,15 @@ import {
   MessageCircle, Send, ChevronLeft, Search,
   CheckCheck, Check, X,
   CheckCircle, XCircle, Tag, AlertTriangle, Loader2,
-  ShoppingCart, Store, Image as ImageIcon,
+  ShoppingCart, Store, Image as ImageIcon, Handshake,
 } from "lucide-react";
 import { BatikBackground } from "../components/BatikBackground";
 import { useAuth } from "../../lib/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { toast } from "sonner";
+
+// Platform fee multiplier — 15% added invisibly to buyer price
+const PLATFORM_FEE_MULTIPLIER = 1.15;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DBMessage {
@@ -130,20 +133,16 @@ export function ChatPage() {
   const [rejectLoading, setRejectLoading] = useState(false);
   const [acceptingMsgId, setAcceptingMsgId] = useState<string | null>(null);
 
-  // Track offer responses locally: msgId → "accepted" | "rejected" (persisted via localStorage)
-  const [respondedOffers, setRespondedOffers] = useState<Record<string, "accepted" | "rejected">>(() => {
+  // Negotiation question chip flow
+  const [showNegotiationOptions, setShowNegotiationOptions] = useState<string | null>(null); // msgId
+  const [sendingNegotiation, setSendingNegotiation] = useState(false);
+
+  // Clear any old stale respondedOffers cache on mount
+  useEffect(() => {
     try {
-      const stored = localStorage.getItem("rekabatik_responded_offers_v2");
-      return stored ? JSON.parse(stored) : {};
-    } catch { return {}; }
-  });
-  const markOfferResponded = (msgId: string, action: "accepted" | "rejected") => {
-    setRespondedOffers(prev => {
-      const next = { ...prev, [msgId]: action };
-      try { localStorage.setItem("rekabatik_responded_offers_v2", JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
+      localStorage.removeItem("rekabatik_responded_offers_v2");
+    } catch {}
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -355,13 +354,15 @@ export function ChatPage() {
   // ── Accept offer ───────────────────────────────────────────────────────────
   const acceptOffer = async (msgId: string, price: number, orderId: string) => {
     if (!user || acceptingMsgId) return;
+    const confirm = window.confirm(`Apakah Anda yakin ingin menyetujui penawaran harga sebesar ${formatCurrency(price)}?`);
+    if (!confirm) return;
     setAcceptingMsgId(msgId);
     await supabase.from("messages").update({ negotiation_status: "accepted" }).eq("id", msgId);
-    // Mark as responded (accepted) locally — persisted in localStorage
-    markOfferResponded(msgId, "accepted");
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, negotiation_status: "accepted" } : m));
+    // Stored price already includes the 15% platform fee
+    const buyerPrice = price;
     const { error } = await supabase.from("orders")
-      .update({ total: price, status: "processing", payment_status: "pending" })
+      .update({ total: buyerPrice, status: "processing", payment_status: "pending" })
       .eq("id", orderId).eq("user_id", user.id);
     if (error) { 
       console.error("Supabase Error Accept Offer:", error);
@@ -371,12 +372,41 @@ export function ChatPage() {
     }
     await supabase.from("messages").insert([{
       order_id: orderId, sender_id: user.id, sender_role: "user",
-      message: `✅ Saya setuju dengan harga ${formatCurrency(price)}. Terima kasih!`, status: "sent",
+      message: `✅ Saya setuju dengan harga ${formatCurrency(buyerPrice)}. Terima kasih!`, status: "sent",
     }]);
     toast.success("Harga disetujui! Pesanan sedang diproses.");
     fetchConversations();
     setAcceptingMsgId(null);
     navigate("/orders", { state: { openPaymentFor: orderId } });
+  };
+
+  // ── Negotiation question chips ─────────────────────────────────────────────
+  const NEGOTIATION_QUESTIONS = [
+    "💬 Apakah harga ini bisa lebih fleksibel?",
+    "🤝 Bolehkah saya menawar sedikit?",
+    "📦 Apakah ada diskon untuk pembelian ini?",
+    "🙏 Bisa tolong pertimbangkan harga yang lebih terjangkau?",
+  ];
+
+  const sendNegotiationQuestion = async (msgId: string, orderId: string, questionText: string) => {
+    if (!user) return;
+    setSendingNegotiation(true);
+    try {
+      await supabase.from("messages").insert([{
+        order_id: orderId,
+        sender_id: user.id,
+        sender_role: "user",
+        message: questionText,
+        status: "sent",
+      }]);
+      setShowNegotiationOptions(null);
+      toast.success("Pertanyaan dikirim! Tunggu balasan pengrajin 😊");
+      fetchConversations();
+    } catch {
+      toast.error("Gagal mengirim pertanyaan");
+    } finally {
+      setSendingNegotiation(false);
+    }
   };
 
   // ── Reject offer ──────────────────────────────────────────────────────────
@@ -401,8 +431,6 @@ export function ChatPage() {
       return;
     }
 
-    // Mark as responded (rejected) locally — persisted in localStorage
-    markOfferResponded(msgId, "rejected");
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, negotiation_status: "rejected" } : m));
 
     // Build descriptive rejection message using item name + price offer
@@ -569,11 +597,9 @@ export function ChatPage() {
                     {messages.map((msg) => {
                       const isUser = msg.sender_role === "user";
                       const isPriceOffer = !!msg.price_offer;
-                      // Derive offer state: DB value takes priority, then local respondedOffers map
-                      const localResponse = respondedOffers[msg.id];
+                      // Derive offer state: purely based on DB status
                       const effectiveStatus: "pending" | "accepted" | "rejected" =
-                        localResponse !== undefined ? localResponse
-                        : msg.negotiation_status === "accepted" ? "accepted"
+                        msg.negotiation_status === "accepted" ? "accepted"
                         : msg.negotiation_status === "rejected" ? "rejected"
                         : "pending";
                       const isOfferPending = isPriceOffer && effectiveStatus === "pending";
@@ -656,35 +682,108 @@ export function ChatPage() {
                               </motion.div>
                             )}
 
-                            {/* Offer action buttons — only show if THIS is still pending */}
+                            {/* Offer action buttons — 3 options: Setuju / Tawar Harga / Tidak Setuju */}
                             {isOfferPending && !isUser && (
-                              <div className="flex gap-2 mt-1.5">
-                                <motion.button whileHover={{ scale: acceptingMsgId ? 1 : 1.02 }} whileTap={{ scale: acceptingMsgId ? 1 : 0.98 }}
-                                  onClick={() => acceptOffer(msg.id, msg.price_offer!, msg.order_id)}
-                                  disabled={!!acceptingMsgId}
-                                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-60"
-                                  style={{ background: "linear-gradient(135deg, #16A34A, #15803D)", boxShadow: "0 2px 8px rgba(22,163,74,0.3)" }}
+                              <div className="mt-2 space-y-2">
+                                {/* ── 3 option buttons (always visible while pending) ── */}
+                                <motion.div
+                                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                                  className="flex flex-wrap gap-1.5"
                                 >
-                                  {acceptingMsgId === msg.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                                  Setuju — {formatCurrency(msg.price_offer!)}
-                                </motion.button>
-                                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                  onClick={async () => {
-                                    // Fetch item name from the order so rejection message is descriptive
-                                    let itemName: string | undefined;
-                                    try {
-                                      const { data: ord } = await supabase
-                                        .from("orders").select("item").eq("id", msg.order_id).single();
-                                      if (ord?.item) itemName = ord.item;
-                                    } catch {}
-                                    setPendingRejectMsg({ id: msg.id, orderId: msg.order_id, priceOffer: msg.price_offer, itemName });
-                                  }}
-                                  disabled={!!acceptingMsgId}
-                                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-60"
-                                  style={{ border: "1.5px solid #EF4444", color: "#EF4444" }}
-                                >
-                                  <XCircle className="w-3.5 h-3.5" />Tidak Setuju
-                                </motion.button>
+                                  {/* Setuju */}
+                                  <motion.button
+                                    whileHover={{ scale: acceptingMsgId ? 1 : 1.03 }}
+                                    whileTap={{ scale: acceptingMsgId ? 1 : 0.97 }}
+                                    onClick={() => acceptOffer(msg.id, msg.price_offer!, msg.order_id)}
+                                    disabled={!!acceptingMsgId}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-60"
+                                    style={{ background: "linear-gradient(135deg, #16A34A, #15803D)", boxShadow: "0 2px 8px rgba(22,163,74,0.3)" }}
+                                  >
+                                    {acceptingMsgId === msg.id
+                                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      : <CheckCircle className="w-3.5 h-3.5" />}
+                                    Setuju — {formatCurrency(msg.price_offer!)}
+                                  </motion.button>
+
+                                  {/* Tanya Pengrajin toggle */}
+                                  <motion.button
+                                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                    onClick={() => setShowNegotiationOptions(showNegotiationOptions === msg.id ? null : msg.id)}
+                                    disabled={!!acceptingMsgId || sendingNegotiation}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold disabled:opacity-60"
+                                    style={{
+                                      background: showNegotiationOptions === msg.id ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.1)",
+                                      color: "#D97706",
+                                      border: `1.5px solid rgba(245,158,11,${showNegotiationOptions === msg.id ? "0.5" : "0.3"})`,
+                                      transition: "all 0.2s",
+                                    }}
+                                  >
+                                    <Handshake className="w-3.5 h-3.5" />
+                                    {showNegotiationOptions === msg.id ? "Tutup Opsi" : "Tanya Pengrajin"}
+                                  </motion.button>
+
+                                  {/* Tidak Setuju */}
+                                  <motion.button
+                                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                    onClick={async () => {
+                                      const confirm = window.confirm("Apakah Anda yakin tidak setuju dengan penawaran harga ini? Pesanan Anda akan dibatalkan.");
+                                      if (!confirm) return;
+                                      let itemName: string | undefined;
+                                      try {
+                                        const { data: ord } = await supabase
+                                          .from("orders").select("item").eq("id", msg.order_id).single();
+                                        if (ord?.item) itemName = ord.item;
+                                      } catch {}
+                                      setPendingRejectMsg({ id: msg.id, orderId: msg.order_id, priceOffer: msg.price_offer, itemName });
+                                    }}
+                                    disabled={!!acceptingMsgId}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold disabled:opacity-60"
+                                    style={{
+                                      background: "rgba(239,68,68,0.07)",
+                                      color: "#DC2626",
+                                      border: "1.5px solid rgba(239,68,68,0.25)",
+                                    }}
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                    Tidak Setuju
+                                  </motion.button>
+                                </motion.div>
+
+                                {/* ── Negotiation question chips ── */}
+                                {showNegotiationOptions === msg.id && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    className="rounded-2xl p-3 space-y-2"
+                                    style={{ background: "rgba(245,158,11,0.06)", border: "1.5px solid rgba(245,158,11,0.2)" }}
+                                  >
+                                    <p className="text-[11px] font-semibold" style={{ color: "#D97706" }}>💬 Pilih pertanyaan untuk dikirim ke pengrajin:</p>
+                                    <div className="flex flex-col gap-1.5">
+                                      {NEGOTIATION_QUESTIONS.map((q) => (
+                                        <motion.button
+                                          key={q}
+                                          whileHover={{ scale: 1.02, x: 2 }}
+                                          whileTap={{ scale: 0.98 }}
+                                          onClick={() => sendNegotiationQuestion(msg.id, msg.order_id, q)}
+                                          disabled={sendingNegotiation}
+                                          className="text-left px-3 py-2 rounded-xl text-xs font-medium disabled:opacity-50 flex items-center gap-2"
+                                          style={{
+                                            background: "rgba(255,255,255,0.7)",
+                                            border: "1px solid rgba(245,158,11,0.25)",
+                                            color: "#3D2B1F",
+                                            transition: "all 0.15s",
+                                          }}
+                                        >
+                                          {sendingNegotiation
+                                            ? <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" style={{ color: "#D97706" }} />
+                                            : <span className="w-3 h-3 flex-shrink-0" />}
+                                          {q}
+                                        </motion.button>
+                                      ))}
+                                    </div>
+                                    <p className="text-[10px]" style={{ color: "#9A8B7E" }}>Atau ketik langsung di kolom chat di bawah untuk negosiasi bebas 🙂</p>
+                                  </motion.div>
+                                )}
                               </div>
                             )}
 

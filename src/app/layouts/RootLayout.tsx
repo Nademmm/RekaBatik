@@ -330,7 +330,13 @@ export function RootLayout() {
                           {userRole === "artisan" && (
                             <Link
                               to="/admin"
-                              onClick={() => setUserMenuOpen(false)}
+                              onClick={(e) => {
+                                if (location.pathname === "/admin") {
+                                  e.preventDefault();
+                                  window.scrollTo({ top: 0, behavior: "smooth" });
+                                }
+                                setUserMenuOpen(false);
+                              }}
                               className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors"
                               style={{ color: "#8B6F47" }}
                               onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.07)")}
@@ -529,6 +535,12 @@ export function RootLayout() {
                 {userRole === "artisan" && (
                   <Link
                     to="/admin"
+                    onClick={(e) => {
+                      if (location.pathname === "/admin") {
+                        e.preventDefault();
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }
+                    }}
                     className="flex items-center justify-between px-4 py-3 rounded-md transition-all"
                     style={{
                       color: location.pathname === "/admin" ? "#3D2B1F" : "#8B6F47",

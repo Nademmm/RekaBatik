@@ -58,30 +58,21 @@ function DesignCard({
   const description = parsed?.projectInfo?.description || "";
   const isOrdered = design.isOrdered ?? false;
 
-  const handleEdit = () => {
-    if (isOrdered) {
-      toast.error("Desain yang sudah dipesan tidak bisa diedit.");
-      return;
-    }
-    navigate(`/custom?editDesignId=${design.id}`);
+  const handleDelete = () => {
+    onDelete(design);
   };
 
-  const handleDelete = () => {
-    if (isOrdered) {
-      toast.error("Desain yang sudah dipesan tidak bisa dihapus.");
-      return;
-    }
-    onDelete(design);
+  const handleEdit = () => {
+    navigate(`/custom?editDesignId=${design.id}`);
   };
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      whileHover={{ y: -4, boxShadow: "0 16px 40px rgba(61,43,31,0.12)" }}
-      className="bg-white rounded-3xl overflow-hidden cursor-pointer"
+      className="bg-white rounded-3xl overflow-hidden cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg flex flex-col justify-between"
       style={{
         border: "1px solid rgba(212,184,139,0.25)",
         boxShadow: "0 4px 16px rgba(61,43,31,0.05)",
@@ -106,41 +97,29 @@ function DesignCard({
           </div>
         )}
 
-        {/* Status badge */}
+        {/* Design badge */}
         <div className="absolute top-3 left-3">
-          {isOrdered ? (
-            <span
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-              style={{ background: "rgba(22,163,74,0.15)", color: "#16A34A", backdropFilter: "blur(8px)", border: "1px solid rgba(22,163,74,0.3)" }}
-            >
-              <CheckCircle className="w-3 h-3" />
-              Sudah Dipesan
-            </span>
-          ) : (
-            <span
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-              style={{ background: "rgba(212,184,139,0.2)", color: "#8B6F47", backdropFilter: "blur(8px)", border: "1px solid rgba(212,184,139,0.4)" }}
-            >
-              <Sparkles className="w-3 h-3" />
-              Belum Dipesan
-            </span>
-          )}
+          <span
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+            style={{ background: "rgba(139,111,71,0.2)", color: "#8B6F47", backdropFilter: "blur(8px)", border: "1px solid rgba(139,111,71,0.4)" }}
+          >
+            <Sparkles className="w-3 h-3" />
+            Desain Kustom
+          </span>
         </div>
 
         {/* Delete button */}
-        {!isOrdered && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete();
-            }}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all"
-            style={{ background: "rgba(239,68,68,0.85)", color: "white", backdropFilter: "blur(6px)" }}
-            title="Hapus desain"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDelete();
+          }}
+          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          style={{ background: "rgba(239,68,68,0.85)", color: "white", backdropFilter: "blur(6px)" }}
+          title="Hapus desain"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Info */}
@@ -155,45 +134,31 @@ function DesignCard({
         </div>
         {/* Actions */}
         <div className="flex gap-2">
-            {!isOrdered && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEdit();
-                }}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:shadow-sm active:scale-95"
-                style={{ border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
-              >
-                <Edit2 className="w-4 h-4" />
-                Edit
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOrder(design);
-              }}
-              disabled={isOrdered}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 active:scale-95"
-              style={{
-                background: isOrdered
-                  ? "rgba(22,163,74,0.7)"
-                  : "linear-gradient(135deg, #8B6F47, #6B4F2F)",
-                boxShadow: isOrdered ? "none" : "0 4px 14px rgba(139,111,71,0.3)",
-              }}
-            >
-              {isOrdered ? (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  Dipesan
-                </>
-              ) : (
-                <>
-                  <ArrowRight className="w-4 h-4" />
-                  Pesan
-                </>
-              )}
-            </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit();
+            }}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:shadow-sm active:scale-95"
+            style={{ border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
+          >
+            <Edit2 className="w-4 h-4" />
+            Edit
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOrder(design);
+            }}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110 active:scale-95"
+            style={{
+              background: "linear-gradient(135deg, #8B6F47, #6B4F2F)",
+              boxShadow: "0 4px 14px rgba(139,111,71,0.3)",
+            }}
+          >
+            <ArrowRight className="w-4 h-4" />
+            Pesan
+          </button>
         </div>
       </div>
     </motion.div>
@@ -222,21 +187,9 @@ export function DesainHistoriPage() {
 
       if (error) throw error;
 
-      // Check which designs have already been ordered
-      const { data: cartData } = await supabase
-        .from("cart_items")
-        .select("custom_design_id")
-        .eq("user_id", user.id);
-
-      // Also check orders table
-      const orderedDesignIds = new Set<number>();
-      cartData?.forEach((ci: any) => {
-        if (ci.custom_design_id) orderedDesignIds.add(ci.custom_design_id);
-      });
-
       const enriched = (designData || []).map((d: any) => ({
         ...d,
-        isOrdered: orderedDesignIds.has(d.id),
+        isOrdered: false,
       }));
 
       setDesigns(enriched);
@@ -343,8 +296,8 @@ export function DesainHistoriPage() {
         >
           {[
             { label: "Total Desain", value: totalDesigns, icon: Palette, color: "#8B6F47" },
-            { label: "Belum Dipesan", value: pendingCount, icon: Star, color: "#D97706" },
-            { label: "Sudah Dipesan", value: orderedCount, icon: CheckCircle, color: "#16A34A" },
+            { label: "Dapat Diedit", value: totalDesigns, icon: Edit2, color: "#D97706" },
+            { label: "Siap Dipesan", value: totalDesigns, icon: ShoppingBag, color: "#16A34A" },
           ].map((s, i) => {
             const Icon = s.icon;
             return (
@@ -613,23 +566,13 @@ export function DesainHistoriPage() {
                     <div className="p-6">
                       {/* Status */}
                       <div className="mb-4">
-                        {isOrdered ? (
-                          <span
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-                            style={{ background: "rgba(22,163,74,0.15)", color: "#16A34A", border: "1px solid rgba(22,163,74,0.3)" }}
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Sudah Dipesan
-                          </span>
-                        ) : (
-                          <span
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-                            style={{ background: "rgba(212,184,139,0.2)", color: "#8B6F47", border: "1px solid rgba(212,184,139,0.4)" }}
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            Belum Dipesan
-                          </span>
-                        )}
+                        <span
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+                          style={{ background: "rgba(139,111,71,0.15)", color: "#8B6F47", border: "1px solid rgba(139,111,71,0.3)" }}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Desain Kustom
+                        </span>
                       </div>
 
                       <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
@@ -657,44 +600,30 @@ export function DesainHistoriPage() {
                       )}
 
                       <div className="flex gap-2">
-                        {!isOrdered && (
-                          <button
-                            onClick={() => {
-                              setDetailTarget(null);
-                              navigate(`/custom?editDesignId=${detailTarget.id}`);
-                            }}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all hover:shadow-sm active:scale-95"
-                            style={{ border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                            Edit Desain
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            setDetailTarget(null);
+                            navigate(`/custom?editDesignId=${detailTarget.id}`);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all hover:shadow-sm active:scale-95"
+                          style={{ border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Edit Desain
+                        </button>
                         <button
                           onClick={() => {
                             setDetailTarget(null);
                             handleOrder(detailTarget);
                           }}
-                          disabled={isOrdered}
-                          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 active:scale-95"
+                          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110 active:scale-95"
                           style={{
-                            background: isOrdered
-                              ? "rgba(22,163,74,0.7)"
-                              : "linear-gradient(135deg, #8B6F47, #6B4F2F)",
-                            boxShadow: isOrdered ? "none" : "0 4px 14px rgba(139,111,71,0.3)",
+                            background: "linear-gradient(135deg, #8B6F47, #6B4F2F)",
+                            boxShadow: "0 4px 14px rgba(139,111,71,0.3)",
                           }}
                         >
-                          {isOrdered ? (
-                            <>
-                              <CheckCircle className="w-4 h-4" />
-                              Sudah Dipesan
-                            </>
-                          ) : (
-                            <>
-                              <ArrowRight className="w-4 h-4" />
-                              Pesan Sekarang
-                            </>
-                          )}
+                          <ArrowRight className="w-4 h-4" />
+                          Pesan Sekarang
                         </button>
                       </div>
                     </div>

@@ -13,6 +13,9 @@ import { useAuth } from "../../lib/AuthContext";
 import { toast, Toaster } from "sonner";
 import { BatikBackground } from "../components/BatikBackground";
 
+// Platform fee multiplier — 15% added for platform earnings
+const PLATFORM_FEE_MULTIPLIER = 1.15;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface StoreInfo {
   id: number;
@@ -81,11 +84,123 @@ const ORDER_STATUS_CONFIG: Record<string, { label: string; color: string; bg: st
 type AdminTab = "overview" | "orders" | "chat";
 type OrderFilter = "all" | "unpaid" | "awaiting_verification" | "paid" | "negotiating" | "processing" | "shipping" | "delivered";
 
+// ─── Default note template for seller ─────────────────────────────────────────
+const DEFAULT_NOTE_TEMPLATE = `Halo! Terima kasih telah mempercayakan pesanan batik Anda kepada kami. 🙏
+
+Penawaran ini sudah mencakup:
+✅ Bahan kain batik premium pilihan
+✅ Proses pewarnaan & pembatikan tangan
+✅ Pengecekan kualitas sebelum pengiriman
+
+Jika ada pertanyaan mengenai detail desain atau bahan, jangan ragu untuk chat dengan kami. Kami siap membantu!
+
+Salam hangat,
+Tim Pengrajin Batik 🎨`;
+
+// ─── Status Dropdown Component ────────────────────────────────────────────────
+const STATUS_OPTIONS = [
+  { value: "negotiating", label: "Negosiasi",  color: "#D97706", bg: "rgba(245,158,11,0.12)",  icon: MessageCircle },
+  { value: "processing",  label: "Diproses",   color: "#2563EB", bg: "rgba(59,130,246,0.12)",  icon: Clock },
+  { value: "shipping",    label: "Dikirim",    color: "#7C3AED", bg: "rgba(139,92,246,0.12)",  icon: Truck },
+] as const;
+
+function StatusDropdown({
+  currentStatus, orderId, disabled,
+  onUpdate, size = "md",
+}: {
+  currentStatus: string; orderId: string; disabled: boolean;
+  onUpdate: (id: string, status: string) => void; size?: "sm" | "md";
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const current = STATUS_OPTIONS.find(o => o.value === currentStatus)
+    ?? { value: currentStatus, label: currentStatus, color: "#8B6F47", bg: "rgba(139,111,71,0.1)", icon: Info };
+  const Icon = (current as any).icon;
+  const isSmall = size === "sm";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        disabled={disabled}
+        onClick={() => setOpen(v => !v)}
+        className={`flex items-center gap-1.5 rounded-xl font-semibold transition-all border disabled:opacity-50 disabled:cursor-not-allowed ${
+          isSmall ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs"
+        }`}
+        style={{
+          background: current.bg,
+          color: current.color,
+          borderColor: `${current.color}33`,
+        }}
+      >
+        <Icon className={isSmall ? "w-3 h-3" : "w-3.5 h-3.5"} />
+        {current.label}
+        <ChevronRight
+          className={`transition-transform duration-200 ${isSmall ? "w-2.5 h-2.5" : "w-3 h-3"}`}
+          style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-50 mt-1.5 min-w-[130px] rounded-2xl overflow-hidden right-0"
+            style={{
+              background: "#FFFFFF",
+              boxShadow: "0 8px 32px rgba(61,43,31,0.18), 0 2px 8px rgba(61,43,31,0.08)",
+              border: "1px solid rgba(212,184,139,0.2)",
+            }}
+          >
+            <div className="p-1.5 flex flex-col gap-0.5">
+              {STATUS_OPTIONS.map(opt => {
+                const OptIcon = opt.icon;
+                const isActive = opt.value === currentStatus;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      setOpen(false);
+                      if (!isActive) onUpdate(orderId, opt.value);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold w-full text-left transition-all ${
+                      isActive ? "cursor-default" : "hover:opacity-90"
+                    }`}
+                    style={{
+                      background: isActive ? opt.bg : "transparent",
+                      color: isActive ? opt.color : "#5A4A3E",
+                    }}
+                  >
+                    <OptIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: opt.color }} />
+                    {opt.label}
+                    {isActive && <Check className="w-3 h-3 ml-auto" style={{ color: opt.color }} />}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ─── Price Offer Modal ────────────────────────────────────────────────────────
 function PriceOfferModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (price: number, estimatedDate: string, note: string) => void }) {
   const [price, setPrice] = useState("");
   const [estimatedDate, setEstimatedDate] = useState("");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(DEFAULT_NOTE_TEMPLATE);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -141,6 +256,11 @@ function PriceOfferModal({ onClose, onSubmit }: { onClose: () => void; onSubmit:
                 style={{ border: "2px solid rgba(139,111,71,0.15)", background: "#FAFAF8", color: "#3D2B1F" }}
               />
             </div>
+            {price && (
+              <p className="text-[11px] font-medium mt-1.5 text-[#8B6F47]">
+                Harga ke Pembeli (+15% Fee): <strong>Rp {Math.ceil(parseFloat(price.replace(/[^0-9]/g, "")) * 1.15).toLocaleString("id-ID")}</strong>
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1.5" style={{ color: "#5A4A3E" }}>Estimasi Selesai</label>
@@ -153,15 +273,24 @@ function PriceOfferModal({ onClose, onSubmit }: { onClose: () => void; onSubmit:
               style={{ border: "2px solid rgba(139,111,71,0.15)", background: "#FAFAF8", color: "#3D2B1F" }}
             />
           </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: "#5A4A3E" }}>Catatan (opsional)</label>
+          <div className="relative">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold" style={{ color: "#5A4A3E" }}>Catatan untuk Pembeli</label>
+              <button
+                type="button"
+                onClick={() => setNote(DEFAULT_NOTE_TEMPLATE)}
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-all"
+                style={{ color: "#8B6F47", background: "rgba(139,111,71,0.08)", border: "1px solid rgba(139,111,71,0.15)" }}
+              >
+                ↺ Reset Template
+              </button>
+            </div>
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
-              placeholder="Jelaskan rincian harga atau syarat lainnya..."
-              rows={2}
+              rows={6}
               className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none"
-              style={{ border: "2px solid rgba(139,111,71,0.15)", background: "#FAFAF8", color: "#3D2B1F" }}
+              style={{ border: "2px solid rgba(139,111,71,0.15)", background: "#FAFAF8", color: "#3D2B1F", lineHeight: 1.6 }}
             />
           </div>
           <motion.button
@@ -345,7 +474,9 @@ export function AdminPage() {
   const { user, userRole } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    return (sessionStorage.getItem("rekabatik_admin_tab") as AdminTab) || "overview";
+  });
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
@@ -376,6 +507,10 @@ export function AdminPage() {
   const activeTabRef = useRef(activeTab);
   // Keep activeTabRef in sync with activeTab state
   activeTabRef.current = activeTab;
+  // Persist active tab to sessionStorage so navbar click doesn't reset it
+  useEffect(() => {
+    sessionStorage.setItem("rekabatik_admin_tab", activeTab);
+  }, [activeTab]);
 
   const scrollChatToBottom = () => {
     const el = chatViewportRef.current;
@@ -542,7 +677,8 @@ export function AdminPage() {
   // ── Send price offer ───────────────────────────────────────────────────────
   const sendPriceOffer = async (price: number, estimatedDate: string, note: string) => {
     if (!priceModalOrderId || !user) return;
-    const text = `${note ? note + "\n\n" : ""}💰 *Penawaran Harga: ${formatCurrency(price)}*\n📅 *Estimasi Selesai: ${formatDate(estimatedDate)}*\n\nSilakan balas dengan Setuju atau Tidak Setuju untuk melanjutkan.`;
+    const finalPrice = Math.ceil(price * PLATFORM_FEE_MULTIPLIER);
+    const text = `${note ? note + "\n\n" : ""}💰 *Penawaran Harga: ${formatCurrency(finalPrice)}*\n📅 *Estimasi Selesai: ${formatDate(estimatedDate)}*\n\nSilakan balas dengan Setuju atau Tidak Setuju untuk melanjutkan.`;
     
     // 1. Kirim pesan penawaran
     const { error: msgError } = await supabase.from("messages").insert([{
@@ -550,7 +686,7 @@ export function AdminPage() {
       sender_id: user.id,
       sender_role: "artisan",
       message: text,
-      price_offer: price,
+      price_offer: finalPrice,
       negotiation_status: "pending",
       status: "sent",
     }]);
@@ -594,6 +730,8 @@ export function AdminPage() {
 
   // ── Update order status ────────────────────────────────────────────────────
   const updateOrderStatus = async (orderId: string, status: string) => {
+    // Guard: only buyer can mark as delivered — admin cannot do it manually
+    if (status === "delivered") return;
     // Intercept shipping: show modal to collect tracking info
     if (status === "shipping") {
       setShippingModalOrderId(orderId);
@@ -1100,20 +1238,16 @@ export function AdminPage() {
 
                                {/* Status Update Dropdown */}
                                {o.status !== "delivered" && o.status !== "cancelled" && (
-                                 <select
-                                   value={o.status}
+                                 <StatusDropdown
+                                   currentStatus={o.status}
+                                   orderId={o.id}
                                    disabled={updatingStatus === o.id}
-                                   onChange={e => {
-                                      if (e.target.value === "shipping") setShippingModalOrderId(o.id);
-                                      else updateOrderStatus(o.id, e.target.value);
+                                   onUpdate={(id, status) => {
+                                     if (status === "shipping") setShippingModalOrderId(id);
+                                     else updateOrderStatus(id, status);
                                    }}
-                                   className="px-3 py-1.5 rounded-xl text-xs font-semibold outline-none cursor-pointer border border-[#8B6F47]/20 bg-[#FAF8F5] text-[#3D2B1F]"
-                                 >
-                                   <option value="negotiating">Negosiasi</option>
-                                   <option value="processing">Diproses</option>
-                                   <option value="shipping">Dikirim</option>
-                                   <option value="delivered">Selesai</option>
-                                 </select>
+                                   size="md"
+                                 />
                                )}
                              </div>
                           </div>
@@ -1558,6 +1692,31 @@ export function AdminPage() {
                            <Paperclip className="w-4 h-4" />
                          </motion.button>
 
+                         {/* Price Offer Button — hanya muncul jika ada order negotiating */}
+                         {(() => {
+                           const negotiatingOrder = orders.find(
+                             o => activeUserOrderIds.includes(o.id) && o.status === "negotiating"
+                           );
+                           if (!negotiatingOrder) return null;
+                           return (
+                             <motion.button
+                               key="price-offer-btn"
+                               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                               onClick={() => setPriceModalOrderId(negotiatingOrder.id)}
+                               className="flex items-center gap-1.5 px-3 h-11 rounded-2xl text-xs font-semibold transition-all flex-shrink-0 border"
+                               style={{
+                                 background: "linear-gradient(135deg, rgba(139,111,71,0.12), rgba(61,43,31,0.08))",
+                                 borderColor: "rgba(139,111,71,0.4)",
+                                 color: "#8B6F47",
+                               }}
+                               title="Beri Penawaran Harga"
+                             >
+                               <Tag className="w-3.5 h-3.5" />
+                               <span className="hidden sm:inline whitespace-nowrap">Beri Penawaran</span>
+                             </motion.button>
+                           );
+                         })()}
+
                          {/* Input Text */}
                          <input
                            type="text"
@@ -1780,17 +1939,13 @@ export function AdminPage() {
                                         <span className="text-[10px]" style={{ color: "#A89B8F" }}>
                                           Update Status Pesanan:
                                         </span>
-                                        <select
-                                          value={o.status}
+                                        <StatusDropdown
+                                          currentStatus={o.status}
+                                          orderId={o.id}
                                           disabled={updatingStatus === o.id}
-                                          onChange={e => updateOrderStatus(o.id, e.target.value)}
-                                          className="px-2 py-1.5 rounded-lg text-[11px] font-semibold outline-none cursor-pointer border border-[#8B6F47]/20 bg-[#FAF8F5] text-[#3D2B1F]"
-                                        >
-                                          <option value="negotiating">Negosiasi</option>
-                                          <option value="processing">Diproses</option>
-                                          <option value="shipping">Dikirim</option>
-                                          <option value="delivered">Selesai</option>
-                                        </select>
+                                          onUpdate={updateOrderStatus}
+                                          size="sm"
+                                        />
                                       </div>
                                     )}
                                   </div>

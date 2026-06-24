@@ -172,7 +172,14 @@ export function DesaJetisStoreDetailPage() {
           const foundStore = mockStores.find(s => s.id === id);
           setStore(foundStore || mockStores[0]);
         } else {
-          setStore(data as Store);
+          // Ensure arrays are never null/undefined
+          setStore({
+            ...data,
+            tags: data.tags || [],
+            motifs: data.motifs || [],
+            gallery: data.gallery || [],
+            team: data.team || [],
+          } as Store);
         }
       } catch (error) {
         console.error("Failed to fetch store:", error);
@@ -450,7 +457,7 @@ export function DesaJetisStoreDetailPage() {
                   Kategori
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {store.tags.map((tag, i) => (
+                  {(store.tags || []).map((tag, i) => (
                     <span key={i} className="px-4 py-2 rounded-full text-sm"
                       style={{ background: "rgba(212, 184, 139, 0.15)", color: "#8B6F47", border: "1px solid rgba(212, 184, 139, 0.3)", fontWeight: 600 }}>
                       {tag}
@@ -470,7 +477,7 @@ export function DesaJetisStoreDetailPage() {
                   Motif Unggulan
                 </h3>
                 <div className="flex flex-wrap gap-2.5">
-                  {store.motifs.map((motif, i) => (
+                  {(store.motifs || []).map((motif, i) => (
                     <motion.span
                       key={i}
                       whileHover={{ scale: 1.05 }}
@@ -483,7 +490,7 @@ export function DesaJetisStoreDetailPage() {
               </motion.div>
 
               {/* Gallery */}
-              {store.gallery && store.gallery.length > 0 && (
+              {(store.gallery || []).length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -494,7 +501,7 @@ export function DesaJetisStoreDetailPage() {
                     Galeri Toko
                   </h3>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {store.gallery.map((img, i) => (
+                    {(store.gallery || []).map((img, i) => (
                       <motion.div
                         key={i}
                         whileHover={{ scale: 1.02, y: -5 }}
@@ -508,7 +515,7 @@ export function DesaJetisStoreDetailPage() {
               )}
 
               {/* Team */}
-              {store.team && store.team.length > 0 && (
+              {(store.team || []).length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -519,7 +526,7 @@ export function DesaJetisStoreDetailPage() {
                     Tim Kami
                   </h3>
                   <div className="flex flex-wrap gap-3">
-                    {store.team.map((member, i) => (
+                    {(store.team || []).map((member, i) => (
                       <span key={i} className="flex items-center gap-2 px-4 py-2.5 rounded-full"
                         style={{ background: "white", color: "#3D2B1F", border: "1px solid #E8E1DA", fontWeight: 500 }}>
                         <Users className="w-4 h-4" style={{ color: "#D4B88B" }} />

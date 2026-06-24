@@ -637,14 +637,14 @@ export function CustomBatikPage() {
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   const [projectInfo, setProjectInfo] = useState({ name: "", description: "", fabric: "Katun Primisima" });
   const [savedDesignId, setSavedDesignId] = useState<number | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [historyLength, setHistoryLength] = useState(0);
   const [patternHistoryIndex, setPatternHistoryIndex] = useState(-1);
   const [patternHistoryLength, setPatternHistoryLength] = useState(0);
   const [hasOffscreenContent, setHasOffscreenContent] = useState(false);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    const hasUnsavedWork = layers.length > 0 || hasOffscreenContent;
-    return hasUnsavedWork && currentLocation.pathname !== nextLocation.pathname;
+    return hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname;
   });
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -1123,6 +1123,7 @@ export function CustomBatikPage() {
       redoStackRef.current = [];
       setCanUndo(true);
       setCanRedo(false);
+      setHasUnsavedChanges(true);
     }
   }, []);
 
@@ -1144,6 +1145,7 @@ export function CustomBatikPage() {
       redoStackRef.current = [];
       setCanUndo(true);
       setCanRedo(false);
+      setHasUnsavedChanges(true);
     }
   }, []);
 
@@ -1431,8 +1433,7 @@ export function CustomBatikPage() {
   }, []);
 
   useEffect(() => {
-    const hasUnsavedWork = layers.length > 0 || hasOffscreenContent;
-    if (!hasUnsavedWork) return;
+    if (!hasUnsavedChanges) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
@@ -1440,7 +1441,7 @@ export function CustomBatikPage() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [layers.length, hasOffscreenContent]);
+  }, [hasUnsavedChanges]);
 
   // Fetch patterns
   useEffect(() => {
@@ -1477,6 +1478,7 @@ export function CustomBatikPage() {
         let parsed: any = null;
         try { parsed = JSON.parse(data.drawing_data); } catch { return; }
         if (parsed.canvasBackground) setCanvasBackground(parsed.canvasBackground);
+        if (parsed.projectInfo) setProjectInfo(parsed.projectInfo);
         if (parsed.objects) {
           fc.loadFromJSON({ objects: parsed.objects, background: parsed.canvasBackground || "#ffffff" }, () => {
             fc.getObjects().forEach((obj: any) => {
@@ -1485,6 +1487,7 @@ export function CustomBatikPage() {
               }
             });
             fc.requestRenderAll();
+            setHasUnsavedChanges(false);
           });
         }
         if (parsed.offscreenDataUrl && offscreenRef.current) {
@@ -1499,6 +1502,7 @@ export function CustomBatikPage() {
             }
             syncDisplay();
             setHasOffscreenContent(true);
+            setHasUnsavedChanges(false);
           };
           img.src = parsed.offscreenDataUrl;
         }
@@ -1803,6 +1807,150 @@ export function CustomBatikPage() {
 
     canvas.on("object:modified", () => saveSnapshot());
     canvas.on("object:removed", () => saveSnapshot());
+
+    // [#27] Track start state of scaling/cropping
+    canvas.on("before:transform", (e) => {
+      const obj = e.transform?.target;
+      if (obj && obj.type === "image") {
+        obj.data = obj.data || {};
+        obj.data.startScaleX = obj.scaleX ?? 1;
+        obj.data.startScaleY = obj.scaleY ?? 1;
+        obj.data.startLeft = obj.left ?? 0;
+        obj.data.startTop = obj.top ?? 0;
+        obj.data.startWidth = obj.width ?? 0;
+        obj.data.startHeight = obj.height ?? 0;
+        obj.data.startCropX = obj.cropX ?? 0;
+        obj.data.startCropY = obj.cropY ?? 0;
+      }
+    });
+
+    // [#27] Smooth Canva-like crop/zoom for middle handles (ml, mr, mt, mb)
+    canvas.on("object:scaling", (e) => {
+      const obj = e.target as any;
+      if (!obj || obj.type !== "image") return;
+
+      const corner: string | undefined = (e as any).transform?.corner;
+      if (!corner || !["ml", "mr", "mt", "mb"].includes(corner)) return;
+
+      // Ensure we have starting properties
+      if (obj.data?.startScaleX === undefined) {
+        obj.data = obj.data || {};
+        obj.data.startScaleX = obj.scaleX ?? 1;
+        obj.data.startScaleY = obj.scaleY ?? 1;
+        obj.data.startLeft = obj.left ?? 0;
+        obj.data.startTop = obj.top ?? 0;
+        obj.data.startWidth = obj.width ?? 0;
+        obj.data.startHeight = obj.height ?? 0;
+        obj.data.startCropX = obj.cropX ?? 0;
+        obj.data.startCropY = obj.cropY ?? 0;
+      }
+
+      const origW = obj.data.originalWidth ?? obj._element?.width ?? obj.data.startWidth ?? obj.width ?? 0;
+      const origH = obj.data.originalHeight ?? obj._element?.height ?? obj.data.startHeight ?? obj.height ?? 0;
+
+      const startScaleX = obj.data.startScaleX;
+      const startScaleY = obj.data.startScaleY;
+      const startLeft = obj.data.startLeft;
+      const startTop = obj.data.startTop;
+      const startWidth = obj.data.startWidth;
+      const startHeight = obj.data.startHeight;
+      const startCropX = obj.data.startCropX;
+      const startCropY = obj.data.startCropY;
+      const startRight = startLeft + startWidth * startScaleX;
+      const startBottom = startTop + startHeight * startScaleY;
+
+      // Calculate the target dimensions directly using the mouse pointer to prevent glitching/feedback loops
+      const pointer = e.e ? canvas.getPointer(e.e) : { x: obj.left, y: obj.top };
+
+      if (corner === "mr") {
+        const targetW = Math.max(10 * startScaleX, pointer.x - startLeft);
+        const maxUncroppedW = origW - startCropX;
+        if (targetW <= maxUncroppedW * startScaleX) {
+          // Crop/uncrop phase
+          const newCropW = Math.max(10, targetW / startScaleX);
+          obj.scaleX = startScaleX;
+          obj.scaleY = startScaleY;
+          obj.width = newCropW;
+          obj.cropX = startCropX;
+          obj.left = startLeft;
+        } else {
+          // Zoom phase
+          const newScale = targetW / maxUncroppedW;
+          obj.scaleX = newScale;
+          obj.scaleY = newScale;
+          obj.width = maxUncroppedW;
+          obj.cropX = startCropX;
+          obj.left = startLeft + startCropX * (startScaleX - newScale);
+        }
+      } else if (corner === "ml") {
+        const targetW = Math.max(10 * startScaleX, startRight - pointer.x);
+        const cropRight = startCropX + startWidth;
+        const maxUncroppedW = cropRight;
+        if (targetW <= maxUncroppedW * startScaleX) {
+          // Crop/uncrop phase
+          const newCropW = Math.max(10, targetW / startScaleX);
+          const newCropX = cropRight - newCropW;
+          obj.scaleX = startScaleX;
+          obj.scaleY = startScaleY;
+          obj.width = newCropW;
+          obj.cropX = newCropX;
+          obj.left = startLeft + (newCropX - startCropX) * startScaleX;
+        } else {
+          // Zoom phase
+          const newScale = targetW / maxUncroppedW;
+          obj.scaleX = newScale;
+          obj.scaleY = newScale;
+          obj.width = maxUncroppedW;
+          obj.cropX = 0;
+          obj.left = startRight - cropRight * newScale;
+        }
+      } else if (corner === "mb") {
+        const targetH = Math.max(10 * startScaleY, pointer.y - startTop);
+        const maxUncroppedH = origH - startCropY;
+        if (targetH <= maxUncroppedH * startScaleY) {
+          // Crop/uncrop phase
+          const newCropH = Math.max(10, targetH / startScaleY);
+          obj.scaleX = startScaleX;
+          obj.scaleY = startScaleY;
+          obj.height = newCropH;
+          obj.cropY = startCropY;
+          obj.top = startTop;
+        } else {
+          // Zoom phase
+          const newScale = targetH / maxUncroppedH;
+          obj.scaleX = newScale;
+          obj.scaleY = newScale;
+          obj.height = maxUncroppedH;
+          obj.cropY = startCropY;
+          obj.top = startTop + startCropY * (startScaleY - newScale);
+        }
+      } else if (corner === "mt") {
+        const targetH = Math.max(10 * startScaleY, startBottom - pointer.y);
+        const cropBottom = startCropY + startHeight;
+        const maxUncroppedH = cropBottom;
+        if (targetH <= maxUncroppedH * startScaleY) {
+          // Crop/uncrop phase
+          const newCropH = Math.max(10, targetH / startScaleY);
+          const newCropY = cropBottom - newCropH;
+          obj.scaleX = startScaleX;
+          obj.scaleY = startScaleY;
+          obj.height = newCropH;
+          obj.cropY = newCropY;
+          obj.top = startTop + (newCropY - startCropY) * startScaleY;
+        } else {
+          // Zoom phase
+          const newScale = targetH / maxUncroppedH;
+          obj.scaleX = newScale;
+          obj.scaleY = newScale;
+          obj.height = maxUncroppedH;
+          obj.cropY = 0;
+          obj.top = startBottom - cropBottom * newScale;
+        }
+      }
+
+      obj.setCoords();
+      canvas.requestRenderAll();
+    });
 
     // Restrict object movement to virtual canvas bounds: [-1600, 2400] on X and [-1200, 1800] on Y
     canvas.on("object:moving", (e) => {
@@ -2352,20 +2500,16 @@ export function CustomBatikPage() {
 
   const screenPointToCanvasCoords = useCallback((clientX: number, clientY: number) => {
     const fc = fabricCanvasRef.current;
-    const canvasEl = canvasRef.current;
-    if (!fc || !canvasEl) return { x: 80, y: 60 };
-    const rect = canvasEl.getBoundingClientRect();
+    const containerEl = containerRef.current;
+    if (!fc || !containerEl) return { x: 80, y: 60 };
+    const rect = containerEl.getBoundingClientRect();
     const vpt = fc.viewportTransform;
     const zoom = fc.getZoom() || 1;
     const displayX = clientX - rect.left;
     const displayY = clientY - rect.top;
-    const scaleX = canvasEl.width / rect.width;
-    const scaleY = canvasEl.height / rect.height;
-    const fabricX = displayX * scaleX;
-    const fabricY = displayY * scaleY;
-    if (!vpt) return { x: fabricX, y: fabricY };
-    const logicalX = (fabricX - vpt[4]) / zoom;
-    const logicalY = (fabricY - vpt[5]) / zoom;
+    if (!vpt) return { x: displayX, y: displayY };
+    const logicalX = (displayX - vpt[4]) / zoom;
+    const logicalY = (displayY - vpt[5]) / zoom;
     // Clamp to virtual canvas limits (-1600..2400 and -1200..1800) so it drops exactly where desired.
     return {
       x: Math.max(-1600, Math.min(2400, logicalX)),
@@ -2406,11 +2550,12 @@ export function CustomBatikPage() {
           perPixelTargetFind: false,
           lockMovementX: false, lockMovementY: false, lockRotation: false,
           lockScalingX: false, lockScalingY: false, lockUniScaling: false,
+          lockScalingFlip: true,
           objectCaching: false,
         });
         img.setCoords();
         const newLayerId = Date.now().toString();
-        (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: selectedPreset.name, customColor: customColor, originalSvg: pattern.style_type && batikSvgMap[pattern.style_type] ? batikSvgMap[pattern.style_type] : null };
+        (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: selectedPreset.name, customColor: customColor, originalSvg: pattern.style_type && batikSvgMap[pattern.style_type] ? batikSvgMap[pattern.style_type] : null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
         fc.add(img); img.setCoords(); fc.setActiveObject(img); fc.requestRenderAll();
         setLayers((prev) => [...prev, { id: newLayerId, type: 'pattern', name: pattern.name || 'Motif', visible: true, locked: false, fabricObject: img }]);
         setSelectedLayerId(newLayerId);
@@ -2445,8 +2590,28 @@ export function CustomBatikPage() {
       recoloredSvg = renderPatternSVGString(pattern);
     }
 
+    // Save current crop and transform properties to prevent setSrc from resetting them
+    const currentWidth = activeObj.width;
+    const currentHeight = activeObj.height;
+    const currentCropX = activeObj.cropX;
+    const currentCropY = activeObj.cropY;
+    const currentScaleX = activeObj.scaleX;
+    const currentScaleY = activeObj.scaleY;
+    const currentLeft = activeObj.left;
+    const currentTop = activeObj.top;
+
     svgStringToPngDataUrl(recoloredSvg).then((pngUrl) => {
       (activeObj as fabric.Image).setSrc(pngUrl, () => {
+        activeObj.set({
+          width: currentWidth,
+          height: currentHeight,
+          cropX: currentCropX,
+          cropY: currentCropY,
+          scaleX: currentScaleX,
+          scaleY: currentScaleY,
+          left: currentLeft,
+          top: currentTop,
+        });
         data.colorPresetName = selectedPreset.name;
         data.customColor = customColor;
         activeObj.setCoords();
@@ -2516,12 +2681,47 @@ export function CustomBatikPage() {
     const layer = layers.find((l) => l.id === layerId);
     if (!layer?.fabricObject || !fabricCanvasRef.current) return;
     layer.fabricObject.clone((clonedObj: fabric.Object) => {
-      clonedObj.set({ left: (clonedObj.left || 0) + 20, top: (clonedObj.top || 0) + 20 });
+      const fc = fabricCanvasRef.current;
+      if (!fc) return;
+
+      clonedObj.set({
+        left: (clonedObj.left || 0) + 20,
+        top: (clonedObj.top || 0) + 20,
+        selectable: true,
+        evented: true,
+        hasControls: true,
+        hasBorders: true,
+      });
+
       const newLayerId = Date.now().toString();
-      (clonedObj as any).data = { ...(layer.fabricObject as any).data, layerId: newLayerId };
-      fabricCanvasRef.current?.add(clonedObj);
+      const layerName = `${layer.name} (Salinan)`;
+      (clonedObj as any).data = {
+        ...(layer.fabricObject as any).data,
+        layerId: newLayerId,
+        layerName: layerName,
+      };
+
+      fc.add(clonedObj);
+      clonedObj.setCoords();
+      fc.setActiveObject(clonedObj);
+      fc.requestRenderAll();
+
+      setLayers((prev) => [
+        ...prev,
+        {
+          id: newLayerId,
+          type: layer.type,
+          name: layerName,
+          visible: true,
+          locked: false,
+          fabricObject: clonedObj,
+        },
+      ]);
+      setSelectedLayerId(newLayerId);
+      setActiveTab("layer");
+      saveSnapshot();
     });
-  }, [layers]);
+  }, [layers, saveSnapshot]);
 
   const flipLayer = useCallback((layerId: string, axis: "x" | "y") => {
     setLayers((prev) => prev.map((layer) => {
@@ -2568,6 +2768,7 @@ export function CustomBatikPage() {
         lockScalingX: false,
         lockScalingY: false,
         lockUniScaling: false,
+        lockScalingFlip: true,
         objectCaching: false,
       });
       img.setCoords();
@@ -2578,6 +2779,9 @@ export function CustomBatikPage() {
         layerId: newLayerId,
         layerName: shortName,
         imageUrl: dataUrl,
+        originalScale: scale,
+        originalWidth: rawW,
+        originalHeight: rawH,
       };
 
       fc.add(img);
@@ -2620,11 +2824,25 @@ export function CustomBatikPage() {
     });
     // Draw the center 800x600 region of the 4000x3000 offscreen canvas
     ctx.drawImage(offscreen, 1600, 1200, 800, 600, 0, 0, 800, 600);
+    // [#28b] Watermark besar diagonal di tengah
     ctx.save();
-    ctx.globalAlpha = 0.5;
-    ctx.font = "bold 24px 'Playfair Display', serif";
+    ctx.globalAlpha = 0.12;
+    ctx.font = "bold 80px 'Playfair Display', serif";
+    ctx.fillStyle = "#4A2F1A";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.translate(400, 300);
+    ctx.rotate(-25 * Math.PI / 180);
+    ctx.shadowColor = "rgba(0,0,0,0.15)";
+    ctx.shadowBlur = 8;
+    ctx.fillText("RekaBatik", 0, 0);
+    ctx.restore();
+    // [#28b] Watermark kecil di pojok kanan bawah
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.font = "bold 20px 'Playfair Display', serif";
     ctx.fillStyle = "#ffffff";
-    ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+    ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 5; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
     ctx.textAlign = "right"; ctx.textBaseline = "bottom";
     ctx.fillText("RekaBatik", 780, 580);
     ctx.restore();
@@ -2667,6 +2885,7 @@ export function CustomBatikPage() {
     saveSnapshot(); saveOffscreenSnapshot();
     isInitRef.current = false;
     setLayers([]); setSelectedLayerId(null); setHasOffscreenContent(false); setCanUndo(false); setCanRedo(false); setSavedDesignId(null);
+    setHasUnsavedChanges(false);
     setShowClearConfirmModal(false);
   };
 
@@ -2679,11 +2898,28 @@ export function CustomBatikPage() {
       const thumbnailDataUrl = final.toDataURL("image/png");
       const designJson = fabricCanvasRef.current.toJSON(["data"]);
       const payload = { ...designJson, offscreenDataUrl: offscreenRef.current?.toDataURL("image/png") || null, canvasBackground, canvasThumbnail: thumbnailDataUrl, projectInfo };
-      const { data, error } = await supabase.from("custom_designs").insert([{ drawing_data: JSON.stringify(payload), pattern_id: 0, scale: 1, rotation: 0, colors: {}, created_at: new Date().toISOString(), user_id: user.id }]).select("id").single();
-      if (error) throw error;
-      const newId = data?.id ?? null;
-      setSavedDesignId(newId);
-      return newId;
+      
+      if (savedDesignId) {
+        const { error } = await supabase
+          .from("custom_designs")
+          .update({ drawing_data: JSON.stringify(payload) })
+          .eq("id", savedDesignId)
+          .eq("user_id", user.id);
+        if (error) throw error;
+        setHasUnsavedChanges(false);
+        return savedDesignId;
+      } else {
+        const { data, error } = await supabase
+          .from("custom_designs")
+          .insert([{ drawing_data: JSON.stringify(payload), pattern_id: 0, scale: 1, rotation: 0, colors: {}, created_at: new Date().toISOString(), user_id: user.id }])
+          .select("id")
+          .single();
+        if (error) throw error;
+        const newId = data?.id ?? null;
+        setSavedDesignId(newId);
+        setHasUnsavedChanges(false);
+        return newId;
+      }
     } catch (err) { console.error(err); toast.error("Gagal menyimpan desain"); return null; }
     finally { setIsSaving(false); }
   };
@@ -2691,8 +2927,11 @@ export function CustomBatikPage() {
   const triggerSaveAction = (type: "save" | "cart" | "order") => {
     if (!user) { toast.error("Silakan login terlebih dahulu"); navigate("/auth?redirect=/custom"); return; }
     if (layers.length === 0 && !hasOffscreenContent) { toast.error("Kanvas masih kosong! Tambahkan motif atau gambar terlebih dahulu."); return; }
-    if (savedDesignId && type !== "save") { executeAction(type); }
-    else { setShowProjectModal(type); }
+    if (savedDesignId) {
+      executeAction(type);
+    } else {
+      setShowProjectModal(type);
+    }
   };
 
   const handleSaveAndShowModal = () => triggerSaveAction("save");
@@ -2701,7 +2940,9 @@ export function CustomBatikPage() {
   const executeAction = async (actionType: "save" | "cart" | "order") => {
     if (actionType === "save") {
       const id = await saveDesign();
-      if (id !== null) { toast.success("Desain berhasil disimpan ke Histori!"); navigate("/desain-histori"); }
+      if (id !== null) {
+        toast.success(savedDesignId ? "Desain berhasil diperbarui!" : "Desain berhasil disimpan ke Histori!");
+      }
     } else if (actionType === "cart") {
       setIsAddingToCart(true);
       try {
