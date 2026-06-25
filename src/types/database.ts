@@ -1,7 +1,6 @@
 export interface BatikItem {
   id: number;
   name: string;
-  category: string;
   price: number;
   description: string;
   origin: string;
@@ -12,6 +11,7 @@ export interface BatikItem {
   sold: number;
   style_type?: string;
   svg_url?: string;
+  image_url?: string;
   created_at?: string;
 }
 

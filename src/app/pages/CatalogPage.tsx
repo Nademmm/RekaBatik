@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Search, Filter, ShoppingBag, Star, MapPin, Heart } from "lucide-react";
+import { Search, ShoppingBag, Star, MapPin, Heart } from "lucide-react";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase } from "../../lib/supabase";
 import { BatikItem } from "../../types/database";
@@ -10,23 +10,145 @@ import { useAuth } from "../../lib/AuthContext";
 import { useCart } from "../../lib/CartContext";
 import { useNavigate } from "react-router";
 
-const categories = [
-  { value: "all", label: "Semua" },
-  { value: "tradisional", label: "Tradisional" },
-  { value: "modern", label: "Modern" },
-  { value: "regional", label: "Regional" },
-  { value: "wedding", label: "Pernikahan" },
+// Import semua gambar catalog
+import BerasUtahImg from "../../assets/catalog-images/beras_utah.webp";
+import CeplokImg from "../../assets/catalog-images/ceplok.webp";
+import KawungImg from "../../assets/catalog-images/kawung.webp";
+import MegaMendungImg from "../../assets/catalog-images/mega_mendung.webp";
+import ParangImg from "../../assets/catalog-images/parang.webp";
+import SekarJagadImg from "../../assets/catalog-images/sekar_jagad.webp";
+import SidomuktiImg from "../../assets/catalog-images/sidomukti.webp";
+import TruntumImg from "../../assets/catalog-images/truntum.webp";
+
+// Map nama gambar ke import gambar
+const imageMap: Record<string, string> = {
+  "beras_utah.webp": BerasUtahImg,
+  "ceplok.webp": CeplokImg,
+  "kawung.webp": KawungImg,
+  "mega_mendung.webp": MegaMendungImg,
+  "parang.webp": ParangImg,
+  "sekar_jagad.webp": SekarJagadImg,
+  "sidomukti.webp": SidomuktiImg,
+  "truntum.webp": TruntumImg
+};
+
+// Fallback data jika database kosong
+const fallbackCatalogItems: BatikItem[] = [
+  {
+    id: 1,
+    name: "Batik Parang",
+    price: 350000,
+    description: "Motif parang klasik dengan garis diagonal khas batik Jawa yang melambangkan keberanian dan keteguhan hati.",
+    origin: "Jawa Tengah",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 234,
+    style_type: "parang",
+    image_url: ParangImg
+  },
+  {
+    id: 2,
+    name: "Batik Mega Mendung",
+    price: 380000,
+    description: "Motif mega mendung khas Cirebon yang terinspirasi dari awan di langit, melambangkan kedamaian dan kesejukan.",
+    origin: "Cirebon",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 189,
+    style_type: "mega",
+    image_url: MegaMendungImg
+  },
+  {
+    id: 3,
+    name: "Batik Ceplok",
+    price: 320000,
+    description: "Motif ceplok dengan pola geometris yang khas batik Yogyakarta, penuh makna filosofi.",
+    origin: "Yogyakarta",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 156,
+    style_type: "ceplok",
+    image_url: CeplokImg
+  },
+  {
+    id: 4,
+    name: "Batik Sidomukti",
+    price: 390000,
+    description: "Motif sido mukti yang melambangkan kebahagiaan, kemakmuran, dan keselamatan bagi pemakainya.",
+    origin: "Jawa Tengah",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 203,
+    style_type: "sido-mukti",
+    image_url: SidomuktiImg
+  },
+  {
+    id: 5,
+    name: "Batik Truntum",
+    price: 360000,
+    description: "Motif truntum yang melambangkan cinta abadi dan kesetiaan, cocok untuk acara pernikahan.",
+    origin: "Jawa Tengah",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 178,
+    style_type: "parang",
+    image_url: TruntumImg
+  },
+  {
+    id: 6,
+    name: "Batik Kawung",
+    price: 370000,
+    description: "Motif kawung yang terinspirasi dari buah kolang-kaling, melambangkan kesempurnaan dan kebijaksanaan.",
+    origin: "Yogyakarta",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 165,
+    style_type: "ceplok",
+    image_url: KawungImg
+  },
+  {
+    id: 7,
+    name: "Batik Sekar Jagad",
+    price: 420000,
+    description: "Motif sekar jagad yang melambangkan keindahan dan keragaman dunia, penuh detail yang memukau.",
+    origin: "Jawa Tengah",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 145,
+    style_type: "parang",
+    image_url: SekarJagadImg
+  },
+  {
+    id: 8,
+    name: "Batik Beras Utah",
+    price: 340000,
+    description: "Motif beras utah yang khas dan unik, melambangkan kemakmuran dan kesejahteraan.",
+    origin: "Jawa Barat",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 132,
+    style_type: "ceplok",
+    image_url: BerasUtahImg
+  }
 ];
 
-const validStyleTypes = [
-  "parang",
-  "parang-new",
-  "mega",
-  "sido-mukti",
-  "bunga1",
-  "bunga2",
-  "ceplok",
-];
+
 
 
 
@@ -41,7 +163,6 @@ export function CatalogPage() {
   const [items, setItems] = useState<BatikItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
   
   const [selectedBatik, setSelectedBatik] = useState<BatikItem | null>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -117,14 +238,39 @@ export function CatalogPage() {
       setLoading(true);
       try {
         let query = supabase.from("batik_items").select("*");
-        if (category !== "all") query = query.eq("category", category);
         if (search) query = query.ilike("name", `%${search}%`);
 
         const { data, error } = await query;
-        if (error) throw error;
-        // Filter only valid items
-        const validItems = (data as BatikItem[]).filter(item => item.style_type && validStyleTypes.includes(item.style_type));
-        setItems(validItems || []);
+        
+        let itemsToShow: BatikItem[] = [];
+        
+        if (error || !data || data.length === 0) {
+          // Jika database error/kosong, gunakan fallback data
+          itemsToShow = [...fallbackCatalogItems];
+        } else {
+          // Map image_url dari database ke import gambar lokal
+          itemsToShow = (data as BatikItem[]).map(item => {
+            // Jika image_url berisi nama file, gunakan imageMap
+            if (item.image_url) {
+              for (const [filename, imgSrc] of Object.entries(imageMap)) {
+                if (item.image_url.includes(filename)) {
+                  return { ...item, image_url: imgSrc };
+                }
+              }
+            }
+            return item;
+          });
+        }
+        
+        // Filter by search untuk fallback juga
+        let filteredItems = [...itemsToShow];
+        if (search) {
+          filteredItems = filteredItems.filter(item => 
+            item.name.toLowerCase().includes(search.toLowerCase())
+          );
+        }
+        
+        setItems(filteredItems);
       } catch (err) {
         toast.error("Gagal memuat katalog batik.");
       } finally {
@@ -133,7 +279,7 @@ export function CatalogPage() {
     }
     fetchItems();
     fetchFavorites();
-  }, [category, search, user]);
+  }, [search, user]);
 
   const handleAddToCart = async (batik: BatikItem, quantity: number) => {
     if (!user) {
@@ -159,72 +305,47 @@ export function CatalogPage() {
     <div className="min-h-screen relative pb-20" style={{ background: "#FAF8F5" }}>
       <BatikBackground opacity={0.03} patternType="floral" />
 
-      <div className="container mx-auto px-4 md:px-6 pt-12 relative z-10 max-w-7xl">
+      <div className="container mx-auto px-4 md:px-6 pt-10 relative z-10 max-w-7xl">
         {/* Header Area */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-          <h1 className="mb-4" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2.5rem, 5vw, 4rem)", fontWeight: 700 }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10">
+          <h1 className="mb-3" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2rem, 4vw, 3.5rem)", fontWeight: 700 }}>
             Koleksi <span style={{ color: "#8B6F47" }}>Mahakarya</span>
           </h1>
-          <p className="max-w-2xl mx-auto text-base md:text-lg" style={{ color: "#7A6B5E" }}>
-            Temukan kekayaan motif batik nusantara dari para pengrajin terbaik kami. Setiap goresan malam membawa cerita dan filosofi mendalam.
+          <p className="max-w-xl mx-auto text-sm md:text-base" style={{ color: "#7A6B5E" }}>
+            Temukan kekayaan motif batik nusantara dari para pengrajin terbaik.
           </p>
         </motion.div>
 
-        {/* Sticky Filter & Search Bar */}
-        <div className="sticky top-20 md:top-24 z-30 bg-white/80 backdrop-blur-xl p-3 md:p-4 rounded-3xl mb-8 transition-all shadow-[0_8px_30px_rgba(61,43,31,0.04)] border" style={{ borderColor: "rgba(212,184,139,0.3)" }}>
-          <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-center justify-between">
-            {/* Search */}
-            <div className="relative w-full md:w-96">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari motif batik (contoh: Mega Mendung)..."
-                className="w-full pl-12 pr-4 py-3.5 rounded-2xl outline-none transition-all shadow-sm focus:shadow-md"
-                style={{ background: "#FFFFFF", border: "1px solid rgba(212,184,139,0.3)", color: "#3D2B1F" }}
-              />
-            </div>
-
-            {/* Categories */}
-            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 hide-scrollbar scroll-smooth">
-              {categories.map((c) => {
-                const active = category === c.value;
-                return (
-                  <button
-                    key={c.value}
-                    onClick={() => setCategory(c.value)}
-                    className="whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-medium transition-all"
-                    style={{
-                      background: active ? "#8B6F47" : "white",
-                      color: active ? "white" : "#5A4A3E",
-                      border: `1px solid ${active ? "#8B6F47" : "rgba(212,184,139,0.3)"}`,
-                      boxShadow: active ? "0 4px 12px rgba(139, 111, 71, 0.25)" : "none",
-                    }}
-                  >
-                    {c.label}
-                  </button>
-                );
-              })}
-            </div>
+        {/* Sticky Search Bar */}
+        <div className="sticky top-20 md:top-24 max-w-2xl mx-auto bg-white/80 backdrop-blur-xl p-2 md:p-3 rounded-2xl mb-8 transition-all shadow-[0_4px_20px_rgba(61,43,31,0.04)] border" style={{ borderColor: "rgba(212,184,139,0.35)" }}>
+          <div className="relative w-full max-w-2xl mx-auto">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: "#7A6B5E" }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari batik (contoh: Mega Mendung)..."
+              className="w-full pl-11 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-2"
+              style={{ background: "#FAF8F5", border: "1px solid rgba(212,184,139,0.5)", color: "#3D2B1F", "--tw-ring-color": "#8B6F47" } as React.CSSProperties}
+            />
           </div>
         </div>
 
         {/* Grid Katalog */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-              <Skeleton key={i} className="h-[450px] w-full rounded-3xl" />
+              <Skeleton key={i} className="h-[400px] w-full rounded-2xl" />
             ))}
           </div>
         ) : items.length === 0 ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-24 text-center">
-            <Filter className="w-16 h-16 mx-auto mb-6 opacity-20" style={{ color: "#3D2B1F" }} />
-            <h3 className="text-2xl font-bold mb-2" style={{ color: "#3D2B1F" }}>Batik Tidak Ditemukan</h3>
-            <p style={{ color: "#7A6B5E" }}>Coba ubah kata kunci atau kategori pencarian Anda.</p>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-20 text-center">
+            <Search className="w-12 h-12 mx-auto mb-4 opacity-20" style={{ color: "#3D2B1F" }} />
+            <h3 className="text-xl font-bold mb-2" style={{ color: "#3D2B1F" }}>Batik Tidak Ditemukan</h3>
+            <p style={{ color: "#7A6B5E" }} className="text-sm">Coba kata kunci pencarian lain.</p>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
             <AnimatePresence>
               {items.map((item, idx) => {
                 const pType = getPatternType(item.style_type);
@@ -236,26 +357,34 @@ export function CatalogPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ duration: 0.4, delay: Math.min(idx * 0.05, 0.5) }}
-                    className="group cursor-pointer flex flex-col bg-white rounded-3xl overflow-hidden relative"
+                    className="group cursor-pointer flex flex-col bg-white rounded-2xl overflow-hidden relative"
                     style={{
-                      border: "1px solid rgba(212,184,139,0.15)",
-                      boxShadow: "0 10px 40px rgba(61,43,31,0.04)",
+                      border: "1px solid rgba(212,184,139,0.2)",
+                      boxShadow: "0 2px 10px rgba(61,43,31,0.03)",
                     }}
                     onClick={() => setSelectedBatik(item)}
-                    whileHover={{ y: -6, boxShadow: "0 20px 40px rgba(61,43,31,0.1)" }}
+                    whileHover={{ y: -4, boxShadow: "0 10px 30px rgba(61,43,31,0.08)" }}
                   >
                     {/* Image Area */}
-                    <div className="h-64 sm:h-72 w-full relative overflow-hidden" style={{ background: item.bg_color }}>
+                    <div className="h-56 sm:h-60 w-full relative overflow-hidden" style={{ background: item.bg_color }}>
                       <motion.div 
                         className="w-full h-full"
                         whileHover={{ scale: 1.05 }}
                         transition={{ duration: 0.6, ease: "easeOut" }}
                       >
-                        <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={pType} />
+                        {item.image_url ? (
+                          <img 
+                            src={item.image_url} 
+                            alt={item.name} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={pType} />
+                        )}
                       </motion.div>
                       
                       {/* Overlay Gradient Soft */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/8 to-transparent pointer-events-none" />
 
                       {/* Favorite Button */}
                       <button
@@ -263,50 +392,55 @@ export function CatalogPage() {
                           e.stopPropagation();
                           toggleFavoriteBatik(item.id);
                         }}
-                        className="absolute top-4 right-4 p-2.5 rounded-full bg-white/90 shadow-sm hover:scale-110 transition-all z-10"
+                        className="absolute top-3 right-3 p-2 rounded-full bg-white/95 shadow hover:scale-110 transition-all z-10"
                         title={favoriteBatikIds.includes(item.id) ? "Hapus dari favorit" : "Tambah ke favorit"}
                       >
                         <Heart
-                          className="w-5 h-5"
+                          className="w-4.5 h-4.5"
                           fill={favoriteBatikIds.includes(item.id) ? "#EF4444" : "none"}
                           style={{ color: favoriteBatikIds.includes(item.id) ? "#EF4444" : "#3D2B1F" }}
                         />
                       </button>
 
+                      {/* Sold Badge */}
+                      <div className="absolute top-3 left-3 bg-[#8B6F47]/95 text-white px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm shadow">
+                        {item.sold} Terjual
+                      </div>
+
                       {/* Quick Action Overlay (Visible on Hover) */}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
-                        <span className="bg-white/90 text-gray-900 px-6 py-2.5 rounded-full font-semibold text-sm backdrop-blur-sm transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                        <span className="bg-white text-gray-900 px-5 py-2 rounded-xl font-semibold text-sm transform translate-y-3 group-hover:translate-y-0 transition-all duration-300 shadow-lg">
                           Lihat Detail
                         </span>
                       </div>
                     </div>
 
                     {/* Content Area */}
-                    <div className="p-5 md:p-6 flex flex-col flex-1 relative bg-white">
+                    <div className="p-4 md:p-5 flex flex-col flex-1 relative bg-white">
                       <div className="flex justify-between items-start mb-2">
-                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#A89B8F" }}>
-                          {categories.find((c) => c.value === item.category)?.label || item.category}
-                        </span>
                         <div className="flex items-center gap-1 text-xs font-medium" style={{ color: "#5A4A3E" }}>
                           <Star className="w-3.5 h-3.5 fill-[#D4B88B] text-[#D4B88B]" />
-                          {item.rating}
+                          <span>{item.rating}</span>
                         </div>
                       </div>
 
-                      <h3 className="font-bold text-lg mb-1 truncate" style={{ color: "#3D2B1F" }}>{item.name}</h3>
-                      <p className="text-xs text-gray-500 mb-4 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />{item.origin}</p>
+                      <h3 className="font-semibold text-base mb-1 truncate" style={{ color: "#3D2B1F" }}>{item.name}</h3>
+                      <p className="text-xs text-gray-500 mb-3 flex items-center gap-1" style={{ color: "#7A6B5E" }}>
+                        <MapPin className="w-3 h-3" />{item.origin}
+                      </p>
                       
-                      <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
+                      <div className="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
                         <span className="font-bold text-lg" style={{ color: "#8B6F47" }}>Rp {item.price.toLocaleString("id-ID")}</span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleAddToCart(item, 1);
                           }}
-                          className="p-2.5 rounded-full bg-[#FAF8F5] text-[#3D2B1F] hover:bg-[#3D2B1F] hover:text-white transition-all shadow-sm hover:shadow-md disabled:opacity-50"
+                          className="p-2.5 rounded-xl hover:bg-[#8B6F47] hover:text-white transition-all"
+                          style={{ background: "#FAF8F5", color: "#8B6F47" }}
                           title="Tambah ke Keranjang"
                         >
-                          <ShoppingBag className="w-4 h-4" />
+                          <ShoppingBag className="w-4.5 h-4.5" />
                         </button>
                       </div>
                     </div>

@@ -81,7 +81,15 @@ export function BatikDetailModal({
 
         {/* Left Side: Big Pattern Visual */}
         <div className="w-full md:w-1/2 h-64 md:h-auto relative flex-shrink-0" style={{ background: item.bg_color }}>
-          <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={patternType} />
+          {item.image_url ? (
+            <img 
+              src={item.image_url} 
+              alt={item.name} 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={patternType} />
+          )}
           
           <div className="absolute top-6 left-6 flex flex-col gap-2">
             <span className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-white/90 text-gray-800 shadow-sm backdrop-blur-md">

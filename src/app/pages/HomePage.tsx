@@ -18,6 +18,116 @@ import { useAuth } from "../../lib/AuthContext";
 import { BatikDetailModal } from "../components/BatikDetailModal";
 import { AnimatePresence } from "motion/react";
 
+// Import semua gambar catalog
+import BerasUtahImg from "../../assets/catalog-images/beras_utah.webp";
+import CeplokImg from "../../assets/catalog-images/ceplok.webp";
+import KawungImg from "../../assets/catalog-images/kawung.webp";
+import MegaMendungImg from "../../assets/catalog-images/mega_mendung.webp";
+import ParangImg from "../../assets/catalog-images/parang.webp";
+import SekarJagadImg from "../../assets/catalog-images/sekar_jagad.webp";
+import SidomuktiImg from "../../assets/catalog-images/sidomukti.webp";
+import TruntumImg from "../../assets/catalog-images/truntum.webp";
+
+// Map nama gambar ke import gambar
+const imageMap: Record<string, string> = {
+  "beras_utah.webp": BerasUtahImg,
+  "ceplok.webp": CeplokImg,
+  "kawung.webp": KawungImg,
+  "mega_mendung.webp": MegaMendungImg,
+  "parang.webp": ParangImg,
+  "sekar_jagad.webp": SekarJagadImg,
+  "sidomukti.webp": SidomuktiImg,
+  "truntum.webp": TruntumImg
+};
+
+// Fallback data jika database kosong
+const fallbackCatalogItems: BatikItem[] = [
+  {
+    id: 1,
+    name: "Batik Parang",
+    price: 350000,
+    description: "Motif parang klasik dengan garis diagonal khas batik Jawa yang melambangkan keberanian dan keteguhan hati.",
+    origin: "Jawa Tengah",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 234,
+    style_type: "parang",
+    image_url: ParangImg
+  },
+  {
+    id: 2,
+    name: "Batik Mega Mendung",
+    price: 380000,
+    description: "Motif mega mendung khas Cirebon yang terinspirasi dari awan di langit, melambangkan kedamaian dan kesejukan.",
+    origin: "Cirebon",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 189,
+    style_type: "mega",
+    image_url: MegaMendungImg
+  },
+  {
+    id: 3,
+    name: "Batik Ceplok",
+    price: 320000,
+    description: "Motif ceplok dengan pola geometris yang khas batik Yogyakarta, penuh makna filosofis.",
+    origin: "Yogyakarta",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 156,
+    style_type: "ceplok",
+    image_url: CeplokImg
+  },
+  {
+    id: 4,
+    name: "Batik Sidomukti",
+    price: 390000,
+    description: "Motif sido mukti yang melambangkan kebahagiaan, kemakmuran, dan keselamatan bagi pemakainya.",
+    origin: "Jawa Tengah",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 203,
+    style_type: "sido-mukti",
+    image_url: SidomuktiImg
+  },
+  {
+    id: 5,
+    name: "Batik Truntum",
+    price: 360000,
+    description: "Motif truntum yang melambangkan cinta abadi dan kesetiaan, cocok untuk acara pernikahan.",
+    origin: "Jawa Tengah",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 178,
+    style_type: "parang",
+    image_url: TruntumImg
+  },
+  {
+    id: 6,
+    name: "Batik Kawung",
+    price: 370000,
+    description: "Motif kawung yang terinspirasi dari buah kolang-kaling, melambangkan kesempurnaan dan kebijaksanaan.",
+    origin: "Yogyakarta",
+    primary_color: "#8B6F47",
+    secondary_color: "#D4B88B",
+    bg_color: "#FAF8F5",
+    rating: 5,
+    sold: 165,
+    style_type: "ceplok",
+    image_url: KawungImg
+  }
+];
+
 interface PopularPatternMapped extends BatikItem {
   tag: string;
 }
@@ -201,37 +311,51 @@ export function HomePage() {
           .order("sold", { ascending: false })
           .limit(6);
         
-        if (pError) throw pError;
-              const safePatterns = patternsData || [];
-              if (safePatterns.length > 0) {
-                setPopularPatterns(safePatterns.map((p: any) => ({
-                  ...p,
-                  tag: p.sold > 200 ? "Terlaris" : "Populer"
-                })));
-              } else {
-                setPopularPatterns([]);
+        let safePatterns: BatikItem[] = [];
+        if (pError || !patternsData || patternsData.length === 0) {
+          // Jika database error/kosong, gunakan fallback data
+          safePatterns = [...fallbackCatalogItems];
+        } else {
+          // Map image_url dari database ke import gambar lokal
+          safePatterns = patternsData.map((p: any) => {
+            let mappedItem = { ...p };
+            if (p.image_url) {
+              for (const [filename, imgSrc] of Object.entries(imageMap)) {
+                if (p.image_url.includes(filename)) {
+                  mappedItem.image_url = imgSrc;
+                  break;
+                }
               }
+            }
+            return mappedItem;
+          });
+        }
 
-              // Fetch reviews
-              const { data: reviewsData, error: rError } = await supabase
-                .from("reviews")
-                .select("*")
-                .limit(4);
-              
-              if (rError) throw rError;
-              const safeReviews = reviewsData || [];
-              if (safeReviews.length > 0) {
-                setReviews(safeReviews);
-              } else {
-                setReviews([]);
-              }
+        setPopularPatterns(safePatterns.map((p: any) => ({
+          ...p,
+          tag: p.sold > 200 ? "Terlaris" : "Populer"
+        })));
 
-              // Trending items (mocking growth for now)
-              setTrendingItems(safePatterns.slice(0, 5).map((p: any) => ({
-                name: p.name || "Batik",
-                sold: p.sold || 0,
-                growth: `+${Math.floor(Math.random() * 30) + 10}%`
-              })));
+        // Fetch reviews
+        const { data: reviewsData, error: rError } = await supabase
+          .from("reviews")
+          .select("*")
+          .limit(4);
+        
+        if (rError) throw rError;
+        const safeReviews = reviewsData || [];
+        if (safeReviews.length > 0) {
+          setReviews(safeReviews);
+        } else {
+          setReviews([]);
+        }
+
+        // Trending items (mocking growth for now)
+        setTrendingItems(safePatterns.slice(0, 5).map((p: any) => ({
+          name: p.name || "Batik",
+          sold: p.sold || 0,
+          growth: `+${Math.floor(Math.random() * 30) + 10}%`
+        })));
 
       } catch (err: any) {
         handleSupabaseError(err, "HomePage.fetchData");
@@ -712,7 +836,21 @@ export function HomePage() {
                 >
                   {/* Pattern Preview */}
                   <div className="relative h-52 overflow-hidden" style={{ background: p.bg_color }}>
-                    <BatikPatternPreview type={p.tag || "parang"} primary={p.primary_color} secondary={p.secondary_color} bg={p.bg_color} />
+                    {p.image_url ? (
+                      <motion.div 
+                        className="w-full h-full"
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ duration: 0.6, ease: "easeOut" }}
+                      >
+                        <img 
+                          src={p.image_url} 
+                          alt={p.name} 
+                          className="w-full h-full object-cover"
+                        />
+                      </motion.div>
+                    ) : (
+                      <BatikPatternPreview type={p.style_type || "parang"} primary={p.primary_color} secondary={p.secondary_color} bg={p.bg_color} />
+                    )}
                     
                     {/* Overlay gradient */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />

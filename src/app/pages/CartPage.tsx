@@ -24,6 +24,39 @@ import { toast, Toaster } from "sonner";
 import { Skeleton } from "../components/ui/skeleton";
 import { INDONESIAN_LOCATIONS, PROVINCES } from "../constants/locations";
 
+// Import semua gambar catalog
+import BerasUtahImg from "../../assets/catalog-images/beras_utah.webp";
+import CeplokImg from "../../assets/catalog-images/ceplok.webp";
+import KawungImg from "../../assets/catalog-images/kawung.webp";
+import MegaMendungImg from "../../assets/catalog-images/mega_mendung.webp";
+import ParangImg from "../../assets/catalog-images/parang.webp";
+import SekarJagadImg from "../../assets/catalog-images/sekar_jagad.webp";
+import SidomuktiImg from "../../assets/catalog-images/sidomukti.webp";
+import TruntumImg from "../../assets/catalog-images/truntum.webp";
+
+// Map nama gambar ke import gambar
+const imageMap: Record<string, string> = {
+  "beras_utah.webp": BerasUtahImg,
+  "ceplok.webp": CeplokImg,
+  "kawung.webp": KawungImg,
+  "mega_mendung.webp": MegaMendungImg,
+  "parang.webp": ParangImg,
+  "sekar_jagad.webp": SekarJagadImg,
+  "sidomukti.webp": SidomuktiImg,
+  "truntum.webp": TruntumImg
+};
+
+// Fungsi helper untuk map image_url ke import lokal
+function mapImageUrl(imageUrl: string | undefined): string | undefined {
+  if (!imageUrl) return undefined;
+  for (const [filename, imgSrc] of Object.entries(imageMap)) {
+    if (imageUrl.includes(filename)) {
+      return imgSrc;
+    }
+  }
+  return imageUrl;
+}
+
 // ─── Tipe ──────────────────────────────────────────────────────────────────
 type CheckoutStep = 1 | 2 | 3 | 4;
 
@@ -741,7 +774,11 @@ export function CartPage() {
                           >
                             <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center">
                               {bItem ? (
-                                <PatternThumb bg={bItem.bg_color} primary={bItem.primary_color} />
+                                mapImageUrl(bItem.image_url) ? (
+                                  <img src={mapImageUrl(bItem.image_url)} alt={bItem.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <PatternThumb bg={bItem.bg_color} primary={bItem.primary_color} />
+                                )
                               ) : (cData?.canvasThumbnail || restoredData?.bg_color) ? (
                                 <img src={cData?.canvasThumbnail || restoredData?.bg_color} alt="Custom Design" className="w-full h-full object-cover" />
                               ) : (
@@ -1141,7 +1178,11 @@ export function CartPage() {
                           <div key={item.id} className="flex items-center gap-3 py-2.5 border-b last:border-0" style={{ borderColor: "rgba(212,184,139,0.15)" }}>
                             <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-stone-100 flex items-center justify-center">
                               {bItem ? (
-                                <PatternThumb bg={bItem.bg_color} primary={bItem.primary_color} />
+                                mapImageUrl(bItem.image_url) ? (
+                                  <img src={mapImageUrl(bItem.image_url)} alt={bItem.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <PatternThumb bg={bItem.bg_color} primary={bItem.primary_color} />
+                                )
                               ) : (cData?.canvasThumbnail || restoredData?.bg_color) ? (
                                 <img src={cData?.canvasThumbnail || restoredData?.bg_color} alt="Custom" className="w-full h-full object-cover" />
                               ) : (
