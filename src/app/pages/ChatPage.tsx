@@ -65,6 +65,53 @@ function avatarInitials(name: string) {
   return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
+// ─── Accept Confirmation Dialog ─────────────────────────────────────────────
+function AcceptConfirmDialog({ onCancel, onConfirm, loading, price }: {
+  onCancel: () => void; onConfirm: () => void; loading: boolean; price: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(61,43,31,0.55)", backdropFilter: "blur(6px)" }}
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ scale: 0.92, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 16 }}
+        className="bg-white rounded-3xl w-full max-w-sm p-6"
+        style={{ boxShadow: "0 30px 80px rgba(61,43,31,0.25)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(22,163,74,0.1)" }}>
+          <CheckCircle className="w-7 h-7" style={{ color: "#16A34A" }} />
+        </div>
+        <h3 className="text-lg font-bold text-center mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+          Setujui Penawaran Harga?
+        </h3>
+        <p className="text-sm text-center mb-2" style={{ color: "#7A6B5E", lineHeight: 1.7 }}>
+          Anda akan menyetujui harga sebesar:
+        </p>
+        <p className="text-2xl font-bold text-center mb-6" style={{ color: "#8B6F47" }}>
+          {formatCurrency(price)}
+        </p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all"
+            style={{ border: "1.5px solid rgba(139,111,71,0.2)", color: "#7A6B5E" }}>
+            Batal
+          </button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={onConfirm} disabled={loading}
+            className="flex-1 py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4" />Ya, Setuju</>}
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Rejection Confirmation Dialog ───────────────────────────────────────────
 function RejectConfirmDialog({ onCancel, onConfirm, loading }: {
   onCancel: () => void; onConfirm: () => void; loading: boolean;
@@ -101,7 +148,7 @@ function RejectConfirmDialog({ onCancel, onConfirm, loading }: {
             className="flex-1 py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, #DC2626, #EF4444)" }}
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ShoppingCart className="w-4 h-4" />Ya, Kembalikan ke Keranjang</>}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ShoppingCart className="w-4 h-4" />Ya, Tolak</>}
           </motion.button>
         </div>
       </motion.div>
@@ -125,8 +172,9 @@ export function ChatPage() {
   const [mobileShowChat, setMobileShowChat] = useState(false);
   const [loadingConvos, setLoadingConvos] = useState(true);
 
-  // Rejection flow
+  // Confirmation flows
   const [pendingRejectMsg, setPendingRejectMsg] = useState<{ id: string; orderId: string; priceOffer?: number; itemName?: string } | null>(null);
+  const [pendingAcceptMsg, setPendingAcceptMsg] = useState<{ id: string; orderId: string; price: number } | null>(null);
   const [rejectLoading, setRejectLoading] = useState(false);
   const [acceptingMsgId, setAcceptingMsgId] = useState<string | null>(null);
 
@@ -351,9 +399,14 @@ export function ChatPage() {
   // ── Accept offer ───────────────────────────────────────────────────────────
   const acceptOffer = async (msgId: string, price: number, orderId: string) => {
     if (!user || acceptingMsgId) return;
-    const confirm = window.confirm(`Apakah Anda yakin ingin menyetujui penawaran harga sebesar ${formatCurrency(price)}?`);
-    if (!confirm) return;
+    setPendingAcceptMsg({ id: msgId, orderId, price });
+  };
+
+  const confirmAcceptOffer = async () => {
+    if (!pendingAcceptMsg || !user) return;
+    const { id: msgId, orderId, price } = pendingAcceptMsg;
     setAcceptingMsgId(msgId);
+    setPendingAcceptMsg(null);
     await supabase.from("messages").update({ negotiation_status: "accepted" }).eq("id", msgId);
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, negotiation_status: "accepted" } : m));
     const buyerPrice = price;
@@ -722,8 +775,6 @@ export function ChatPage() {
                                   <motion.button
                                     whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                                     onClick={async () => {
-                                      const confirm = window.confirm("Apakah Anda yakin tidak setuju dengan penawaran harga ini? Pesanan Anda akan dibatalkan.");
-                                      if (!confirm) return;
                                       let itemName: string | undefined;
                                       try {
                                         const { data: ord } = await supabase
@@ -848,6 +899,14 @@ export function ChatPage() {
       </div>
 
       <AnimatePresence>
+        {pendingAcceptMsg && (
+          <AcceptConfirmDialog
+            onCancel={() => setPendingAcceptMsg(null)}
+            onConfirm={confirmAcceptOffer}
+            loading={!!acceptingMsgId}
+            price={pendingAcceptMsg.price}
+          />
+        )}
         {pendingRejectMsg && (
           <RejectConfirmDialog
             onCancel={() => setPendingRejectMsg(null)}

@@ -288,7 +288,7 @@ function PaymentModal({ order, onClose, onPaid }: { order: Order; onClose: () =>
 function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onViewFullPreview, onPay, onReview }: {
   order: Order;
   onClose: () => void;
-  onConfirmReceived: (id: string) => Promise<void>;
+  onConfirmReceived: (id: string) => void;
   onBuyAgain: (order: Order) => Promise<void>;
   onViewFullPreview: (src: string, title: string) => void;
   onPay: (order: Order) => void;
@@ -548,17 +548,11 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
             {order.status === "shipping" && (
               <motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                disabled={confirming}
-                onClick={async () => {
-                  setConfirming(true);
-                  const ok = await onConfirmReceived(order.id);
-                  setConfirming(false);
-                  if (ok) onClose();
-                }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white disabled:opacity-70 cursor-pointer"
+                onClick={() => { onClose(); onConfirmReceived(order.id); }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white cursor-pointer"
                 style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}
               >
-                {confirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4" />Konfirmasi Terima</>}
+                <CheckCircle2 className="w-4 h-4" />Konfirmasi Terima
               </motion.button>
             )}
             {order.status === "delivered" && order.can_review && !order.reviewed && (
@@ -631,6 +625,69 @@ function ImageLightbox({ src, title, onClose }: { src: string; title: string; on
   );
 }
 
+// ─── Confirm Received Dialog ───────────────────────────────────────────────
+function ConfirmReceivedDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    await onConfirm();
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = "unset"; };
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(61,43,31,0.55)", backdropFilter: "blur(4px)" }}
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+        className="bg-white rounded-3xl w-full max-w-md p-6"
+        style={{ boxShadow: "0 30px 80px rgba(61,43,31,0.25)" }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}>
+            <CheckCircle2 className="w-8 h-8 text-white" />
+          </div>
+          <h3 className="text-xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Konfirmasi Penerimaan</h3>
+          <p className="text-sm mt-2" style={{ color: "#7A6B5E" }}>
+            Apakah Anda yakin barang ini telah sampai dengan baik dan ingin menyelesaikan pesanan?
+          </p>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <motion.button
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl font-semibold text-sm"
+            style={{ border: "1.5px solid rgba(139,111,71,0.3)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
+            disabled={loading}
+          >
+            Batal
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={handleConfirm}
+            className="flex-1 py-3 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
+            style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Ya, Konfirmasi"}
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 export function OrdersPage() {
   const { user } = useAuth();
@@ -644,6 +701,7 @@ export function OrdersPage() {
   const [previewImage, setPreviewImage] = useState<{ src: string; title: string } | null>(null);
   const [payingOrder, setPayingOrder] = useState<Order | null>(null);
   const [reviewingOrder, setReviewingOrder] = useState<Order | null>(null);
+  const [confirmingReceived, setConfirmingReceived] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, label = "Teks") => {
     navigator.clipboard.writeText(text);
@@ -679,9 +737,7 @@ export function OrdersPage() {
     }
   }, [location, orders, navigate]);
 
-  const handleConfirmReceived = async (orderId: string): Promise<boolean> => {
-    const confirm = window.confirm("Apakah Anda yakin barang ini telah sampai dengan baik dan ingin menyelesaikan pesanan?");
-    if (!confirm) return false;
+  const handleConfirmReceived = async (orderId: string): Promise<void> => {
     try {
       const { error } = await supabase.from("orders")
         .update({ status: "delivered", delivered_date: new Date().toISOString(), can_review: true })
@@ -689,10 +745,8 @@ export function OrdersPage() {
       if (error) throw error;
       toast.success("Pesanan dikonfirmasi diterima! Silakan berikan ulasan Anda. 🎉");
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "delivered", delivered_date: new Date().toISOString(), can_review: true } : o));
-      return true;
     } catch { 
       toast.error("Gagal mengkonfirmasi pesanan"); 
-      return false;
     }
   };
 
@@ -733,12 +787,19 @@ export function OrdersPage() {
   const handlePaid = async (orderId: string, method: string) => {
     try {
       const paymentMethod = method as Order["payment_method"];
+      const targetOrder = orders.find(o => o.id === orderId);
+      const needsAdminVerification = targetOrder?.type === "custom";
+      const nextPaymentStatus = needsAdminVerification ? "awaiting_verification" : "paid";
       const { error } = await supabase.from("orders")
-        .update({ payment_status: "awaiting_verification", payment_method: paymentMethod })
+        .update({ payment_status: nextPaymentStatus, payment_method: paymentMethod })
         .eq("id", orderId).eq("user_id", user!.id);
       if (error) throw error;
-      toast.success("Konfirmasi pembayaran terkirim! Menunggu verifikasi admin. 🎉");
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_status: "awaiting_verification", payment_method: paymentMethod } : o));
+      toast.success(
+        needsAdminVerification
+          ? "Konfirmasi pembayaran terkirim! Menunggu verifikasi admin. 🎉"
+          : "Pembayaran berhasil dikonfirmasi. Pesanan langsung diproses. 🎉"
+      );
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_status: nextPaymentStatus, payment_method: paymentMethod } : o));
     } catch { toast.error("Gagal mengirim konfirmasi pembayaran"); }
   };
 
@@ -1205,9 +1266,9 @@ export function OrdersPage() {
 
                       {order.status === "shipping" && (
                         <button
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            await handleConfirmReceived(order.id);
+                            setConfirmingReceived(order.id);
                           }}
                           className="px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-1.5"
                           style={{
@@ -1264,7 +1325,7 @@ export function OrdersPage() {
           <OrderDetailModal
             order={selectedOrder}
             onClose={() => setSelectedOrder(null)}
-            onConfirmReceived={handleConfirmReceived}
+            onConfirmReceived={(orderId) => setConfirmingReceived(orderId)}
             onBuyAgain={handleBuyAgain}
             onViewFullPreview={(src, title) => setPreviewImage({ src, title })}
             onPay={(o) => { setSelectedOrder(null); setPayingOrder(o); }}
@@ -1296,6 +1357,17 @@ export function OrdersPage() {
             src={previewImage.src}
             title={previewImage.title}
             onClose={() => setPreviewImage(null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {confirmingReceived && (
+          <ConfirmReceivedDialog
+            onConfirm={async () => {
+              await handleConfirmReceived(confirmingReceived);
+              setConfirmingReceived(null);
+            }}
+            onCancel={() => setConfirmingReceived(null)}
           />
         )}
       </AnimatePresence>

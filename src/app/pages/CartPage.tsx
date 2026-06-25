@@ -6,6 +6,14 @@ import {
   Building2, Navigation, Hash, StickyNote, BadgeCheck, Palette, Store, MessageCircle, X,
   BookUser, Check
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { cn } from "../components/ui/utils";
 import { Link, useNavigate, useLocation } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
 import { useAuth } from "../../lib/AuthContext";
@@ -14,6 +22,7 @@ import { supabase } from "../../lib/supabase";
 import { CartItem, ShippingAddress } from "../../types/database";
 import { toast, Toaster } from "sonner";
 import { Skeleton } from "../components/ui/skeleton";
+import { INDONESIAN_LOCATIONS, PROVINCES } from "../constants/locations";
 
 // ─── Tipe ──────────────────────────────────────────────────────────────────
 type CheckoutStep = 1 | 2 | 3 | 4;
@@ -26,16 +35,6 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; desc: string; icon: R
   { id: "gopay", label: "GoPay", desc: "Bayar via aplikasi Gojek", icon: <img src="https://upload.wikimedia.org/wikipedia/commons/8/86/Gopay_logo.svg" alt="GoPay" className="h-5 md:h-6 object-contain" />, color: "#00AED6" },
   { id: "ovo", label: "OVO", desc: "Bayar via aplikasi OVO", icon: <img src="https://upload.wikimedia.org/wikipedia/commons/e/eb/Logo_ovo_purple.svg" alt="OVO" className="h-5 md:h-6 object-contain" />, color: "#4C3494" },
   { id: "cod", label: "Bayar di Tempat (COD)", desc: "Bayar saat paket tiba", icon: <Package className="w-6 h-6" style={{ color: "#5A3D2B" }} />, color: "#5A3D2B" },
-];
-
-const PROVINCES = [
-  "DKI Jakarta", "Jawa Barat", "Jawa Tengah", "DI Yogyakarta", "Jawa Timur",
-  "Banten", "Bali", "Sumatera Utara", "Sumatera Barat", "Riau", "Kepulauan Riau",
-  "Jambi", "Sumatera Selatan", "Bengkulu", "Lampung", "Bangka Belitung",
-  "Kalimantan Barat", "Kalimantan Tengah", "Kalimantan Selatan", "Kalimantan Timur",
-  "Kalimantan Utara", "Sulawesi Utara", "Sulawesi Tengah", "Sulawesi Selatan",
-  "Sulawesi Tenggara", "Gorontalo", "Sulawesi Barat", "Maluku", "Maluku Utara",
-  "Papua Barat", "Papua", "NTB", "NTT", "Aceh",
 ];
 
 // ─── Store Helper ────────────────────────────────────────────────────────────
@@ -143,25 +142,41 @@ export function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [approvedStores, setApprovedStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<CheckoutStep>(((location.state as any)?.step) || 1);
+  
+  // Load step from sessionStorage or location state
+  const [step, setStep] = useState<CheckoutStep>(() => {
+    const savedStep = sessionStorage.getItem('checkoutStep');
+    if (savedStep) return parseInt(savedStep, 10) as CheckoutStep;
+    return ((location.state as any)?.step) || 1;
+  });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
+  const [finalTotal, setFinalTotal] = useState<number>(0);
+  const [finalHasCustom, setFinalHasCustom] = useState<boolean>(false);
   
   // Dari penolakan negosiasi - paksa flow ke Pilih Toko
   const forceCustomStep = !!(location.state as any)?.forceCustomStep;
   const restoredItem = (location.state as any)?.restoredItem || null;
 
-  // Step 2 — Alamat
-  const [address, setAddress] = useState<ShippingAddress>(((location.state as any)?.address) || {
-    name: user?.user_metadata?.full_name || "",
-    phone: "",
-    street: "",
-    city: "",
-    province: "",
-    postal_code: "",
+  // Step 2 — Alamat (load from sessionStorage)
+  const [address, setAddress] = useState<ShippingAddress>(() => {
+    const savedAddress = sessionStorage.getItem('checkoutAddress');
+    if (savedAddress) return JSON.parse(savedAddress);
+    return ((location.state as any)?.address) || {
+      name: user?.user_metadata?.full_name || "",
+      phone: "",
+      street: "",
+      city: "",
+      province: "",
+      postal_code: "",
+    };
   });
   const [addressErrors, setAddressErrors] = useState<Partial<ShippingAddress>>({});
-  const [notes, setNotes] = useState("");
+  
+  const [notes, setNotes] = useState<string>(() => {
+    return sessionStorage.getItem('checkoutNotes') || "";
+  });
 
   // Address Book state in Cart
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -211,41 +226,93 @@ export function CartPage() {
     }
   }, [user]);
 
-  // Step 3 — Pembayaran
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer_bca");
+  // Step 3 — Pembayaran (load from sessionStorage)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
+    return (sessionStorage.getItem('checkoutPaymentMethod') as PaymentMethod) || "transfer_bca";
+  });
 
-  // Step 3 — Pilih Toko (custom flow)
-  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
+  // Step 3 — Pilih Toko (custom flow, load from sessionStorage)
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(() => {
+    const saved = sessionStorage.getItem('checkoutSelectedStoreId');
+    return saved ? parseInt(saved, 10) : null;
+  });
 
   const SHIPPING_COST = 20000;
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
-  const fetchCartItems = useCallback(async () => {
+  const fetchCartItems = useCallback(async (showLoading = true) => {
     if (!user) { setLoading(false); return; }
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const data = await fetchFullCart();
       setCartItems(data || []);
     } catch (err) {
       toast.error("Gagal memuat keranjang belanja");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  }, [user, fetchFullCart]);
+  }, [user?.id, fetchFullCart]);
+
+  // Save checkout state to sessionStorage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('checkoutStep', step.toString());
+  }, [step]);
+
+  useEffect(() => {
+    sessionStorage.setItem('checkoutAddress', JSON.stringify(address));
+  }, [address]);
+
+  useEffect(() => {
+    sessionStorage.setItem('checkoutNotes', notes);
+  }, [notes]);
+
+  useEffect(() => {
+    sessionStorage.setItem('checkoutPaymentMethod', paymentMethod);
+  }, [paymentMethod]);
+
+  useEffect(() => {
+    if (selectedStoreId) {
+      sessionStorage.setItem('checkoutSelectedStoreId', selectedStoreId.toString());
+    } else {
+      sessionStorage.removeItem('checkoutSelectedStoreId');
+    }
+  }, [selectedStoreId]);
+
+  // Clear sessionStorage when order is successful
+  useEffect(() => {
+    if (successOrderId) {
+      sessionStorage.removeItem('checkoutStep');
+      sessionStorage.removeItem('checkoutAddress');
+      sessionStorage.removeItem('checkoutNotes');
+      sessionStorage.removeItem('checkoutPaymentMethod');
+      sessionStorage.removeItem('checkoutSelectedStoreId');
+    }
+  }, [successOrderId]);
 
   useEffect(() => { 
-    fetchCartItems();
-    fetchSavedAddresses();
-    const fetchStores = async () => {
-      try {
-        const { data } = await supabase.from("stores").select("*").eq("status", "approved");
-        if (data) setApprovedStores(data);
-      } catch (err) {
-        console.error("Gagal memuat toko:", err);
-      }
+    let mounted = true;
+
+    const initData = async () => {
+      if (!user?.id || !mounted) return;
+      
+      // Fetch data without showing full-page loader if we already have items
+      const showLoader = cartItems.length === 0;
+      await Promise.all([
+        fetchCartItems(showLoader),
+        fetchSavedAddresses()
+      ]);
+
+      if (!mounted) return;
+      const { data } = await supabase.from("stores").select("*").eq("status", "approved");
+      if (data && mounted) setApprovedStores(data);
     };
-    fetchStores();
-  }, [fetchCartItems, fetchSavedAddresses]);
+
+    initData();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]); // Only re-run if user identity changes, not on token refresh
 
   // ── Quantity ──────────────────────────────────────────────────────────────
   const updateQuantity = async (id: string, currentQty: number, delta: number) => {
@@ -337,7 +404,7 @@ export function CartPage() {
             date: new Date().toISOString(),
             quantity: item.quantity,
             payment_method: hasCustomItems ? "cod" : paymentMethod,
-            payment_status: "pending",
+            payment_status: isCustom ? "pending" : "paid",
             shipping_address: address,
             notes: notes || null,
           };
@@ -406,6 +473,8 @@ export function CartPage() {
       }
 
       // Clear cart
+      setFinalTotal(total);
+      setFinalHasCustom(hasCustomItems);
       await supabase.from("cart_items").delete().eq("user_id", user.id);
       setCartItems([]);
       refreshCart();
@@ -524,15 +593,15 @@ export function CartPage() {
               <div className="flex justify-between items-center text-sm">
                 <span style={{ color: "#7A6B5E" }}>Total Tagihan</span>
                 <span className="font-bold text-xl" style={{ color: "#8B6F47" }}>
-                      {!hasCustomItems ? `Rp ${total.toLocaleString("id-ID")}` : "Rp xxx.xxx"}
+                      {!finalHasCustom ? `Rp ${finalTotal.toLocaleString("id-ID")}` : "Rp xxx.xxx"}
                     </span>
               </div>
               
-              {paymentMethod !== "cod" && (
+              {!finalHasCustom && (
                 <div className="pt-4 mt-2 border-t" style={{ borderColor: "rgba(212,184,139,0.2)" }}>
                   <p className="text-xs leading-relaxed flex items-start gap-2" style={{ color: "#7A6B5E" }}>
-                    <span className="text-base">⏰</span>
-                    <span>Selesaikan pembayaran dalam <strong style={{ color: "#D97706" }}>24 jam</strong> agar pesanan tidak dibatalkan otomatis oleh sistem.</span>
+                    <span className="text-base">✓</span>
+                    <span>Pembayaran pesanan katalog sudah tercatat dari checkout keranjang. Pesanan tinggal masuk proses pengiriman.</span>
                   </p>
                 </div>
               )}
@@ -760,50 +829,169 @@ export function CartPage() {
                       </div>
                     )}
 
-                    {[
-                      { key: "name", label: "Nama Penerima", icon: User, placeholder: "Nama lengkap" },
-                      { key: "phone", label: "Nomor HP", icon: Phone, placeholder: "08xx-xxxx-xxxx" },
-                      { key: "street", label: "Alamat Jalan", icon: Navigation, placeholder: "Nama jalan, nomor rumah, RT/RW, kelurahan" },
-                      { key: "city", label: "Kota / Kabupaten", icon: Building2, placeholder: "Cth: Sidoarjo" },
-                      { key: "postal_code", label: "Kode Pos", icon: Hash, placeholder: "5 digit kode pos" },
-                    ].map(field => (
-                      <div key={field.key}>
-                        <label className="block text-sm font-medium mb-1.5" style={{ color: "#5A4A3E" }}>{field.label}</label>
-                        <div className="relative">
-                          <field.icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#B8A898" }} />
-                          <input
-                            type="text"
-                            value={(address as any)[field.key]}
-                            onChange={e => { setAddress(prev => ({ ...prev, [field.key]: e.target.value })); setAddressErrors(prev => ({ ...prev, [field.key]: undefined })); }}
-                            placeholder={field.placeholder}
-                            maxLength={field.key === "postal_code" ? 5 : undefined}
-                            className="w-full pl-10 pr-4 py-3 rounded-xl outline-none text-sm transition-all"
-                            style={{
-                              border: `1.5px solid ${(addressErrors as any)[field.key] ? "#ef4444" : "rgba(139,111,71,0.2)"}`,
-                              background: "#FAFAF8",
-                              color: "#3D2B1F",
-                            }}
-                          />
-                        </div>
-                        {(addressErrors as any)[field.key] && (
-                          <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{(addressErrors as any)[field.key]}</p>
-                        )}
+                    {/* Name */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5" style={{ color: "#5A4A3E" }}>Nama Penerima</label>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#B8A898" }} />
+                        <input
+                          type="text"
+                          value={address.name}
+                          onChange={e => { setAddress(prev => ({ ...prev, name: e.target.value })); setAddressErrors(prev => ({ ...prev, name: undefined })); }}
+                          placeholder="Nama lengkap"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl outline-none text-sm transition-all hover:border-amber-200 focus:border-[#8B6F47]"
+                          style={{
+                            border: `1.5px solid ${addressErrors.name ? "#ef4444" : "rgba(139,111,71,0.2)"}`,
+                            background: "#FAFAF8",
+                            color: "#3D2B1F",
+                          }}
+                        />
                       </div>
-                    ))}
+                      {addressErrors.name && <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{addressErrors.name}</p>}
+                    </div>
+
+                    {/* Phone */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5" style={{ color: "#5A4A3E" }}>Nomor HP</label>
+                      <div className="relative">
+                        <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#B8A898" }} />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={address.phone}
+                          onChange={e => { 
+                            const val = e.target.value.replace(/[^0-9]/g, "");
+                            setAddress(prev => ({ ...prev, phone: val })); 
+                            setAddressErrors(prev => ({ ...prev, phone: undefined })); 
+                          }}
+                          placeholder="08xx-xxxx-xxxx"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl outline-none text-sm transition-all hover:border-amber-200 focus:border-[#8B6F47]"
+                          style={{
+                            border: `1.5px solid ${addressErrors.phone ? "#ef4444" : "rgba(139,111,71,0.2)"}`,
+                            background: "#FAFAF8",
+                            color: "#3D2B1F",
+                          }}
+                        />
+                      </div>
+                      {addressErrors.phone && <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{addressErrors.phone}</p>}
+                    </div>
 
                     {/* Province */}
                     <div>
                       <label className="block text-sm font-medium mb-1.5" style={{ color: "#5A4A3E" }}>Provinsi</label>
-                      <select
+                      <Select
                         value={address.province}
-                        onChange={e => { setAddress(prev => ({ ...prev, province: e.target.value })); setAddressErrors(prev => ({ ...prev, province: undefined })); }}
-                        className="w-full px-4 py-3 rounded-xl outline-none text-sm appearance-none"
-                        style={{ border: `1.5px solid ${addressErrors.province ? "#ef4444" : "rgba(139,111,71,0.2)"}`, background: "#FAFAF8", color: address.province ? "#3D2B1F" : "#C4B5A5" }}
+                        onValueChange={(newProvince) => { 
+                          setAddress(prev => ({ 
+                            ...prev, 
+                            province: newProvince, 
+                            city: "", 
+                            postal_code: "" 
+                          })); 
+                          setAddressErrors(prev => ({ ...prev, province: undefined, city: undefined, postal_code: undefined })); 
+                        }}
                       >
-                        <option value="">Pilih Provinsi</option>
-                        {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
+                        <SelectTrigger
+                          className={cn(
+                            "w-full px-4 py-3 rounded-xl text-sm transition-all",
+                            addressErrors.province ? "border-red-500" : "border-[rgba(139,111,71,0.2)]"
+                          )}
+                          style={{ 
+                            background: "#FAFAF8", 
+                            color: address.province ? "#3D2B1F" : "#C4B5A5"
+                          }}
+                        >
+                          <SelectValue placeholder="Pilih Provinsi" />
+                        </SelectTrigger>
+                        <SelectContent sideOffset={6} className="max-h-[300px]">
+                          {PROVINCES.map(p => (
+                            <SelectItem key={p} value={p}>
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {addressErrors.province && <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{addressErrors.province}</p>}
+                    </div>
+
+                    {/* City */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5" style={{ color: "#5A4A3E" }}>Kota / Kabupaten</label>
+                      <Select
+                        value={address.city}
+                        onValueChange={(newCity) => { 
+                          setAddress(prev => ({ 
+                            ...prev, 
+                            city: newCity
+                          })); 
+                          setAddressErrors(prev => ({ ...prev, city: undefined, postal_code: undefined })); 
+                        }}
+                        disabled={!address.province}
+                      >
+                        <SelectTrigger
+                          className={cn(
+                            "w-full px-4 py-3 rounded-xl text-sm transition-all",
+                            addressErrors.city ? "border-red-500" : "border-[rgba(139,111,71,0.2)]"
+                          )}
+                          style={{ 
+                            background: "#FAFAF8", 
+                            color: address.city ? "#3D2B1F" : "#C4B5A5"
+                          }}
+                        >
+                          <SelectValue placeholder="Pilih Kota / Kabupaten" />
+                        </SelectTrigger>
+                        <SelectContent sideOffset={6} className="max-h-[300px]">
+                          {INDONESIAN_LOCATIONS.find(loc => loc.province === address.province)?.cities.map(city => (
+                            <SelectItem key={city.name} value={city.name}>
+                              {city.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {addressErrors.city && <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{addressErrors.city}</p>}
+                    </div>
+
+                    {/* Street Address */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5" style={{ color: "#5A4A3E" }}>Nama Jalan, Gedung, No. Rumah</label>
+                      <div className="relative">
+                        <Navigation className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#B8A898" }} />
+                        <input
+                          type="text"
+                          value={address.street}
+                          onChange={e => { setAddress(prev => ({ ...prev, street: e.target.value })); setAddressErrors(prev => ({ ...prev, street: undefined })); }}
+                          placeholder="Nama jalan, gedung, nomor rumah, RT/RW, kelurahan"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl outline-none text-sm transition-all hover:border-amber-200 focus:border-[#8B6F47]"
+                          style={{
+                            border: `1.5px solid ${addressErrors.street ? "#ef4444" : "rgba(139,111,71,0.2)"}`,
+                            background: "#FAFAF8",
+                            color: "#3D2B1F",
+                          }}
+                        />
+                      </div>
+                      {addressErrors.street && <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{addressErrors.street}</p>}
+                    </div>
+
+                    {/* Postal Code */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5" style={{ color: "#5A4A3E" }}>Kode Pos</label>
+                      <div className="relative">
+                        <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#B8A898" }} />
+                        <input
+                          type="text"
+                          value={address.postal_code}
+                          onChange={e => { setAddress(prev => ({ ...prev, postal_code: e.target.value })); setAddressErrors(prev => ({ ...prev, postal_code: undefined })); }}
+                          placeholder="5 digit kode pos"
+                          maxLength={5}
+                          className="w-full pl-10 pr-4 py-3 rounded-xl outline-none text-sm transition-all hover:border-amber-200 focus:border-[#8B6F47]"
+                          style={{
+                            border: `1.5px solid ${addressErrors.postal_code ? "#ef4444" : "rgba(139,111,71,0.2)"}`,
+                            background: "#FAFAF8",
+                            color: "#3D2B1F",
+                          }}
+                        />
+                      </div>
+                      {addressErrors.postal_code && <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{addressErrors.postal_code}</p>}
                     </div>
 
                     {/* Save to address book */}
@@ -836,7 +1024,7 @@ export function CartPage() {
                       <textarea
                         value={notes}
                         onChange={e => setNotes(e.target.value)}
-                        placeholder="Cth: Tolong bungkus rapi karena untuk hadiah..."
+                        placeholder="Contoh: Pilih warna latar transparan, tambahkan pagar hitam..."
                         rows={3}
                         className="w-full px-4 py-3 rounded-xl outline-none text-sm resize-none"
                         style={{ border: "1.5px solid rgba(139,111,71,0.2)", background: "#FAFAF8", color: "#3D2B1F" }}

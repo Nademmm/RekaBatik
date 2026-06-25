@@ -1810,7 +1810,7 @@ export function CustomBatikPage() {
 
     // [#27] Track start state of scaling/cropping
     canvas.on("before:transform", (e) => {
-      const obj = e.transform?.target;
+      const obj = e.transform?.target as any;
       if (obj && obj.type === "image") {
         obj.data = obj.data || {};
         obj.data.startScaleX = obj.scaleX ?? 1;
@@ -2591,10 +2591,11 @@ export function CustomBatikPage() {
     }
 
     // Save current crop and transform properties to prevent setSrc from resetting them
+    const activeObjAny = activeObj as any;
     const currentWidth = activeObj.width;
     const currentHeight = activeObj.height;
-    const currentCropX = activeObj.cropX;
-    const currentCropY = activeObj.cropY;
+    const currentCropX = activeObjAny.cropX;
+    const currentCropY = activeObjAny.cropY;
     const currentScaleX = activeObj.scaleX;
     const currentScaleY = activeObj.scaleY;
     const currentLeft = activeObj.left;
@@ -2605,13 +2606,13 @@ export function CustomBatikPage() {
         activeObj.set({
           width: currentWidth,
           height: currentHeight,
-          cropX: currentCropX,
-          cropY: currentCropY,
           scaleX: currentScaleX,
           scaleY: currentScaleY,
           left: currentLeft,
           top: currentTop,
-        });
+        } as any);
+        activeObjAny.cropX = currentCropX;
+        activeObjAny.cropY = currentCropY;
         data.colorPresetName = selectedPreset.name;
         data.customColor = customColor;
         activeObj.setCoords();

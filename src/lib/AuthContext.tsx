@@ -36,8 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       setUserRole(resolveRole(session?.user ?? null));
@@ -46,16 +49,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setUserRole(resolveRole(session?.user ?? null));
+      (event, session) => {
+        if (!mounted) return;
+
+        // Only update if session ID or user ID changed, or if it's a critical event
+        // This prevents re-renders on every token refresh if the user object is technically new but the same identity
+        if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setUserRole(resolveRole(session?.user ?? null));
+        } else if (session?.user?.id !== user?.id) {
+          // Fallback check if identity changed during other events
+          setSession(session);
+          setUser(session?.user ?? null);
+          setUserRole(resolveRole(session?.user ?? null));
+        }
+
         setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [user?.id]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();

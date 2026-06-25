@@ -42,6 +42,14 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { Label } from "../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { INDONESIAN_LOCATIONS, PROVINCES } from "../constants/locations";
 import type { BatikItem, Store as StoreType } from "../../types/database";
 
 function getInitials(user: {
@@ -1430,8 +1438,12 @@ export function ProfilePage() {
               <Label htmlFor="addrPhone" className="text-xs font-bold text-[#5A4A3E]">Nomor HP</Label>
               <Input
                 id="addrPhone"
+                inputMode="numeric"
                 value={addressForm.phone}
-                onChange={(e) => setAddressForm(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, "");
+                  setAddressForm(prev => ({ ...prev, phone: val }));
+                }}
                 placeholder="Contoh: 08123456789"
                 className="mt-1.5 rounded-xl text-xs"
                 style={{ borderColor: "rgba(212,184,139,0.35)", height: 38 }}
@@ -1452,44 +1464,63 @@ export function ProfilePage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="addrCity" className="text-xs font-bold text-[#5A4A3E]">Kota / Kabupaten</Label>
-                <Input
-                  id="addrCity"
-                  value={addressForm.city}
-                  onChange={(e) => setAddressForm(prev => ({ ...prev, city: e.target.value }))}
-                  placeholder="Contoh: Sidoarjo"
-                  className="mt-1.5 rounded-xl text-xs"
-                  style={{ borderColor: "rgba(212,184,139,0.35)", height: 38 }}
-                />
+                <Label htmlFor="addrProvince" className="text-xs font-bold text-[#5A4A3E]">Provinsi</Label>
+                <Select
+                  value={addressForm.province}
+                  onValueChange={(val) => setAddressForm(prev => ({ ...prev, province: val, city: "", postal_code: "" }))}
+                >
+                  <SelectTrigger
+                    id="addrProvince"
+                    className="mt-1.5 h-9 rounded-xl text-xs transition-all border-[rgba(212,184,139,0.35)]"
+                    style={{ background: "#fff", color: addressForm.province ? "#3D2B1F" : "#C4B5A5" }}
+                  >
+                    <SelectValue placeholder="Pilih Provinsi" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {PROVINCES.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label htmlFor="addrPostal" className="text-xs font-bold text-[#5A4A3E]">Kode Pos</Label>
-                <Input
-                  id="addrPostal"
-                  value={addressForm.postal_code}
-                  onChange={(e) => setAddressForm(prev => ({ ...prev, postal_code: e.target.value }))}
-                  placeholder="5 digit angka"
-                  maxLength={5}
-                  className="mt-1.5 rounded-xl text-xs"
-                  style={{ borderColor: "rgba(212,184,139,0.35)", height: 38 }}
-                />
+                <Label htmlFor="addrCity" className="text-xs font-bold text-[#5A4A3E]">Kota / Kabupaten</Label>
+                <Select
+                  value={addressForm.city}
+                  onValueChange={(val) => setAddressForm(prev => ({ ...prev, city: val }))}
+                  disabled={!addressForm.province}
+                >
+                  <SelectTrigger
+                    id="addrCity"
+                    className="mt-1.5 h-9 rounded-xl text-xs transition-all border-[rgba(212,184,139,0.35)]"
+                    style={{ background: "#fff", color: addressForm.city ? "#3D2B1F" : "#C4B5A5" }}
+                  >
+                    <SelectValue placeholder="Pilih Kota" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {INDONESIAN_LOCATIONS.find(loc => loc.province === addressForm.province)?.cities.map((city) => (
+                      <SelectItem key={city.name} value={city.name}>{city.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="addrProvince" className="text-xs font-bold text-[#5A4A3E]">Provinsi</Label>
-              <select
-                id="addrProvince"
-                value={addressForm.province}
-                onChange={(e) => setAddressForm(prev => ({ ...prev, province: e.target.value }))}
-                className="w-full mt-1.5 px-3 py-2 border rounded-xl outline-none text-xs"
-                style={{ borderColor: "rgba(212,184,139,0.35)", background: "#fff", height: 38, color: addressForm.province ? "#3D2B1F" : "#C4B5A5" }}
-              >
-                <option value="">Pilih Provinsi</option>
-                {PROVINCES.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
+              <Label htmlFor="addrPostal" className="text-xs font-bold text-[#5A4A3E]">Kode Pos</Label>
+              <Input
+                id="addrPostal"
+                value={addressForm.postal_code}
+                inputMode="numeric"
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, "");
+                  setAddressForm(prev => ({ ...prev, postal_code: val }));
+                }}
+                placeholder="5 digit angka"
+                maxLength={5}
+                className="mt-1.5 rounded-xl text-xs"
+                style={{ borderColor: "rgba(212,184,139,0.35)", height: 38 }}
+              />
             </div>
           </div>
           <AlertDialogFooter className="gap-2 pt-2">
@@ -1507,13 +1538,3 @@ export function ProfilePage() {
     </div>
   );
 }
-
-const PROVINCES = [
-  "DKI Jakarta", "Jawa Barat", "Jawa Tengah", "DI Yogyakarta", "Jawa Timur",
-  "Banten", "Bali", "Sumatera Utara", "Sumatera Barat", "Riau", "Kepulauan Riau",
-  "Jambi", "Sumatera Selatan", "Bengkulu", "Lampung", "Bangka Belitung",
-  "Kalimantan Barat", "Kalimantan Tengah", "Kalimantan Selatan", "Kalimantan Timur",
-  "Kalimantan Utara", "Sulawesi Utara", "Sulawesi Tengah", "Sulawesi Selatan",
-  "Sulawesi Tenggara", "Gorontalo", "Sulawesi Barat", "Maluku", "Maluku Utara",
-  "Papua Barat", "Papua", "NTB", "NTT", "Aceh",
-];
