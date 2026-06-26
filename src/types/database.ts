@@ -71,6 +71,9 @@ export interface Store {
   featured: boolean;
   description: string;
   motifs: string[];
+  gallery?: string[];
+  team?: string[];
+  hero_image?: string;
   status?: "pending" | "approved" | "rejected";
   owner_id?: string;
 }

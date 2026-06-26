@@ -2,124 +2,21 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   MapPin, Phone, Clock, Star, ChevronLeft, Users, Award,
-  ShoppingBag, Camera, Heart, Share2
+  ShoppingBag, Heart, Share2, Edit
 } from "lucide-react";
 import { Link, useParams, useNavigate } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/AuthContext";
 import { toast } from "sonner";
+import type { Store } from "../../types/database";
+import { Skeleton } from "../components/ui/skeleton";
 
-const villageImg = "https://images.unsplash.com/photo-1661011612361-4e0704509a58?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmFkaXRpb25hbCUyMEphdmFuZXNlJTIwaG91c2UlMjB2aWxsYWdlJTIwc3RyZWV0fGVufDF8fHx8MTc3NzUyMDI0MHww&ixlib=rb-4.1.0&q=80&w=1080";
-const artisanImg = "https://images.unsplash.com/photo-1527650003412-4c330a38fdf5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXRpayUyMGFydGlzYW4lMjBjcmFmdHNtYW4lMjBwYWludGluZyUyMHdheHxlbnwxfHx8fDE3Nzc1MjAyMjZ8MA&ixlib=rb-4.1.0&q=80&w=1080";
-const workshopImg = "https://images.unsplash.com/photo-1759655058313-3f29dbf686ff?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXRpayUyMHdvcmtzaG9wJTIwcHJvZHVjdGlvbiUyMGR5ZWluZyUyMGNsb3RoefGVufDF8fHx8MTc3NzUyMDI0MXww&ixlib=rb-4.1.0&q=80&w=1080";
-const storeImg = "https://images.unsplash.com/photo-1776000680547-8f301e8d07b3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXRpayUyY2xvdGhlcyUyMGZhc2hpb24lMjBkaXNwbGF5JTIwc3RvcmV8GVufDF8fHx8MTc3NzUyMDIzNnww&ixlib=rb-4.1.0&q=80&w=1080";
-const batikFabricImg = "https://images.unsplash.com/photo-1761516659902-2994696b362e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXRpayUyZmFicmljJTIwdGV4dGlsZSUyMEluZG9uZXNpYW4lMjB0cmFkaXRpb25hbHwGVufDF8fHx8MTc3NzUyMDIyNnw=&ixlib=rb-4.1.0&q=80&w=1080";
-const shopImg = "https://images.unsplash.com/photo-1530603103472-faaa353d8ab0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmFkaXRpb25hbCUyMEluZG9uZXNpYW4lMjB2aWxsYWdlJTIwdGV4dGlsZSUyMHNob3B8GVufDF8fHx8MTc3NzUyMDIzMHww&ixlib=rb-4.1.0&q=80&w=1080";
-
-type Store = {
-  id: number;
-  name: string;
-  owner: string;
-  established: string;
-  specialty: string;
-  address: string;
-  phone: string;
-  hours: string;
-  rating: number;
-  review_count: number;
-  price_range: string;
-  tags: string[];
-  image: string;
-  featured: boolean;
-  description: string;
-  motifs: string[];
-  gallery?: string[];
-  team?: string[];
+// Default fallback images
+const defaultImages = {
+  hero: "https://images.unsplash.com/photo-1661011612361-4e0704509a58?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1080",
+  store: "https://images.unsplash.com/photo-1776000680547-8f301e8d07b3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=1080"
 };
-
-const mockStores: Store[] = [
-  {
-    id: 1,
-    name: "Batik Amri Jetis",
-    owner: "Pak Amri",
-    established: "1978",
-    specialty: "Batik Tulis Beras Utah",
-    address: "Jl. Raya Jetis No. 12",
-    phone: "+62 812-3456-7890",
-    hours: "08:00 - 17:00",
-    rating: 4.9,
-    review_count: 256,
-    price_range: "Rp 500.000 - Rp 3.000.000",
-    tags: ["Batik Tulis", "Custom", "Tradisional"],
-    image: artisanImg,
-    featured: true,
-    description: "Toko batik tertua di Jetis yang terkenal dengan motif Beras Utah asli, dibuat dengan tangan oleh pengrajin berpengalaman. Setiap motif dikerjakan dengan teliti dan penuh cinta selama beberapa hari untuk menghasilkan kualitas terbaik.",
-    motifs: ["Beras Utah", "Kawung", "Sidomukti", "Parang", "Gurda"],
-    gallery: [artisanImg, storeImg, workshopImg, batikFabricImg],
-    team: ["Pak Amri (Pemilik)", "Bu Siti (Pengrajin)", "Pak Budi (Pengrajin)"]
-  },
-  {
-    id: 2,
-    name: "Batik Siti Collection",
-    owner: "Bu Siti",
-    established: "1995",
-    specialty: "Batik Cap Modern",
-    address: "Jl. Batik Jetis No. 45",
-    phone: "+62 821-9876-5432",
-    hours: "07:30 - 18:00",
-    rating: 4.8,
-    review_count: 189,
-    price_range: "Rp 250.000 - Rp 1.500.000",
-    tags: ["Batik Cap", "Modern", "Wedding"],
-    image: shopImg,
-    featured: false,
-    description: "Koleksi batik cap modern dengan motif flora dan fauna yang fresh dan cocok untuk fashion sehari-hari. Kami juga menerima pesanan batik untuk acara khusus seperti wedding dan company event.",
-    motifs: ["Mega Mendung", "Bunga Melati", "Burung Merak", "Bunga Tulip"],
-    gallery: [shopImg, villageImg, storeImg],
-    team: ["Bu Siti (Pemilik)", "Mbak Rina (Designer)"]
-  },
-  {
-    id: 3,
-    name: "Rumah Batik Hartono",
-    owner: "Pak Hartono",
-    established: "1985",
-    specialty: "Batik Tulis Premium",
-    address: "Jl. Jetis Barat No. 28",
-    phone: "+62 819-8765-4321",
-    hours: "09:00 - 20:00",
-    rating: 5.0,
-    review_count: 312,
-    price_range: "Rp 1.000.000 - Rp 10.000.000",
-    tags: ["Batik Tulis", "Premium", "Custom"],
-    image: workshopImg,
-    featured: false,
-    description: "Studio batik premium yang menerima pesanan custom dengan detail dan kualitas terbaik untuk koleksi pribadi. Kami menggunakan bahan sutra dan pewarna alami untuk hasil batik yang mewah dan tahan lama.",
-    motifs: ["Sido Mulyo", "Lereng", "Semen Gedhe", "Parang Rusak"],
-    gallery: [workshopImg, batikFabricImg, storeImg],
-    team: ["Pak Hartono (Pemilik & Seniman)"]
-  },
-  {
-    id: 4,
-    name: "Batik Jetis Muda",
-    owner: "Kak Dian",
-    established: "2015",
-    specialty: "Batik Kontemporer",
-    address: "Jl. Raya Jetis No. 67",
-    phone: "+62 856-7890-1234",
-    hours: "10:00 - 21:00",
-    rating: 4.7,
-    review_count: 98,
-    price_range: "Rp 300.000 - Rp 2.000.000",
-    tags: ["Modern", "Kontemporer", "Young"],
-    image: batikFabricImg,
-    featured: false,
-    description: "Wajah baru batik Indonesia dengan desain kontemporer yang cocok untuk anak muda dan fashion forward. Kami menggabungkan motif tradisional dengan warna dan gaya modern.",
-    motifs: ["Geometric", "Abstract", "Modern Kawung", "Digital Print"],
-    gallery: [batikFabricImg, shopImg],
-    team: ["Kak Dian (Pemilik & Designer)"]
-  }
-];
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -140,6 +37,32 @@ function StarRating({ rating }: { rating: number }) {
 
 const MotionLink = motion(Link);
 
+// Fallback store data
+const fallbackStore: Store = {
+  id: 1,
+  name: "Batik Amri Jetis",
+  owner: "Pak Amri",
+  established: "1978",
+  specialty: "Batik Tulis Beras Utah",
+  address: "Jl. Raya Jetis No. 12",
+  phone: "+62 812-3456-7890",
+  hours: "08:00 - 17:00",
+  rating: 4.9,
+  review_count: 256,
+  price_range: "Rp 500.000 - Rp 3.000.000",
+  tags: ["Batik Tulis", "Custom", "Tradisional"],
+  image: defaultImages.store,
+  featured: true,
+  description: "Toko batik tertua di Jetis yang terkenal dengan motif Beras Utah asli, dibuat dengan tangan oleh pengrajin berpengalaman.",
+  motifs: ["Beras Utah", "Kawung", "Sidomukti", "Parang", "Gurda"],
+  gallery: [
+    "https://images.unsplash.com/photo-1527650003412-4c330a38fdf5?w=1080",
+    defaultImages.store,
+    "https://images.unsplash.com/photo-1759655058313-3f29dbf686ff?w=1080"
+  ],
+  team: ["Pak Amri (Pemilik)", "Bu Siti (Pengrajin)", "Pak Budi (Pengrajin)"]
+};
+
 export function DesaJetisStoreDetailPage() {
   const { storeId } = useParams<{ storeId: string }>();
   const navigate = useNavigate();
@@ -148,6 +71,7 @@ export function DesaJetisStoreDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [loadingFavorite, setLoadingFavorite] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
@@ -167,27 +91,21 @@ export function DesaJetisStoreDetailPage() {
 
         if (error) throw error;
         
-        // If not found in Supabase, use mock (for testing)
         if (!data) {
-          const foundStore = mockStores.find(s => s.id === id);
-          setStore(foundStore || mockStores[0]);
+          setStore(fallbackStore);
         } else {
-          // Ensure arrays are never null/undefined
           setStore({
             ...data,
             tags: data.tags || [],
             motifs: data.motifs || [],
             gallery: data.gallery || [],
             team: data.team || [],
-          } as Store);
+          });
         }
       } catch (error) {
         console.error("Failed to fetch store:", error);
+        setStore(fallbackStore);
         toast.error("Gagal memuat data toko");
-        // Fallback to mock
-        const id = parseInt(storeId || "0");
-        const foundStore = mockStores.find(s => s.id === id);
-        setStore(foundStore || mockStores[0]);
       } finally {
         setLoading(false);
       }
@@ -195,10 +113,17 @@ export function DesaJetisStoreDetailPage() {
     fetchStore();
   }, [storeId]);
 
+  // Check if current user is the owner
+  useEffect(() => {
+    if (user && store) {
+      setIsOwner(user.id === store.owner_id);
+    }
+  }, [user, store]);
+
   // Fetch favorite status
   useEffect(() => {
     const fetchFavorite = async () => {
-      if (!user) {
+      if (!user || !store) {
         setIsFavorite(false);
         return;
       }
@@ -208,7 +133,7 @@ export function DesaJetisStoreDetailPage() {
           .from("favorite_stores")
           .select("id")
           .eq("user_id", user.id)
-          .eq("store_id", storeId);
+          .eq("store_id", store.id);
 
         if (error) throw error;
         setIsFavorite(data && data.length > 0);
@@ -219,7 +144,7 @@ export function DesaJetisStoreDetailPage() {
     if (storeId && user) {
       fetchFavorite();
     }
-  }, [storeId, user]);
+  }, [storeId, user, store]);
 
   // Toggle favorite
   const toggleFavorite = async (event: React.MouseEvent) => {
@@ -233,9 +158,10 @@ export function DesaJetisStoreDetailPage() {
 
     setLoadingFavorite(true);
     try {
-      const id = parseInt(storeId || "0");
+      const id = store?.id;
+      if (!id) return;
+      
       if (isFavorite) {
-        // Remove from favorites
         const { error } = await supabase
           .from("favorite_stores")
           .delete()
@@ -246,7 +172,6 @@ export function DesaJetisStoreDetailPage() {
         setIsFavorite(false);
         toast.success("Dihapus dari favorit");
       } else {
-        // Add to favorites
         const { error } = await supabase
           .from("favorite_stores")
           .insert([{ user_id: user.id, store_id: id }]);
@@ -293,9 +218,9 @@ export function DesaJetisStoreDetailPage() {
         <div className="animate-pulse">
           <div className="h-[50vh] bg-gray-200"></div>
           <div className="container mx-auto px-6 py-12">
-            <div className="h-8 bg-gray-200 rounded mb-4 w-1/3"></div>
-            <div className="h-4 bg-gray-200 rounded mb-2 w-1/2"></div>
-            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+            <Skeleton className="h-8 w-1/3 rounded mb-4" />
+            <Skeleton className="h-4 w-1/2 rounded mb-2" />
+            <Skeleton className="h-4 w-2/3 rounded" />
           </div>
         </div>
       </div>
@@ -316,7 +241,7 @@ export function DesaJetisStoreDetailPage() {
             Toko Tidak Ditemukan
           </h1>
           <p style={{ color: "#7A6B5E", marginBottom: "2rem", fontSize: "1rem", lineHeight: "1.6" }}>
-            Maaf, toko yang Anda cari tidak dapat ditemukan. Silakan kembali ke halaman Desa Jetis untuk melihat daftar toko yang tersedia.
+            Maaf, toko yang Anda cari tidak dapat ditemukan.
           </p>
           <button 
             onClick={() => navigate("/desa-jetis")}
@@ -331,13 +256,15 @@ export function DesaJetisStoreDetailPage() {
     );
   }
 
+  const heroImage = store.hero_image || store.image || defaultImages.hero;
+
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF8F5", minHeight: "100vh" }}>
       {/* Hero Section */}
       <section className="relative">
         <div className="absolute inset-0 max-h-[71vh]">
           <img 
-            src={store.image} 
+            src={heroImage} 
             alt={store.name} 
             className="w-full h-full object-cover"
           />
@@ -361,9 +288,19 @@ export function DesaJetisStoreDetailPage() {
             transition={{ duration: 0.6 }}
             className="max-w-3xl"
           >
-            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "3.5rem", color: "#FAF8F5", marginBottom: "1rem", lineHeight: "1.1" }}>
-              {store.name}
-            </h1>
+            <div className="flex items-center gap-4 mb-4">
+              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "3.5rem", color: "#FAF8F5", marginBottom: "1rem", lineHeight: "1.1" }}>
+                {store.name}
+              </h1>
+              {isOwner && (
+                <Link 
+                  to="/profile?tab=store" 
+                  className="p-2 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors"
+                >
+                  <Edit className="w-5 h-5 text-white" />
+                </Link>
+              )}
+            </div>
             <p style={{ color: "rgba(250, 248, 245, 0.85)", fontSize: "1.25rem", marginBottom: "1.5rem" }}>
               {store.specialty}
             </p>

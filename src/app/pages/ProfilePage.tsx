@@ -21,6 +21,7 @@ import {
   Phone,
   Trash2,
   Plus,
+  Edit,
 } from "lucide-react";
 import { useNavigate, Link } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
@@ -66,13 +67,14 @@ function getInitials(user: {
   return (user.email || "U").slice(0, 2).toUpperCase();
 }
 
-type TabId = "account" | "favorites" | "orders" | "support" | "addresses";
+type TabId = "account" | "favorites" | "orders" | "support" | "addresses" | "store";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "account", label: "Akun", icon: <User className="w-4 h-4" /> },
   { id: "addresses", label: "Alamat", icon: <MapPin className="w-4 h-4" /> },
   { id: "favorites", label: "Favorit", icon: <Heart className="w-4 h-4" /> },
   { id: "orders", label: "Pesanan", icon: <Package className="w-4 h-4" /> },
+  { id: "store", label: "Kelola Toko", icon: <Store className="w-4 h-4" /> },
   { id: "support", label: "Bantuan", icon: <MessageCircle className="w-4 h-4" /> },
 ];
 
@@ -220,7 +222,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export function ProfilePage() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, userRole } = useAuth();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<TabId>("account");
@@ -263,6 +265,118 @@ export function ProfilePage() {
     postal_code: "",
     is_default: false,
   });
+
+  // Store Management state
+  const [store, setStore] = useState<StoreType | null>(null);
+  const [loadingStore, setLoadingStore] = useState(true);
+  const [isEditingStore, setIsEditingStore] = useState(false);
+  const [savingStore, setSavingStore] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [storeForm, setStoreForm] = useState({
+    name: "",
+    owner: "",
+    established: "",
+    specialty: "",
+    address: "",
+    phone: "",
+    hours_start: "",
+    hours_end: "",
+    price_min: "",
+    price_max: "",
+    description: "",
+    image: "",
+    hero_image: "",
+    tags: "" as string,
+    motifs: "" as string,
+    gallery: "" as string,
+    team: "" as string,
+  });
+
+  const canManageStoreFromProfile =
+    userRole === "artisan" && store?.status === "approved";
+
+  const visibleTabs = TABS.filter(
+    (tab) => tab.id !== "store" || canManageStoreFromProfile,
+  );
+
+  // Function to upload file to Supabase Storage
+  const uploadFile = async (file: File, folder: string) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `${folder}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('store-images')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data } = supabase.storage
+        .from('store-images')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Gagal mengunggah file');
+      return null;
+    }
+  };
+
+  // Handle file change for store image
+  const handleStoreImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Hanya file gambar yang diizinkan');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Ukuran file tidak boleh lebih dari 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    const url = await uploadFile(file, 'store-profiles');
+    if (url) {
+      setStoreForm(prev => ({ ...prev, image: url }));
+      toast.success('Gambar toko berhasil diunggah');
+    }
+    setUploadingImage(false);
+  };
+
+  // Handle file change for hero image
+  const handleHeroImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Hanya file gambar yang diizinkan');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Ukuran file tidak boleh lebih dari 10MB');
+      return;
+    }
+
+    setUploadingHero(true);
+    const url = await uploadFile(file, 'store-heroes');
+    if (url) {
+      setStoreForm(prev => ({ ...prev, hero_image: url }));
+      toast.success('Gambar hero berhasil diunggah');
+    }
+    setUploadingHero(false);
+  };
 
   const fetchAddresses = async () => {
     if (!user) return;
@@ -429,15 +543,167 @@ export function ProfilePage() {
     }
   };
 
+  const fetchStore = async () => {
+    if (!user) return;
+    try {
+      setLoadingStore(true);
+      const { data, error } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("owner_id", user.id)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error; // PGRST116 means no rows found
+
+      if (data) {
+        setStore(data as StoreType);
+        
+        // Parse existing hours and price_range
+        let hours_start = "";
+        let hours_end = "";
+        if (data.hours) {
+          const parts = data.hours.split(/[-–—]/);
+          if (parts.length >= 2) {
+            hours_start = parts[0].trim();
+            hours_end = parts[1].trim();
+          }
+        }
+
+        let price_min = "";
+        let price_max = "";
+        if (data.price_range) {
+          const parts = data.price_range.split(/[-–—]/);
+          if (parts.length >= 2) {
+            // Extract numbers only
+            price_min = parts[0].replace(/[^0-9]/g, '');
+            price_max = parts[1].replace(/[^0-9]/g, '');
+          }
+        }
+
+        setStoreForm({
+          name: data.name || "",
+          owner: data.owner || "",
+          established: data.established || "",
+          specialty: data.specialty || "",
+          address: data.address || "",
+          phone: data.phone || "",
+          hours_start,
+          hours_end,
+          price_min,
+          price_max,
+          description: data.description || "",
+          image: data.image || "",
+          hero_image: data.hero_image || "",
+          tags: (data.tags || []).join(", "),
+          motifs: (data.motifs || []).join(", "),
+          gallery: (data.gallery || []).join(", "),
+          team: (data.team || []).join(", "),
+        });
+      }
+    } catch {
+      toast.error("Gagal memuat data toko");
+    } finally {
+      setLoadingStore(false);
+    }
+  };
+
+  const formatRupiah = (angka: string) => {
+    if (!angka) return "";
+    const num = parseInt(angka.replace(/[^0-9]/g, ''));
+    if (isNaN(num)) return "";
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+  };
+
+  const handleSaveStore = async () => {
+    if (!user) return;
+    if (!canManageStoreFromProfile) {
+      toast.error("Akses kelola toko hanya tersedia untuk pengrajin yang sudah disetujui admin");
+      return;
+    }
+    setSavingStore(true);
+    try {
+      // Format hours and price range
+      const hours = storeForm.hours_start && storeForm.hours_end 
+        ? `${storeForm.hours_start} - ${storeForm.hours_end}` 
+        : "";
+      
+      const price_range = storeForm.price_min && storeForm.price_max 
+        ? `Rp ${parseInt(storeForm.price_min).toLocaleString('id-ID')} - Rp ${parseInt(storeForm.price_max).toLocaleString('id-ID')}` 
+        : "";
+
+      const payload = {
+        name: storeForm.name,
+        owner: storeForm.owner,
+        established: storeForm.established,
+        specialty: storeForm.specialty,
+        address: storeForm.address,
+        phone: storeForm.phone,
+        hours,
+        price_range,
+        description: storeForm.description,
+        image: storeForm.image,
+        hero_image: storeForm.hero_image,
+        tags: storeForm.tags.split(",").map((s) => s.trim()).filter(Boolean),
+        motifs: storeForm.motifs.split(",").map((s) => s.trim()).filter(Boolean),
+        gallery: storeForm.gallery.split(",").map((s) => s.trim()).filter(Boolean),
+        team: storeForm.team.split(",").map((s) => s.trim()).filter(Boolean),
+        owner_id: user.id,
+        // Default values for required fields
+        rating: 0,
+        review_count: 0,
+        featured: false,
+      };
+
+      if (store?.id) {
+        const { error } = await supabase
+          .from("stores")
+          .update(payload)
+          .eq("id", store.id);
+        if (error) throw error;
+        toast.success("Toko berhasil diperbarui");
+      } else {
+        const { error } = await supabase
+          .from("stores")
+          .insert([payload]);
+        if (error) throw error;
+        toast.success("Toko berhasil dibuat");
+      }
+
+      await fetchStore();
+      setIsEditingStore(false);
+    } catch (err: any) {
+      console.error("Error saving store full:", err);
+      console.error("Error message:", err?.message);
+      console.error("Error details:", err?.details);
+      toast.error(err?.message || err?.hint || "Gagal menyimpan data toko");
+    } finally {
+      setSavingStore(false);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       setFullName(user.user_metadata?.full_name || "");
       setEmail(user.email || "");
       fetchFavorites();
       fetchAddresses();
+      if (userRole === "artisan") {
+        fetchStore();
+      } else {
+        setStore(null);
+        setLoadingStore(false);
+        setIsEditingStore(false);
+      }
     }
     setLoading(false);
-  }, [user]);
+  }, [user, userRole]);
+
+  useEffect(() => {
+    if (activeTab === "store" && !canManageStoreFromProfile) {
+      setActiveTab("account");
+      setIsEditingStore(false);
+    }
+  }, [activeTab, canManageStoreFromProfile]);
 
   const handleSaveName = async () => {
     if (!user) return;
@@ -665,7 +931,7 @@ export function ProfilePage() {
             boxShadow: "0 1px 3px rgba(61,43,31,0.05)",
           }}
         >
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -1263,6 +1529,556 @@ export function ProfilePage() {
                   <ChevronRight className="w-4 h-4 ml-1.5" />
                 </Button>
               </Link>
+            </SectionCard>
+          </motion.div>
+        )}
+
+        {/* ── Tab: Kelola Toko ── */}
+        {activeTab === "store" && canManageStoreFromProfile && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4"
+          >
+            <SectionCard
+              icon={<Store className="w-4 h-4" />}
+              title="Informasi Toko"
+              description="Kelola detail dan informasi toko Anda"
+            >
+              {loadingStore ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {isEditingStore ? (
+                    <>
+                      <FieldRow label="Nama Toko">
+                        <Input
+                          value={storeForm.name}
+                          onChange={(e) => setStoreForm({ ...storeForm, name: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                        />
+                      </FieldRow>
+                      <FieldRow label="Nama Pemilik">
+                        <Input
+                          value={storeForm.owner}
+                          onChange={(e) => setStoreForm({ ...storeForm, owner: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                        />
+                      </FieldRow>
+                      <FieldRow label="Tahun Berdiri">
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          min="1900"
+                          max={new Date().getFullYear()}
+                          value={storeForm.established}
+                          onChange={(e) => setStoreForm({ ...storeForm, established: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                          placeholder="2020"
+                        />
+                      </FieldRow>
+                      <FieldRow label="Keahlian / Spesialisasi">
+                        <Input
+                          value={storeForm.specialty}
+                          onChange={(e) => setStoreForm({ ...storeForm, specialty: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                        />
+                      </FieldRow>
+                      <FieldRow label="Alamat Toko">
+                        <Input
+                          value={storeForm.address}
+                          onChange={(e) => setStoreForm({ ...storeForm, address: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                        />
+                      </FieldRow>
+                      <FieldRow label="Nomor Telepon">
+                        <Input
+                          value={storeForm.phone}
+                          onChange={(e) => setStoreForm({ ...storeForm, phone: e.target.value.replace(/[^0-9]/g, "") })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                          inputMode="numeric"
+                        />
+                      </FieldRow>
+                      <FieldRow label="Jam Operasional">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <p className="text-xs text-[#9B8C80] mb-1">Dari</p>
+                            <Input
+                              type="time"
+                              value={storeForm.hours_start}
+                              onChange={(e) => setStoreForm({ ...storeForm, hours_start: e.target.value })}
+                              className="rounded-xl text-sm"
+                              style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                            />
+                          </div>
+                          <span className="text-lg text-[#8B6F47]">–</span>
+                          <div className="flex-1">
+                            <p className="text-xs text-[#9B8C80] mb-1">Sampai</p>
+                            <Input
+                              type="time"
+                              value={storeForm.hours_end}
+                              onChange={(e) => setStoreForm({ ...storeForm, hours_end: e.target.value })}
+                              className="rounded-xl text-sm"
+                              style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                            />
+                          </div>
+                        </div>
+                      </FieldRow>
+                      <FieldRow label="Rentang Harga">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <p className="text-xs text-[#9B8C80] mb-1">Minimum</p>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#8B6F47]">Rp</span>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                value={storeForm.price_min ? parseInt(storeForm.price_min).toLocaleString('id-ID') : ''}
+                                onChange={(e) => {
+                                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                  setStoreForm({ ...storeForm, price_min: rawValue });
+                                }}
+                                className="rounded-xl text-sm pl-12"
+                                style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                                placeholder="500.000"
+                              />
+                            </div>
+                          </div>
+                          <span className="text-lg text-[#8B6F47]">–</span>
+                          <div className="flex-1">
+                            <p className="text-xs text-[#9B8C80] mb-1">Maksimum</p>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#8B6F47]">Rp</span>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                value={storeForm.price_max ? parseInt(storeForm.price_max).toLocaleString('id-ID') : ''}
+                                onChange={(e) => {
+                                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                                  setStoreForm({ ...storeForm, price_max: rawValue });
+                                }}
+                                className="rounded-xl text-sm pl-12"
+                                style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                                placeholder="3.000.000"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </FieldRow>
+                      <FieldRow label="Deskripsi Toko">
+                        <textarea
+                          value={storeForm.description}
+                          onChange={(e) => setStoreForm({ ...storeForm, description: e.target.value })}
+                          rows={4}
+                          className="w-full p-3 rounded-xl outline-none transition-all text-sm"
+                          style={{ border: "1px solid rgba(212,184,139,0.35)", color: "#3D2B1F", resize: "vertical" }}
+                        />
+                      </FieldRow>
+                      <FieldRow label="Gambar Toko" hint="Unggah gambar untuk profil toko (max 5MB)">
+                        <div className="space-y-3">
+                          {/* Preview */}
+                          {storeForm.image && (
+                            <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-[rgba(212,184,139,0.3)]">
+                              <img
+                                src={storeForm.image}
+                                alt="Preview gambar toko"
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setStoreForm({ ...storeForm, image: '' })}
+                                className="absolute top-2 right-2 p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* File Upload */}
+                          <label className="flex items-center justify-center w-full h-12 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderColor: 'rgba(139,111,71,0.4)' }}>
+                            {uploadingImage ? (
+                              <div className="flex items-center gap-2 text-sm" style={{ color: '#8B6F47' }}>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Mengunggah...</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-sm" style={{ color: '#8B6F47' }}>
+                                <Plus className="w-4 h-4" />
+                                <span>{storeForm.image ? 'Ganti gambar' : 'Pilih gambar'}</span>
+                              </div>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleStoreImageChange}
+                              disabled={uploadingImage}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {/* Optional URL input */}
+                          <Input
+                            value={storeForm.image}
+                            onChange={(e) => setStoreForm({ ...storeForm, image: e.target.value })}
+                            className="rounded-xl text-sm"
+                            style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                            placeholder="Atau masukkan URL gambar..."
+                          />
+                        </div>
+                      </FieldRow>
+                      
+                      <FieldRow label="Gambar Hero Toko" hint="Unggah gambar hero untuk halaman toko (max 10MB)">
+                        <div className="space-y-3">
+                          {/* Preview */}
+                          {storeForm.hero_image && (
+                            <div className="relative w-full h-48 rounded-2xl overflow-hidden border border-[rgba(212,184,139,0.3)]">
+                              <img
+                                src={storeForm.hero_image}
+                                alt="Preview gambar hero"
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setStoreForm({ ...storeForm, hero_image: '' })}
+                                className="absolute top-2 right-2 p-1.5 bg-white rounded-full shadow-md hover:bg-gray-100"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* File Upload */}
+                          <label className="flex items-center justify-center w-full h-12 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderColor: 'rgba(139,111,71,0.4)' }}>
+                            {uploadingHero ? (
+                              <div className="flex items-center gap-2 text-sm" style={{ color: '#8B6F47' }}>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Mengunggah...</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-sm" style={{ color: '#8B6F47' }}>
+                                <Plus className="w-4 h-4" />
+                                <span>{storeForm.hero_image ? 'Ganti gambar' : 'Pilih gambar'}</span>
+                              </div>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleHeroImageChange}
+                              disabled={uploadingHero}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {/* Optional URL input */}
+                          <Input
+                            value={storeForm.hero_image}
+                            onChange={(e) => setStoreForm({ ...storeForm, hero_image: e.target.value })}
+                            className="rounded-xl text-sm"
+                            style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                            placeholder="Atau masukkan URL gambar..."
+                          />
+                        </div>
+                      </FieldRow>
+                      <FieldRow label="Tag / Kategori" hint="Pisahkan dengan koma (contoh: Batik Tulis, Custom, Tradisional)">
+                        <Input
+                          value={storeForm.tags}
+                          onChange={(e) => setStoreForm({ ...storeForm, tags: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                        />
+                      </FieldRow>
+                      <FieldRow label="Motif Unggulan" hint="Pisahkan dengan koma (contoh: Parang, Kawung, Mega Mendung)">
+                        <Input
+                          value={storeForm.motifs}
+                          onChange={(e) => setStoreForm({ ...storeForm, motifs: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                        />
+                      </FieldRow>
+                      <FieldRow label="Galeri Toko" hint="Pisahkan URL gambar dengan koma">
+                        <Input
+                          value={storeForm.gallery}
+                          onChange={(e) => setStoreForm({ ...storeForm, gallery: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                        />
+                      </FieldRow>
+                      <FieldRow label="Tim Toko" hint="Pisahkan dengan koma (contoh: Pak Amri, Bu Siti)">
+                        <Input
+                          value={storeForm.team}
+                          onChange={(e) => setStoreForm({ ...storeForm, team: e.target.value })}
+                          className="rounded-xl text-sm"
+                          style={{ borderColor: "rgba(212,184,139,0.35)", height: 42 }}
+                        />
+                      </FieldRow>
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          onClick={handleSaveStore}
+                          disabled={savingStore}
+                          className="flex-1 rounded-xl font-semibold"
+                          style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "#fff", height: 42 }}
+                        >
+                          {savingStore ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                              Menyimpan...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Simpan
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setIsEditingStore(false);
+                            if (store) {
+                              // Parse existing hours and price_range for cancel
+                              let hours_start = "";
+                              let hours_end = "";
+                              if (store.hours) {
+                                const parts = store.hours.split(/[-–—]/);
+                                if (parts.length >= 2) {
+                                  hours_start = parts[0].trim();
+                                  hours_end = parts[1].trim();
+                                }
+                              }
+
+                              let price_min = "";
+                              let price_max = "";
+                              if (store.price_range) {
+                                const parts = store.price_range.split(/[-–—]/);
+                                if (parts.length >= 2) {
+                                  price_min = parts[0].replace(/[^0-9]/g, '');
+                                  price_max = parts[1].replace(/[^0-9]/g, '');
+                                }
+                              }
+
+                              setStoreForm({
+                                name: store.name || "",
+                                owner: store.owner || "",
+                                established: store.established || "",
+                                specialty: store.specialty || "",
+                                address: store.address || "",
+                                phone: store.phone || "",
+                                hours_start,
+                                hours_end,
+                                price_min,
+                                price_max,
+                                description: store.description || "",
+                                image: store.image || "",
+                                hero_image: store.hero_image || "",
+                                tags: (store.tags || []).join(", "),
+                                motifs: (store.motifs || []).join(", "),
+                                gallery: (store.gallery || []).join(", "),
+                                team: (store.team || []).join(", "),
+                              });
+                            }
+                          }}
+                          className="rounded-xl font-semibold"
+                          style={{ height: 42 }}
+                        >
+                          Batal
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {store ? (
+                        <div className="space-y-4">
+                          {/* Hero Image Preview */}
+                          {store.hero_image && (
+                            <div className="w-full h-48 rounded-2xl overflow-hidden border border-[rgba(212,184,139,0.3)]">
+                              <img
+                                src={store.hero_image}
+                                alt="Hero gambar toko"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Store Image Preview */}
+                          {store.image && (
+                            <div className="w-32 h-32 rounded-2xl overflow-hidden border border-[rgba(212,184,139,0.3)]">
+                              <img
+                                src={store.image}
+                                alt="Gambar profil toko"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                                Nama Toko
+                              </p>
+                              <p className="text-base font-semibold" style={{ color: "#3D2B1F" }}>
+                                {store.name || "-"}
+                              </p>
+                            </div>
+                            {store.id && (
+                              <Link
+                                to={`/desa-jetis/${store.id}`}
+                                className="p-2 rounded-xl hover:bg-[#FAF8F5] transition-colors"
+                                target="_blank"
+                              >
+                                <Eye className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                              </Link>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                                Pemilik
+                              </p>
+                              <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>
+                                {store.owner || "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                                Tahun Berdiri
+                              </p>
+                              <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>
+                                {store.established || "-"}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                              Keahlian
+                            </p>
+                            <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>
+                              {store.specialty || "-"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                              Alamat
+                            </p>
+                            <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>
+                              {store.address || "-"}
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                                Telepon
+                              </p>
+                              <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>
+                                {store.phone || "-"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                                Jam Operasional
+                              </p>
+                              <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>
+                                {store.hours || "-"}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                              Rentang Harga
+                            </p>
+                            <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>
+                              {store.price_range || "-"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#9B8C80" }}>
+                              Deskripsi
+                            </p>
+                            <p className="text-sm font-medium leading-relaxed" style={{ color: "#7A6B5E" }}>
+                              {store.description || "-"}
+                            </p>
+                          </div>
+                          {(store.tags || []).length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#9B8C80" }}>
+                                Tag
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {(store.tags || []).map((tag, i) => (
+                                  <span
+                                    key={i}
+                                    className="px-3 py-1.5 rounded-full text-xs font-medium"
+                                    style={{ background: "rgba(212,184,139,0.15)", color: "#8B6F47", border: "1px solid rgba(212,184,139,0.3)" }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {(store.motifs || []).length > 0 && (
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#9B8C80" }}>
+                                Motif Unggulan
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {(store.motifs || []).map((motif, i) => (
+                                  <span
+                                    key={i}
+                                    className="px-3 py-1.5 rounded-xl text-xs font-medium"
+                                    style={{ background: "linear-gradient(135deg, rgba(61,43,31,0.05), rgba(212,184,139,0.1))", color: "#3D2B1F", border: "1px solid rgba(212,184,139,0.2)" }}
+                                  >
+                                    {motif}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsEditingStore(true)}
+                            className="w-full rounded-xl font-semibold mt-4"
+                            style={{ borderColor: "rgba(139,111,71,0.35)", color: "#8B6F47", height: 42 }}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Toko
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-center py-10">
+                          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(139,111,71,0.08)" }}>
+                            <Store className="w-7 h-7" style={{ color: "#8B6F47" }} />
+                          </div>
+                          <p className="text-sm font-semibold mb-1" style={{ color: "#3D2B1F" }}>Belum Ada Toko</p>
+                          <p className="text-xs mb-4" style={{ color: "#9B8C80" }}>
+                            Buat toko Anda dan mulai berjualan batik
+                          </p>
+                          <Button
+                            onClick={() => setIsEditingStore(true)}
+                            className="rounded-xl font-semibold"
+                            style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "#fff", height: 42 }}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Buat Toko
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </SectionCard>
           </motion.div>
         )}

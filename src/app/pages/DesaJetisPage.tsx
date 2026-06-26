@@ -78,7 +78,10 @@ export function DesaJetisPage() {
   const fetchStores = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("stores").select("*").eq("status", "approved");
+      const { data, error } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("status", "approved");
       if (error) throw error;
       setStores(data || []);
     } catch (error) {

@@ -59,34 +59,174 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 
-// Import batik SVGs
-import parangBatikSvg from "../../assets/batik-svgs/parang_batik.svg?raw";
-import parangNewSvg from "../../assets/batik-svgs/parang.svg?raw";
-import megaMendungNewSvg from "../../assets/batik-svgs/mega_mendung.svg?raw";
-import bunga1Svg from "../../assets/batik-svgs/bunga1.svg?raw";
-import bunga2Svg from "../../assets/batik-svgs/bunga2.svg?raw";
-import ceplokSvg from "../../assets/batik-svgs/ceplok.svg?raw";
-import sidomuktiSvg from "../../assets/batik-svgs/sidomukti.svg?raw";
-import bunga3Svg from "../../assets/batik-svgs/bunga3.svg?raw";
-import tiesSvg from "../../assets/batik-svgs/ties.svg?raw";
-import terataiSvg from "../../assets/batik-svgs/teratai.svg?raw";
-import urangSvg from "../../assets/batik-svgs/urang.svg?raw";
-import iwakSvg from "../../assets/batik-svgs/iwak.svg?raw";
+const normalizeStyleType = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/\.svg$/i, "")
+    .replace(/[_\s]+/g, "-");
 
-// Mapping style_type ke SVG
-const batikSvgMap: Record<string, string> = {
-  parang: parangBatikSvg,
-  "parang-new": parangNewSvg,
-  mega: megaMendungNewSvg,
-  "sido-mukti": sidomuktiSvg,
-  bunga1: bunga1Svg,
-  bunga2: bunga2Svg,
-  ceplok: ceplokSvg,
-  bunga3: bunga3Svg,
-  ties: tiesSvg,
-  teratai: terataiSvg,
-  urang: urangSvg,
-  iwak: iwakSvg,
+const formatPatternName = (value: string) =>
+  value
+    .replace(/([a-zA-Z])(\d)/g, "$1 $2")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+const batikSvgModules = import.meta.glob("../../assets/batik-svgs/*.svg", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+const batikAssetSvgMap = Object.fromEntries(
+  Object.entries(batikSvgModules).map(([path, svg]) => {
+    const fileName = path.split("/").pop() ?? "";
+    return [normalizeStyleType(fileName), svg];
+  }),
+);
+
+const batikSvgMap: Record<string, string> = Object.fromEntries(
+  Object.entries({
+    ...batikAssetSvgMap,
+    parang: batikAssetSvgMap["parang-batik"],
+    "parang-new": batikAssetSvgMap.parang,
+    mega: batikAssetSvgMap["mega-mendung"],
+    "sido-mukti": batikAssetSvgMap.sidomukti,
+  }).filter(([, svg]) => Boolean(svg)),
+) as Record<string, string>;
+
+const getBatikSvg = (styleType?: string) => {
+  if (!styleType) return undefined;
+  return batikSvgMap[normalizeStyleType(styleType)];
+};
+
+const batikAssetStyleTypeMap: Record<string, string> = {
+  "parang-batik": "parang",
+  parang: "parang-new",
+  "mega-mendung": "mega",
+  sidomukti: "sido-mukti",
+};
+
+const batikAssetMeta: Record<string, Partial<BatikItem>> = {
+  "parang-batik": {
+    name: "Parang Klasik",
+    description: "Motif parang klasik dengan garis diagonal khas batik Jawa.",
+    origin: "Jawa Tengah",
+  },
+  parang: {
+    name: "Parang Baru",
+    description: "Motif parang dengan detail yang lebih modern untuk kanvas custom.",
+    origin: "Jawa Tengah",
+  },
+  "mega-mendung": {
+    name: "Mega Mendung",
+    description: "Motif awan khas Cirebon yang lembut dan ikonik.",
+    origin: "Cirebon",
+  },
+  bunga1: {
+    name: "Bunga 1",
+    description: "Motif bunga bernuansa klasik yang siap dipadukan di desain custom.",
+    origin: "Jawa",
+  },
+  bunga2: {
+    name: "Bunga 2",
+    description: "Motif bunga alternatif dengan komposisi ornamen yang lebih padat.",
+    origin: "Jawa",
+  },
+  bunga3: {
+    name: "Bunga 3",
+    description: "Motif bunga dekoratif untuk tampilan batik yang lebih manis.",
+    origin: "Yogyakarta",
+  },
+  ceplok: {
+    name: "Ceplok",
+    description: "Motif geometris khas Yogyakarta yang rapi dan seimbang.",
+    origin: "Yogyakarta",
+  },
+  sidomukti: {
+    name: "Sido Mukti",
+    description: "Motif klasik yang melambangkan kebahagiaan dan kemakmuran.",
+    origin: "Jawa Tengah",
+  },
+  teratai: {
+    name: "Teratai",
+    description: "Motif floral lembut dengan karakter elegan.",
+    origin: "Cirebon",
+  },
+  ties: {
+    name: "Ties",
+    description: "Motif modern dengan ritme pola yang lebih kontemporer.",
+    origin: "Solo",
+  },
+  truntum: {
+    name: "Truntum",
+    description: "Motif bintang kecil khas Solo yang melambangkan cinta dan kesetiaan.",
+    origin: "Surakarta",
+  },
+  urang: {
+    name: "Urang",
+    description: "Motif pesisir bertema udang dengan karakter dinamis.",
+    origin: "Pekalongan",
+  },
+  iwak: {
+    name: "Iwak",
+    description: "Motif ikan khas Nusantara untuk nuansa pesisir yang kuat.",
+    origin: "Lamongan",
+  },
+};
+
+const batikAssetPatterns: BatikItem[] = Object.keys(batikAssetSvgMap)
+  .sort((a, b) => a.localeCompare(b))
+  .map((assetKey, index) => {
+    const styleType = batikAssetStyleTypeMap[assetKey] ?? assetKey;
+    const meta = batikAssetMeta[assetKey] ?? {};
+    const name = meta.name ?? formatPatternName(assetKey);
+
+    return {
+      id: 100000 + index,
+      name,
+      price: meta.price ?? 0,
+      description: meta.description ?? `Motif ${name} siap dipakai untuk desain batik custom.`,
+      origin: meta.origin ?? "Nusantara",
+      primary_color: meta.primary_color ?? "#8B6F47",
+      secondary_color: meta.secondary_color ?? "#D4B88B",
+      bg_color: meta.bg_color ?? "#f3f3f3",
+      rating: meta.rating ?? 5,
+      sold: meta.sold ?? 0,
+      style_type: styleType,
+    };
+  });
+
+const batikPatternOrder = new Map(
+  batikAssetPatterns.map((pattern, index) => [pattern.style_type ?? "", index]),
+);
+
+const mergePatternsWithAssets = (items: BatikItem[] = []) => {
+  const merged = new Map<string, BatikItem>();
+
+  items.forEach((item) => {
+    const styleType = normalizeStyleType(item.style_type ?? "");
+    if (!styleType || !getBatikSvg(styleType)) return;
+
+    merged.set(styleType, {
+      ...item,
+      style_type: styleType,
+    });
+  });
+
+  batikAssetPatterns.forEach((item) => {
+    const styleType = item.style_type ?? "";
+    if (!styleType || merged.has(styleType)) return;
+    merged.set(styleType, item);
+  });
+
+  return Array.from(merged.values()).sort((a, b) => {
+    const aIndex = batikPatternOrder.get(a.style_type ?? "") ?? Number.MAX_SAFE_INTEGER;
+    const bIndex = batikPatternOrder.get(b.style_type ?? "") ?? Number.MAX_SAFE_INTEGER;
+    return aIndex - bIndex;
+  });
 };
 
 type Tool = "select" | "brush" | "eraser" | "fill" | "shape" | "text";
@@ -154,6 +294,10 @@ const recolorSVG = (svgString: string, preset: typeof colorPresets[0]) => {
   result = result.replace(/#333333/gi, preset.batik.dark);
   result = result.replace(/#000000/gi, preset.colors.primary);
   result = result.replace(/#caac47/gi, preset.colors.secondary);
+  result = result.replace(/#[0-9a-f]{6}\b/gi, (match) => mapGrayscaleHexToPreset(match, preset));
+  result = result.replace(/rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/gi, (match, r, g, b) =>
+    mapGrayscaleRgbToPreset(match, Number(r), Number(g), Number(b), preset),
+  );
   return result;
 };
 
@@ -171,6 +315,29 @@ const rgbToHex = (r: number, g: number, b: number) => {
     const hex = Math.round(Math.max(0, Math.min(255, x))).toString(16);
     return hex.length === 1 ? "0" + hex : hex;
   }).join("");
+};
+
+const mapGrayscaleHexToPreset = (hex: string, preset: typeof colorPresets[0]) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb || rgb.r !== rgb.g || rgb.g !== rgb.b) return hex;
+
+  const tone = rgb.r;
+  if (tone >= 245) return preset.batik.background;
+  if (tone >= 190) return preset.batik.light;
+  if (tone >= 130) return preset.batik.mid;
+  if (tone >= 70) return preset.batik.dark;
+  return preset.colors.primary;
+};
+
+const mapGrayscaleRgbToPreset = (
+  original: string,
+  r: number,
+  g: number,
+  b: number,
+  preset: typeof colorPresets[0],
+) => {
+  if (r !== g || g !== b) return original;
+  return mapGrayscaleHexToPreset(rgbToHex(r, g, b), preset);
 };
 
 const generatePresetFromPrimary = (primaryColor: string) => {
@@ -1449,11 +1616,10 @@ export function CustomBatikPage() {
       try {
         const { data, error } = await supabase.from("batik_items").select("*").order("id", { ascending: true });
         if (error) throw error;
-        const filteredPatterns = data?.filter(item => batikSvgMap[item.style_type]) || [];
-        setPatterns(filteredPatterns);
+        setPatterns(mergePatternsWithAssets(data || []));
       } catch (err: any) {
         handleSupabaseError(err, "CustomBatikPage.fetchPatterns");
-        setPatterns([]);
+        setPatterns(batikAssetPatterns);
       } finally {
         setLoading(false);
       }
@@ -2419,8 +2585,9 @@ export function CustomBatikPage() {
   }, [isFullMode]);
 
   const renderPatternSVGString = useCallback((pattern: BatikItem) => {
-    if (pattern.style_type && batikSvgMap[pattern.style_type]) {
-      return recolorSVG(batikSvgMap[pattern.style_type], selectedPreset);
+    const svgSource = getBatikSvg(pattern.style_type);
+    if (svgSource) {
+      return recolorSVG(svgSource, selectedPreset);
     }
     const id = `pattern-${pattern.id}`;
     const colors = { primary: "#8B6F47", secondary: "#D4B88B", background: "transparent" };
@@ -2443,8 +2610,9 @@ export function CustomBatikPage() {
 
   const renderMiniPattern = useCallback((pattern: BatikItem, presetName?: string) => {
     const preset = presetName ? colorPresets.find(p => p.name === presetName) || selectedPreset : selectedPreset;
-    if (pattern.style_type && batikSvgMap[pattern.style_type]) {
-      const svgString = recolorSVG(batikSvgMap[pattern.style_type], preset);
+    const svgSource = getBatikSvg(pattern.style_type);
+    if (svgSource) {
+      const svgString = recolorSVG(svgSource, preset);
       return (
         <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full"
           dangerouslySetInnerHTML={{ __html: svgString }} />
@@ -2555,7 +2723,7 @@ export function CustomBatikPage() {
         });
         img.setCoords();
         const newLayerId = Date.now().toString();
-        (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: selectedPreset.name, customColor: customColor, originalSvg: pattern.style_type && batikSvgMap[pattern.style_type] ? batikSvgMap[pattern.style_type] : null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
+        (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: selectedPreset.name, customColor: customColor, originalSvg: getBatikSvg(pattern.style_type) || null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
         fc.add(img); img.setCoords(); fc.setActiveObject(img); fc.requestRenderAll();
         setLayers((prev) => [...prev, { id: newLayerId, type: 'pattern', name: pattern.name || 'Motif', visible: true, locked: false, fabricObject: img }]);
         setSelectedLayerId(newLayerId);
