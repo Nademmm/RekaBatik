@@ -4,8 +4,28 @@ import { Link, useNavigate } from "react-router";
 const MotionLink = motion(Link);
 import { BatikBackground } from "../components/BatikBackground";
 import { useState } from "react";
+import { fallbackCatalogItems, normalizeBatikName } from "../constants/batikCatalog";
 
-const batikMotifs = [
+interface BatikMotifInfo {
+  id: number;
+  name: string;
+  origin: string;
+  meaning: string;
+  colors: {
+    primary: string;
+    secondary: string;
+    bg: string;
+  };
+  patternType: string;
+  imageUrl?: string;
+  catalogName?: string;
+}
+
+const batikMotifCatalogLookup = new Map(
+  fallbackCatalogItems.map((item) => [normalizeBatikName(item.name), item]),
+);
+
+const batikMotifs: BatikMotifInfo[] = [
   {
     id: 1,
     name: "Parang",
@@ -98,7 +118,15 @@ Secara singkat, Batik Sekar Jagad adalah simbol keindahan yang beragam, kedamaia
     colors: { primary: "#FF8F00", secondary: "#FFE082", bg: "#FFF3E0" },
     patternType: "sekar",
   }
-];
+].map((motif) => {
+  const catalogItem = batikMotifCatalogLookup.get(normalizeBatikName(motif.name));
+
+  return {
+    ...motif,
+    imageUrl: catalogItem?.image_url,
+    catalogName: catalogItem?.name,
+  };
+});
 
 function BatikPatternPreview({ 
   type, 
@@ -265,14 +293,25 @@ function MotifModal({ motif, onClose }: { motif: typeof batikMotifs[0]; onClose:
         onClick={e => e.stopPropagation()}
         style={{ boxShadow: "0 25px 80px rgba(0,0,0,0.3)", maxHeight: "90vh" }}
       >
-        <div className="relative h-64 flex-shrink-0" style={{ background: motif.colors.bg }}>
-          <BatikPatternPreview
-            type={motif.patternType}
-            primary={motif.colors.primary}
-            secondary={motif.colors.secondary}
-            bg={motif.colors.bg}
-            isHovered={true}
-          />
+        <div className="relative h-64 flex-shrink-0 overflow-hidden" style={{ background: motif.colors.bg }}>
+          {motif.imageUrl ? (
+            <>
+              <img
+                src={motif.imageUrl}
+                alt={motif.catalogName || motif.name}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#3D2B1F]/40 via-transparent to-transparent" />
+            </>
+          ) : (
+            <BatikPatternPreview
+              type={motif.patternType}
+              primary={motif.colors.primary}
+              secondary={motif.colors.secondary}
+              bg={motif.colors.bg}
+              isHovered={true}
+            />
+          )}
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
@@ -456,13 +495,32 @@ export function BelajarBatikPage() {
                 >
                   {/* Pattern Preview */}
                   <div className="relative h-64 overflow-hidden" style={{ background: motif.colors.bg }}>
-                    <BatikPatternPreview
-                      type={motif.patternType}
-                      primary={motif.colors.primary}
-                      secondary={motif.colors.secondary}
-                      bg={motif.colors.bg}
-                      isHovered={false}
-                    />
+                    {motif.imageUrl ? (
+                      <>
+                        <img
+                          src={motif.imageUrl}
+                          alt={motif.catalogName || motif.name}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#3D2B1F]/45 via-transparent to-transparent" />
+                      </>
+                    ) : (
+                      <BatikPatternPreview
+                        type={motif.patternType}
+                        primary={motif.colors.primary}
+                        secondary={motif.colors.secondary}
+                        bg={motif.colors.bg}
+                        isHovered={false}
+                      />
+                    )}
+                    <div className="absolute left-5 bottom-5">
+                      <div
+                        className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                        style={{ background: "rgba(255,255,255,0.92)", color: "#6F573E" }}
+                      >
+                        {motif.origin}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Content */}
