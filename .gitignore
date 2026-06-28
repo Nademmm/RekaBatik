@@ -114,3 +114,5 @@ dist/
 
 # pnpm-lock.yaml is often kept, but pnpm workspace files can be ignored if redundant
 # but we are deleting the workspace file anyway.
+
+.vercel

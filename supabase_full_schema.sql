@@ -410,12 +410,60 @@ BEGIN
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE messages;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'cart_items'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE cart_items;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'orders'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+  END IF;
 END
 $$;
 
 
 -- =====================================================
--- 4. SEED DATA
+-- 4. STORAGE (bucket store-images)
+-- =====================================================
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('store-images', 'store-images', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Public can view store images" ON storage.objects;
+DROP POLICY IF EXISTS "Artisans can upload store images" ON storage.objects;
+DROP POLICY IF EXISTS "Artisans can update store images" ON storage.objects;
+DROP POLICY IF EXISTS "Artisans can delete store images" ON storage.objects;
+
+CREATE POLICY "Public can view store images"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'store-images');
+
+CREATE POLICY "Artisans can upload store images"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'store-images');
+
+CREATE POLICY "Artisans can update store images"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'store-images');
+
+CREATE POLICY "Artisans can delete store images"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'store-images');
+
+
+-- =====================================================
+-- 5. SEED DATA
 -- =====================================================
 
 INSERT INTO batik_items (name, price, description, origin, primary_color, secondary_color, bg_color, rating, sold, style_type, image_url)
@@ -445,6 +493,6 @@ VALUES
 -- =====================================================
 -- Langkah berikutnya (di luar SQL):
 -- 1. Buat akun super_admin di Auth → User Metadata: {"role": "super_admin"}
--- 2. Buat Storage bucket "store-images" + policy upload/read
--- 3. Atur Auth Site URL ke domain production
+-- 2. Atur Auth Site URL ke domain production (Vercel)
+-- 3. (Opsional) Aktifkan OAuth Google/Facebook di Authentication → Providers
 -- =====================================================

@@ -2,6 +2,8 @@
 
 Dokumen ini menjelaskan cara men-deploy RekaBatik berdasarkan kondisi repository saat ini. Proyek ini adalah aplikasi frontend Vite + React yang terhubung langsung ke Supabase dari sisi client.
 
+> **Pemula?** Ikuti panduan langkah demi langkah yang lebih detail: [panduan-deploy.md](./panduan-deploy.md)
+
 ## Gambaran Arsitektur Deployment
 
 Komponen yang perlu tersedia:
