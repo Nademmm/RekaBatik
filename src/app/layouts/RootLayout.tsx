@@ -658,7 +658,7 @@ export function RootLayout() {
       <main>{<Outlet />}</main>
 
       {/* Footer */}
-      {!isFullMode && (
+      {!isFullMode && location.pathname !== '/chat' && (
         <footer className="relative overflow-hidden" style={{ background: "linear-gradient(180deg, #3D2B1F 0%, #2A1D15 100%)" }}>
         <BatikBackground opacity={0.06} patternType="mega" />
         

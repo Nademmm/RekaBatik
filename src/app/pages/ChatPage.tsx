@@ -341,6 +341,8 @@ export function ChatPage() {
   // Reset initial load flag when switching conversations
   useEffect(() => {
     isInitialLoadRef.current = true;
+    // Prevent global page scroll when switching chat
+    window.scrollTo(0, 0);
   }, [activeStoreName]);
 
   // Scroll to bottom when browser tab regains focus (visibilitychange)
@@ -528,34 +530,40 @@ export function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen relative flex flex-col" style={{ background: "#FAF8F5" }}>
+    <div className="h-[calc(100dvh-80px)] relative flex flex-col overflow-hidden bg-[#FAF8F5] overscroll-behavior-none">
       <BatikBackground opacity={0.02} patternType="mega" />
 
-      <div className="flex-1 flex overflow-hidden relative z-10 max-w-[200vh] w-full mx-auto max-h-[90vh]">
-        <div className="flex-1 flex overflow-hidden bg-white shadow-lg">
+      <div className="flex-1 flex overflow-hidden relative z-10 w-full mx-auto h-full sm:p-0 sm:max-w-none">
+        <div className="flex-1 flex overflow-hidden bg-white sm:shadow-none sm:rounded-none border-t sm:border-none border-stone-100 h-full w-full">
 
           {/* ── Sidebar ──────────────────────────────────────────────── */}
           <div
-            className={`flex-shrink-0 flex flex-col border-r ${mobileShowChat ? "hidden sm:flex" : "flex"}`}
-            style={{ width: "320px", borderColor: "rgba(212,184,139,0.15)" }}
+            className={`flex-shrink-0 flex flex-col border-r w-full sm:w-[350px] md:w-[400px] lg:w-[450px] xl:w-[500px] ${mobileShowChat ? "hidden sm:flex" : "flex"}`}
+            style={{ borderColor: "rgba(212,184,139,0.15)" }}
           >
-            <div className="px-5 py-4 flex-shrink-0"
-              style={{ borderBottom: "1px solid rgba(212,184,139,0.15)", background: "linear-gradient(to bottom, #FAF8F5, #FFFFFF)" }}
+            {/* Sidebar Header */}
+            <div className="flex-shrink-0 z-30 px-5 py-5 sm:py-4 bg-[#FAF8F5] border-b"
+              style={{ borderColor: "rgba(212,184,139,0.15)" }}
             >
-              <h2 className="font-bold text-lg mb-3" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
-                Chat Pengrajin
-              </h2>
+              <div className="flex items-center justify-between mb-4 sm:mb-3">
+                <h2 className="font-bold text-xl sm:text-lg" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+                  Pesan
+                </h2>
+                <div className="sm:hidden w-10 h-10 rounded-full bg-[#8B6F47]/10 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-[#8B6F47]" />
+                </div>
+              </div>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#A89B8F" }} />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#A89B8F" }} />
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari toko..."
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
+                  placeholder="Cari toko atau pengrajin..."
+                  className="w-full pl-10 pr-4 py-3 sm:py-2.5 rounded-2xl sm:rounded-xl text-sm outline-none transition-all focus:ring-2 focus:ring-[#8B6F47]/10"
                   style={{ border: "1px solid rgba(212,184,139,0.25)", background: "#FAF8F5", color: "#3D2B1F" }}
                 />
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto scrollbar-hide">
               {loadingConvos ? (
                 <div className="flex flex-col gap-2 p-4">
                   {[1, 2, 3].map((i) => (
@@ -580,7 +588,7 @@ export function ChatPage() {
                         background: isActive ? "rgba(139,111,71,0.08)" : "transparent",
                         borderLeft: isActive ? "3px solid #8B6F47" : "3px solid transparent",
                       }}
-                      whileHover={{ background: "rgba(139,111,71,0.05)" }}
+                      whileHover={window.innerWidth > 640 ? { background: "rgba(139,111,71,0.05)" } : {}}
                     >
                       <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white flex-shrink-0 text-sm"
                         style={{ background: `linear-gradient(135deg, ${convo.storeColor}, ${convo.storeColor}99)` }}
@@ -614,28 +622,32 @@ export function ChatPage() {
             {activeConvo ? (
               <>
                 {/* Chat Header */}
-                <div className="px-5 py-4 flex items-center gap-4 flex-shrink-0"
-                  style={{ borderBottom: "1px solid rgba(212,184,139,0.15)", background: "linear-gradient(to bottom, #FAF8F5, #FFFFFF)" }}
+                <div className="flex-shrink-0 z-30 px-4 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3 sm:gap-4 bg-white border-b"
+                  style={{ 
+                    borderColor: "rgba(212,184,139,0.15)", 
+                  }}
                 >
-                  <button onClick={() => setMobileShowChat(false)} className="sm:hidden p-2 rounded-xl hover:bg-stone-100 transition-colors">
-                    <ChevronLeft className="w-5 h-5" style={{ color: "#3D2B1F" }} />
+                  <button onClick={() => setMobileShowChat(false)} className="sm:hidden p-2 -ml-2 rounded-full hover:bg-stone-100 transition-colors">
+                    <ChevronLeft className="w-6 h-6" style={{ color: "#3D2B1F" }} />
                   </button>
-                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
                     style={{ background: `linear-gradient(135deg, ${activeConvo.storeColor}, ${activeConvo.storeColor}99)` }}
                   >
                     {activeConvo.storeAvatar}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold" style={{ color: "#3D2B1F" }}>{activeConvo.storeName}</p>
-                    <p className="text-xs" style={{ color: "#A89B8F" }}>
-                      {activeConvo.orderIds.length} pesanan · {activeConvo.hasNegotiating ? "🟡 Negosiasi aktif" : "✅ Semua diproses"}
-                    </p>
+                    <p className="font-bold text-sm sm:text-base truncate" style={{ color: "#3D2B1F" }}>{activeConvo.storeName}</p>
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${activeConvo.hasNegotiating ? "bg-amber-400 animate-pulse" : "bg-green-400"}`} />
+                      <p className="text-[10px] sm:text-xs font-medium" style={{ color: "#A89B8F" }}>
+                        {activeConvo.hasNegotiating ? "Negosiasi Aktif" : "Online"}
+                      </p>
+                    </div>
                   </div>
-                  {/* Global Offer Badge Removed in favor of Per-Order Contextual Offers */}
                 </div>
 
                 {/* Messages */}
-                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ background: "#F8F6F2" }}>
+                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-4 scrollbar-hide" style={{ background: "#F8F6F2" }}>
                   <div className="flex items-center gap-3 my-2">
                     <div className="flex-1 h-px" style={{ background: "rgba(139,111,71,0.12)" }} />
                     <span className="text-[10px] font-medium px-3" style={{ color: "#A89B8F" }}>Semua percakapan dengan {activeConvo.storeName}</span>
@@ -670,8 +682,8 @@ export function ChatPage() {
                               {activeConvo.storeAvatar[0]}
                             </div>
                           )}
-                          <div className={`max-w-[75%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
-                            <div className="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
+                          <div className={`max-w-[85%] sm:max-w-[70%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
+                            <div className="px-4 py-2.5 rounded-2xl text-sm sm:text-base leading-relaxed"
                               style={{
                                 background: isUser ? "linear-gradient(135deg, #8B6F47, #6B4F2F)" : isPriceOffer ? "linear-gradient(135deg, #FFF7ED, #FFFFFF)" : "#FFFFFF",
                                 color: isUser ? "#FFFFFF" : "#3D2B1F",
@@ -849,29 +861,32 @@ export function ChatPage() {
                 </div>
 
                 {/* Input area */}
-                <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0"
-                  style={{ borderTop: "1px solid rgba(212,184,139,0.15)", background: "#FFFFFF" }}
+                <div className="px-4 py-3 sm:py-4 flex items-center gap-2 sm:gap-3 flex-shrink-0 bg-white z-20"
+                  style={{ borderTop: "1px solid rgba(212,184,139,0.15)", paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
                 >
                   <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleImageUpload} />
                   <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                     onClick={() => fileInputRef.current?.click()}
                     disabled={sending}
-                    className="w-11 h-11 rounded-2xl flex items-center justify-center border transition-all text-stone-500 hover:text-[#8B6F47] hover:bg-stone-50 flex-shrink-0 disabled:opacity-40"
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full sm:rounded-2xl flex items-center justify-center border transition-all text-stone-500 hover:text-[#8B6F47] hover:bg-stone-50 flex-shrink-0 disabled:opacity-40"
                     style={{ borderColor: "rgba(212,184,139,0.25)" }}
                   >
                     <ImageIcon className="w-5 h-5" />
                   </motion.button>
 
-                  <input ref={inputRef} type="text" value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                    placeholder={`Pesan ke ${activeConvo.storeName}...`}
-                    className="flex-1 px-4 py-2.5 rounded-2xl text-sm outline-none"
-                    style={{ border: "1px solid rgba(212,184,139,0.25)", background: "#FAF8F5", color: "#3D2B1F" }}
-                  />
+                  <div className="flex-1 relative">
+                    <input ref={inputRef} type="text" value={inputText}
+                      onChange={(e) => setInputText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                      placeholder="Ketik pesan..."
+                      className="w-full px-4 py-2.5 sm:py-3 rounded-full sm:rounded-2xl text-sm outline-none transition-all focus:ring-2 focus:ring-[#8B6F47]/10"
+                      style={{ border: "1px solid rgba(212,184,139,0.25)", background: "#FAF8F5", color: "#3D2B1F" }}
+                    />
+                  </div>
+
                   <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                     onClick={sendMessage} disabled={!inputText.trim() || sending}
-                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-white transition-all disabled:opacity-40 flex-shrink-0"
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full sm:rounded-2xl flex items-center justify-center text-white transition-all disabled:opacity-40 flex-shrink-0"
                     style={{ background: inputText.trim() ? "linear-gradient(135deg, #8B6F47, #6B4F2F)" : "#E8E1DA" }}
                   >
                     {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" style={{ transform: "translateX(1px)" }} />}

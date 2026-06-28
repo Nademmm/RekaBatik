@@ -291,9 +291,9 @@ function MotifModal({ motif, onClose }: { motif: typeof batikMotifs[0]; onClose:
         exit={{ scale: 0.9, y: 20 }}
         className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
-        style={{ boxShadow: "0 25px 80px rgba(0,0,0,0.3)", maxHeight: "90vh" }}
+        style={{ boxShadow: "0 25px 80px rgba(0,0,0,0.3)", maxHeight: "85vh" }}
       >
-        <div className="relative h-64 flex-shrink-0 overflow-hidden" style={{ background: motif.colors.bg }}>
+        <div className="relative h-48 sm:h-64 flex-shrink-0 overflow-hidden" style={{ background: motif.colors.bg }}>
           {motif.imageUrl ? (
             <>
               <img
@@ -316,14 +316,14 @@ function MotifModal({ motif, onClose }: { motif: typeof batikMotifs[0]; onClose:
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={onClose}
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full"
-            style={{ background: "rgba(255,255,255,0.9)" }}
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 w-10 h-10 flex items-center justify-center rounded-full shadow-lg"
+            style={{ background: "rgba(255,255,255,0.95)", color: "#3D2B1F" }}
           >
             ✕
           </motion.button>
         </div>
         <div 
-          className="p-8 overflow-y-auto flex-1 no-scrollbar"
+          className="p-6 sm:p-8 overflow-y-auto flex-1 no-scrollbar"
           style={{ 
             scrollbarWidth: "none", 
             msOverflowStyle: "none"
@@ -336,13 +336,9 @@ function MotifModal({ motif, onClose }: { motif: typeof batikMotifs[0]; onClose:
           `}} />
           <div className="flex items-center gap-3 mb-4">
             <div>
-              <h2 className="text-3xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+              <h2 className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
                 {motif.name}
               </h2>
-              <div className="flex items-center gap-2 mt-1" style={{ color: "#8B6F47" }}>
-                <MapPin className="w-4 h-4" />
-                <span>{motif.origin}</span>
-              </div>
             </div>
           </div>
           <div className="mb-8">
@@ -385,7 +381,7 @@ export function BelajarBatikPage() {
           style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }}
         />
         
-        <div className="container mx-auto px-6 relative z-20 py-24 max-w-7xl mx-auto">
+        <div className="container mx-auto px-6 relative z-20 py-16 sm:py-24 max-w-7xl mx-auto">
           <div className="max-w-4xl mx-auto">
             <motion.div
               initial={{ opacity: 0, x: -40 }}
@@ -398,7 +394,7 @@ export function BelajarBatikPage() {
                 className="mb-6"
                 style={{
                   fontFamily: "'Playfair Display', serif",
-                  fontSize: "clamp(2.8rem, 6vw, 5rem)",
+                  fontSize: "clamp(2.4rem, 7vw, 5rem)",
                   color: "#FAF8F5",
                   lineHeight: "1.1",
                   fontWeight: 700
@@ -409,13 +405,13 @@ export function BelajarBatikPage() {
                   Setiap Motif Batik
                 </span>
               </h1>
-              <p className="mb-10 max-w-2xl mx-auto" style={{ color: "rgba(250, 248, 245, 0.8)", lineHeight: "1.9", fontSize: "1.15rem" }}>
+              <p className="mb-10 max-w-2xl mx-auto text-sm sm:text-base md:text-lg lg:text-xl" style={{ color: "rgba(250, 248, 245, 0.8)", lineHeight: "1.8" }}>
                 Batik bukan hanya kain, tapi sebuah bahasa budaya Indonesia. Setiap goresan dan pola menyimpan nilai-nilai luhur nenek moyang kita.
               </p>
-              <div className="flex flex-wrap gap-4 justify-center">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                 <MotionLink
                   to="/custom"
-                  className="inline-flex items-center gap-3 px-8 py-5 rounded-2xl"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 sm:py-5 rounded-full"
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ duration: 0.3 }}
@@ -434,7 +430,7 @@ export function BelajarBatikPage() {
                   onClick={() => {
                     document.getElementById("motifs")?.scrollIntoView({ behavior: "smooth" });
                   }}
-                  className="inline-flex items-center gap-3 px-8 py-5 rounded-2xl"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 sm:py-5 rounded-full"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.98 }}
                   style={{
@@ -455,25 +451,25 @@ export function BelajarBatikPage() {
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
       {/* ======================== MOTIFS LIST ======================== */}
-      <section id="motifs" className="py-27 relative overflow-hidden max-w-7xl mx-auto">
+      <section id="motifs" className="py-16 sm:py-24 relative overflow-hidden max-w-7xl mx-auto">
         <BatikBackground opacity={0.05} patternType="mega" />
         <div className="container mx-auto px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center mb-20"
+            className="text-center mb-12 sm:mb-20"
           >
             
-            <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2.2rem, 4vw, 3.5rem)", fontWeight: 700, marginBottom: "1rem" }}>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 700, marginBottom: "1rem" }}>
               Eksplorasi Motif Batik
             </h2>
-            <p style={{ color: "#7A6B5E", fontSize: "1.15rem", maxWidth: "600px", margin: "0 auto" }}>
+            <p className="text-sm sm:text-base md:text-lg" style={{ color: "#7A6B5E", maxWidth: "600px", margin: "0 auto" }}>
               Klik pada motif untuk melihat detail makna dan filosofinya
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 md:gap-8">
             {batikMotifs.map((motif, index) => (
               <motion.div
                 key={motif.id}
@@ -494,7 +490,7 @@ export function BelajarBatikPage() {
                   }}
                 >
                   {/* Pattern Preview */}
-                  <div className="relative h-64 overflow-hidden" style={{ background: motif.colors.bg }}>
+                  <div className="relative h-40 sm:h-64 overflow-hidden" style={{ background: motif.colors.bg }}>
                     {motif.imageUrl ? (
                       <>
                         <img
@@ -513,19 +509,11 @@ export function BelajarBatikPage() {
                         isHovered={false}
                       />
                     )}
-                    <div className="absolute left-5 bottom-5">
-                      <div
-                        className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
-                        style={{ background: "rgba(255,255,255,0.92)", color: "#6F573E" }}
-                      >
-                        {motif.origin}
-                      </div>
-                    </div>
                   </div>
 
                   {/* Content */}
-                  <div className="p-7">
-                    <h3 className="mb-3" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "1.75rem", fontWeight: 700 }}>
+                  <div className="p-4 sm:p-7">
+                    <h3 className="mb-1 text-base sm:text-2xl" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontWeight: 700 }}>
                       {motif.name}
                     </h3>
                   </div>

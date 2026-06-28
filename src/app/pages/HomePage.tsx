@@ -19,10 +19,6 @@ import { BatikDetailModal } from "../components/BatikDetailModal";
 import { AnimatePresence } from "motion/react";
 import { fallbackCatalogItems, normalizeBatikName, resolveCatalogItems } from "../constants/batikCatalog";
 
-interface PopularPatternMapped extends BatikItem {
-  tag: string;
-}
-
 const learningPreviewOrder = ["Parang", "Kawung", "Mega Mendung", "Truntum"] as const;
 const artisanImg = "https://images.unsplash.com/photo-1527650003412-4c3a0a38fdf5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXRpayUyMGFydGlzYW4lMjBjcmFmdHNtYW4lMjBwYWludGluZyUyMHdheHxlbnwxfHx8fDE3Nzc1MjAyMjZ8MA&ixlib=rb-4.1.0&q=80&w=1080";
 const reviewImg1 = "https://images.unsplash.com/photo-1758600587815-b654d1405e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoYXBweSUyMGN1c3RvbWVyJTIwcmV2aWV3JTIwcG9ydHJhaXQlMjBBc2lhbiUyMHdvbWFufGVufDF8fHx8MTc3NzUyMDIzNnww&ixlib=rb-4.1.0&q=80&w=400";
@@ -120,7 +116,7 @@ function BatikPatternPreview({ type, primary, secondary, bg }: { type: string; p
 export function HomePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [selectedBatik, setSelectedBatik] = useState<PopularPatternMapped | null>(null);
+  const [selectedBatik, setSelectedBatik] = useState<BatikItem | null>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const [activeReview, setActiveReview] = useState(0);
@@ -185,7 +181,7 @@ export function HomePage() {
     }
   };
 
-  const [popularPatterns, setPopularPatterns] = useState<PopularPatternMapped[]>([]);
+  const [popularPatterns, setPopularPatterns] = useState<BatikItem[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [trendingItems, setTrendingItems] = useState<{ name: string; sold: number; growth: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,10 +202,7 @@ export function HomePage() {
           safePatterns = resolveCatalogItems(patternsData as BatikItem[]);
         }
 
-        setPopularPatterns(safePatterns.map((p: any) => ({
-          ...p,
-          tag: p.sold > 200 ? "Terlaris" : "Populer"
-        })));
+        setPopularPatterns(safePatterns);
 
         const { data: reviewsData, error: rError } = await supabase
           .from("reviews")
@@ -370,7 +363,7 @@ export function HomePage() {
         </div>
         <div className="absolute inset-0 bg-gradient-to-r from-[#f6f0e7]/94 via-[#f6f0e7]/72 to-white/10 sm:bg-transparent" />
 
-        <div className="container mx-auto px-4 sm:px-6 md:px-12 lg:px-24 relative z-10 py-7 sm:py-14 md:py-20">
+        <div className="container mx-auto px-6 sm:px-6 md:px-12 lg:px-24 relative z-10 py-7 sm:py-14 md:py-20">
           <div className="max-w-[17rem] sm:max-w-3xl">
             <h1
               className="mb-3 sm:mb-5 max-w-[16rem] sm:max-w-2xl lg:max-w-3xl"
@@ -474,7 +467,7 @@ export function HomePage() {
       */}
       <section className="py-10 sm:py-16 lg:py-24 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #3D2B1F 0%, #5A3E2A 50%, #3D2B1F 100%)" }}>
         <BatikBackground opacity={0.08} patternType="parang" />
-        <div className="container mx-auto px-3 sm:px-6 lg:px-8 relative z-10">
+        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10">
           {/* Section Header */}
           <div className="text-center mb-8 sm:mb-12 md:mb-16">
             <h2 style={{ fontWeight: 700, fontFamily: "'Playfair Display', serif", color: "#FAF8F5", fontSize: "clamp(1.5rem, 5vw, 3rem)", marginBottom: "0.75rem" }}>
@@ -555,7 +548,7 @@ export function HomePage() {
       {/* ======================== BELAJAR BATIK ======================== */}
       <section className="py-12 sm:py-20 lg:py-24 relative overflow-hidden" style={{ background: "#FAF8F5" }}>
         <BatikBackground opacity={0.03} patternType="floral" />
-        <div className="container mx-auto px-4 sm:px-6 relative z-10 max-w-7xl">
+        <div className="container mx-auto px-6 sm:px-6 relative z-10 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             <motion.div
               initial={{ opacity: 0, x: -40 }}
@@ -662,15 +655,15 @@ export function HomePage() {
         <div className="absolute top-10 right-0 w-64 h-64 rounded-full opacity-5" style={{ background: "linear-gradient(135deg, #8B6F47, #D4B88B)" }} />
         <div className="absolute bottom-10 left-0 w-48 h-48 rounded-full opacity-5" style={{ background: "#D4B88B" }} />
         
-        <div className="container mx-auto px-3 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
+        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
           {/* Section Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mb-8 sm:mb-12 lg:mb-16 gap-4">
             <div className="max-w-xl">
               <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(1.4rem, 4vw, 2.8rem)", fontWeight: 700, marginBottom: "0.5rem", lineHeight: 1.2 }}>
-                Motif Batik <span style={{ color: "#8B6F47" }}>Paling Diminati</span>
+                Katalog Batik <span style={{ color: "#8B6F47" }}>Pilihan Rekabatik</span>
               </h2>
               <p style={{ color: "#7A6B5E", fontSize: "clamp(0.8rem, 2.3vw, 1rem)", lineHeight: 1.7 }}>
-                Jelajahi koleksi motif batik pilihan yang sudah dipakai dan dicintai oleh ribuan pelanggan
+                Jelajahi beragam motif batik eksklusif siap pakai dengan kualitas premium dari pengrajin terbaik
               </p>
             </div>
             <MotionLink
@@ -689,8 +682,8 @@ export function HomePage() {
             </MotionLink>
           </div>
 
-          {/* Patterns Grid — 2 kolom di mobile, 3 di desktop */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 lg:gap-8">
+          {/* Patterns Grid — Scrollable horizontal di mobile, grid di desktop */}
+          <div className="flex overflow-x-auto overflow-y-hidden pb-6 -mx-6 px-6 gap-4 snap-x snap-mandatory sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-5 lg:gap-8 sm:overflow-x-visible sm:pb-0 scrollbar-hide">
             {loading ? (
               [...Array(6)].map((_, i) => (
                 <motion.div
@@ -698,9 +691,10 @@ export function HomePage() {
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: i * 0.08 }}
+                  className="flex-shrink-0 w-[62vw] sm:w-auto snap-center"
                 >
                   <div className="rounded-2xl sm:rounded-3xl overflow-hidden bg-white border border-gray-100" style={{ boxShadow: "0 4px 24px rgba(61,43,31,0.04)" }}>
-                    <Skeleton className="h-32 sm:h-44 lg:h-52 w-full rounded-none" />
+                    <Skeleton className="h-30 sm:h-44 lg:h-52 w-full rounded-none" />
                     <div className="p-3 sm:p-5 space-y-2 sm:space-y-4">
                       <Skeleton className="h-5 w-3/5" />
                       <Skeleton className="h-4 w-2/5" />
@@ -720,7 +714,7 @@ export function HomePage() {
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
                 whileHover={{ y: -6 }}
-                className="group"
+                className="group flex-shrink-0 w-[62vw] sm:w-auto snap-center"
               >
                 <div
                   onClick={() => setSelectedBatik(p)}
@@ -732,7 +726,7 @@ export function HomePage() {
                   }}
                 >
                   {/* Pattern Preview */}
-                  <div className="relative h-32 sm:h-44 lg:h-52 overflow-hidden" style={{ background: p.bg_color }}>
+                  <div className="relative h-28 sm:h-44 lg:h-52 overflow-hidden" style={{ background: p.bg_color }}>
                     {p.image_url ? (
                       <motion.div 
                         className="w-full h-full"
@@ -770,21 +764,6 @@ export function HomePage() {
                           color={likedPatterns.includes(p.id) ? "#EF4444" : "#7A6B5E"}
                         />
                       </motion.button>
-                    </div>
-                    
-                    {/* Tag badge */}
-                    <div className="absolute top-2 left-2 sm:top-4 sm:left-4">
-                      <span
-                        className="px-2 py-1 sm:px-3.5 sm:py-1.5 rounded-full font-bold uppercase tracking-wider shadow-sm"
-                        style={{ 
-                          fontSize: "clamp(0.55rem, 1.5vw, 0.7rem)",
-                          background: "rgba(255,255,255,0.95)", 
-                          color: "#8B6F47",
-                          backdropFilter: "blur(8px)"
-                        }}
-                      >
-                        {p.tag}
-                      </span>
                     </div>
                   </div>
                   
@@ -833,7 +812,7 @@ export function HomePage() {
         <div className="absolute top-0 left-0 w-96 h-96 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)", transform: "translate(-50%, -50%)" }} />
         <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)", transform: "translate(50%, 50%)" }} />
         
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
+        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
             {/* Left - Content */}
             <motion.div
@@ -949,7 +928,7 @@ export function HomePage() {
         List items: kompak di mobile, full di desktop
       */}
       <section className="py-12 sm:py-20 lg:py-24 relative overflow-hidden" style={{ background: "linear-gradient(180deg, #FAF8F5 0%, #FFFFFF 100%)" }}>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
+        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Left Content */}
             <motion.div
@@ -1081,7 +1060,7 @@ export function HomePage() {
         
         <BatikBackground opacity={0.03} patternType="parang" />
 
-        <div className="container mx-auto px-4 sm:px-6 lg:px-12 xl:px-24 relative z-10">
+        <div className="container mx-auto px-6 sm:px-6 lg:px-12 xl:px-24 relative z-10">
           {/* Section Header */}
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-12 sm:mb-16 lg:mb-20">
             <motion.div
@@ -1261,7 +1240,7 @@ export function HomePage() {
 
       {/* ======================== CTA ======================== */}
       <section className="py-12 sm:py-20 md:py-32 relative overflow-hidden bg-[#FAF8F5]">
-        <div className="container mx-auto px-4 md:px-8 relative z-10">
+        <div className="container mx-auto px-6 md:px-8 relative z-10">
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}

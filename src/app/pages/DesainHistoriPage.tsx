@@ -80,7 +80,7 @@ function DesignCard({
       onClick={() => onDetail(design)}
     >
       {/* Thumbnail */}
-      <div className="relative h-48 overflow-hidden bg-stone-100">
+      <div className="relative h-32 sm:h-48 overflow-hidden bg-stone-100">
         {thumbnail ? (
           <img
             src={thumbnail}
@@ -92,19 +92,20 @@ function DesignCard({
             className="w-full h-full flex flex-col items-center justify-center"
             style={{ background: "linear-gradient(135deg, #FAF8F5, #F0EBE1)" }}
           >
-            <Palette className="w-14 h-14 mb-2" style={{ color: "rgba(139,111,71,0.3)" }} />
-            <p className="text-sm" style={{ color: "rgba(139,111,71,0.5)" }}>Tidak ada preview</p>
+            <Palette className="w-8 h-8 sm:w-14 sm:h-14 mb-2" style={{ color: "rgba(139,111,71,0.3)" }} />
+            <p className="text-[10px] sm:text-sm" style={{ color: "rgba(139,111,71,0.5)" }}>Tidak ada preview</p>
           </div>
         )}
 
         {/* Design badge */}
-        <div className="absolute top-3 left-3">
+        <div className="absolute top-2 left-2 sm:top-3 sm:left-3">
           <span
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
+            className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-[9px] sm:text-xs font-bold"
             style={{ background: "rgba(139,111,71,0.2)", color: "#8B6F47", backdropFilter: "blur(8px)", border: "1px solid rgba(139,111,71,0.4)" }}
           >
-            <Sparkles className="w-3 h-3" />
-            Desain Kustom
+            <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+            <span className="hidden sm:inline">Desain Kustom</span>
+            <span className="sm:hidden">Kustom</span>
           </span>
         </div>
 
@@ -114,35 +115,35 @@ function DesignCard({
             e.stopPropagation();
             handleDelete();
           }}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          className="absolute top-2 right-2 sm:top-3 sm:right-3 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
           style={{ background: "rgba(239,68,68,0.85)", color: "white", backdropFilter: "blur(6px)" }}
           title="Hapus desain"
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
         </button>
       </div>
 
       {/* Info */}
-      <div className="p-5">
-        <h3 className="font-bold text-base mb-0.5 truncate" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+      <div className="p-3 sm:p-5">
+        <h3 className="font-bold text-sm sm:text-base mb-0.5 truncate" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
           {projectName}
         </h3>
         
-        <div className="flex items-center gap-1.5 mb-3" style={{ color: "#A89B8F" }}>
-          <Clock className="w-3.5 h-3.5" />
-          <span className="text-xs">{formatDate(design.created_at)}</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 mb-2 sm:mb-3" style={{ color: "#A89B8F" }}>
+          <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+          <span className="text-[10px] sm:text-xs">{formatDate(design.created_at)}</span>
         </div>
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
               handleEdit();
             }}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:shadow-sm active:scale-95"
+            className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-semibold transition-all hover:shadow-sm active:scale-95"
             style={{ border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
           >
-            <Edit2 className="w-4 h-4" />
+            <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Edit
           </button>
           <button
@@ -150,13 +151,13 @@ function DesignCard({
               e.stopPropagation();
               onOrder(design);
             }}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:brightness-110 active:scale-95"
+            className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold text-white transition-all hover:brightness-110 active:scale-95"
             style={{
               background: "linear-gradient(135deg, #8B6F47, #6B4F2F)",
               boxShadow: "0 4px 14px rgba(139,111,71,0.3)",
             }}
           >
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Pesan
           </button>
         </div>
@@ -279,11 +280,11 @@ export function DesainHistoriPage() {
           </div>
           <Link
             to="/custom"
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl text-white font-semibold text-sm transition-all hover:brightness-110"
+            className="flex items-center justify-center gap-2 px-6 py-3 rounded-full text-white font-bold text-sm transition-all hover:brightness-110 w-full sm:w-auto"
             style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", boxShadow: "0 4px 16px rgba(139,111,71,0.25)" }}
           >
             <Plus className="w-4 h-4" />
-            Buat Desain Baru
+            <span>Buat Desain Baru</span>
           </Link>
         </motion.div>
 
@@ -323,14 +324,14 @@ export function DesainHistoriPage() {
 
         {/* Designs Grid */}
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map(i => (
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+            {[1, 2, 3, 4].map(i => (
               <div key={i} className="bg-white rounded-3xl overflow-hidden" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
-                <Skeleton className="h-48 w-full rounded-none" />
-                <div className="p-5 space-y-3">
-                  <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-10 w-full rounded-xl" />
+                <Skeleton className="h-32 sm:h-48 w-full rounded-none" />
+                <div className="p-3 sm:p-5 space-y-3">
+                  <Skeleton className="h-4 sm:h-5 w-3/4" />
+                  <Skeleton className="h-3 sm:h-4 w-1/2" />
+                  <Skeleton className="h-8 sm:h-10 w-full rounded-lg sm:rounded-xl" />
                 </div>
               </div>
             ))}
@@ -363,7 +364,7 @@ export function DesainHistoriPage() {
           </motion.div>
         ) : (
           <AnimatePresence>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               {designs.map((design) => (
                 <DesignCard
                   key={design.id}

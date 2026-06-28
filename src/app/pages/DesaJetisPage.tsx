@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import {
-  MapPin, Phone, Clock, Star, ChevronRight, Users, Award,
+  MapPin, Clock, Star, ChevronRight, Users, Award,
   ShoppingBag, Heart, ExternalLink, Camera, Info, Car, Bus, Bike, Watch, Wallet, Sparkles, Store
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
@@ -155,31 +155,25 @@ export function DesaJetisPage() {
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF8F5" }}>
       {/* ======================== HERO ======================== */}
-      <section className="relative min-h-[85vh] flex items-center overflow-hidden">
+      <section className="relative min-h-[75vh] sm:min-h-[85vh] flex items-center overflow-hidden">
         {/* Background Image & Overlay */}
         <div className="absolute inset-0">
           <img src={villageImg} alt="Desa Jetis" className="w-full h-full object-cover" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(120deg, rgba(61, 43, 31, 0.98) 0%, rgba(61, 43, 31, 0.80) 50%, rgba(61, 43, 31, 0.65) 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(120deg, rgba(61, 43, 31, 0.98) 0%, rgba(61, 43, 31, 0.85) 50%, rgba(61, 43, 31, 0.75) 100%)" }} />
         </div>
         
         {/* Decorative Batik Background */}
         <BatikBackground opacity={0.07} patternType="kawung" className="z-10" />
         
-        {/* Decorative Elements */}
-        <div className="absolute top-20 right-0 w-80 h-80 rounded-full opacity-12" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
-        <div className="absolute bottom-10 left-10 w-60 h-60 rounded-full opacity-8" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
-        
-        <div className="container mx-auto px-6 relative z-20 py-24 max-w-7xl">
+        <div className="container mx-auto px-6 relative z-20 py-16 sm:py-24 max-w-7xl">
           <div className="max-w-4xl">
-            
-            
             {/* Main Heading */}
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="mb-7"
-              style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(2.5rem, 6vw, 4.2rem)", color: "#FAF8F5", lineHeight: "1.15", fontWeight: 700 }}
+              className="mb-5 sm:mb-7"
+              style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(2.2rem, 8vw, 4.2rem)", color: "#FAF8F5", lineHeight: "1.1", fontWeight: 700 }}
             >
               Hubungkan dengan<br/>
               <span style={{ color: "#D4B88B" }}>Pengrajin Batik Terbaik</span>
@@ -190,10 +184,10 @@ export function DesaJetisPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="mb-10 max-w-2xl"
-              style={{ color: "rgba(250, 248, 245, 0.85)", lineHeight: "1.9", fontSize: "1.15rem" }}
+              className="mb-8 sm:mb-10 max-w-2xl"
+              style={{ color: "rgba(250, 248, 245, 0.85)", lineHeight: "1.7", fontSize: "clamp(1rem, 2.5vw, 1.15rem)" }}
             >
-              RekaBatik adalah platform yang menghubungkan Anda langsung dengan pengrajin batik berpengalaman di Desa Batik Jetis. Kustomisasi batik sesuai keinginan, bicarakan langsung dengan pembuatnya, dan dapatkan karya budaya berkualitas tinggi.
+              RekaBatik adalah platform yang menghubungkan Anda langsung dengan pengrajin batik berpengalaman di Desa Batik Jetis. Kustomisasi batik sesuai keinginan, bicarakan langsung dengan pembuatnya.
             </motion.p>
             
             {/* Stats Grid */}
@@ -201,44 +195,45 @@ export function DesaJetisPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-11"
+              className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5 mb-10 sm:mb-11"
             >
               {[
                 { value: "35+", label: "Pengrajin Mitra" },
-                { value: "12.500+", label: "Pelanggan Puas" },
-                { value: "48.200+", label: "Pesanan Selesai" },
+                { value: "12k+", label: "Pelanggan" },
+                { value: "48k+", label: "Pesanan" },
               ].map((stat, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.4 + i * 0.1 }}
-                  className="p-5 rounded-2xl"
+                  className="p-4 sm:p-5 rounded-2xl"
                   style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(212, 184, 139, 0.25)" }}
                 >
-                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#D4B88B", fontSize: "2rem", fontWeight: 700, marginBottom: "0.25rem" }}>{stat.value}</div>
-                  <div style={{ color: "rgba(250,248,245,0.7)", fontSize: "0.9rem", fontWeight: 500 }}>{stat.label}</div>
+                  <div style={{ fontFamily: "'Playfair Display', serif", color: "#D4B88B", fontSize: "clamp(1.5rem, 4vw, 2rem)", fontWeight: 700, marginBottom: "0.25rem" }}>{stat.value}</div>
+                  <div style={{ color: "rgba(250,248,245,0.7)", fontSize: "0.8rem", fontWeight: 500 }}>{stat.label}</div>
                 </motion.div>
               ))}
             </motion.div>
             
-            {/* CTA Buttons */}
+            {/* CTA Buttons - Full width on mobile */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.5 }}
-              className="flex flex-wrap gap-4"
+              className="flex flex-col sm:flex-row gap-4"
             >
               <MotionLink
                 to="/custom"
-                className="flex items-center gap-2.5 px-9 py-4 rounded-2xl"
+                className="flex items-center justify-center gap-2.5 px-8 py-4 rounded-full w-full sm:w-auto"
                 whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
                 transition={{ duration: 0.3 }}
                 style={{
                   background: "linear-gradient(135deg, #D4B88B, #C9AB7F)",
                   color: "#3D2B1F",
                   fontWeight: 700,
-                  fontSize: "1.05rem",
+                  fontSize: "1rem",
                   boxShadow: "0 8px 24px rgba(212, 184, 139, 0.35)"
                 }}
               >
@@ -247,22 +242,22 @@ export function DesaJetisPage() {
               </MotionLink>
               <motion.a
                 href="#toko"
-                className="flex items-center gap-2.5 px-9 py-4 rounded-2xl"
+                className="flex items-center justify-center gap-2.5 px-8 py-4 rounded-full w-full sm:w-auto"
                 whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.98 }}
                 transition={{ duration: 0.3 }}
                 onClick={(e) => {
                   e.preventDefault();
                   const section = document.getElementById("toko");
-                  if (section) {
-                    section.scrollIntoView({ behavior: "smooth" });
-                  }
+                  if (section) section.scrollIntoView({ behavior: "smooth" });
                 }}
                 style={{
                   color: "#FAF8F5",
-                  border: "2px solid rgba(250, 248, 245, 0.45)",
+                  border: "2px solid rgba(250, 248, 245, 0.4)",
                   fontWeight: 600,
-                  background: "transparent",
-                  fontSize: "1.05rem"
+                  background: "rgba(255,255,255,0.05)",
+                  backdropFilter: "blur(4px)",
+                  fontSize: "1rem"
                 }}
               >
                 <Store className="w-5 h-5" />
@@ -274,10 +269,10 @@ export function DesaJetisPage() {
       </section>
 
       {/* ======================== STATS ======================== */}
-      <section style={{ background: "#3D2B1F" }} className="relative py-8 overflow-hidden">
+      <section style={{ background: "#3D2B1F" }} className="relative py-6 sm:py-8 overflow-hidden">
         <BatikBackground opacity={0.08} patternType="parang" />
-        <div className="container flex justify-around px-4 relative z-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 lg:gap-30">
+        <div className="container px-4 relative z-10 mx-auto">
+          <div className="grid grid-cols-4 gap-1 sm:gap-3 md:gap-8 lg:gap-30 max-w-6xl mx-auto">
             {[
               { value: "100+", label: "Tahun Tradisi", icon: Award },
               { value: "350+", label: "Pengrajin Aktif", icon: Users },
@@ -286,14 +281,14 @@ export function DesaJetisPage() {
             ].map((s, i) => {
               const Icon = s.icon;
               return (
-                <div key={i} className="flex items-center gap-4">
+                <div key={i} className="flex flex-col items-center text-center gap-2 p-2 sm:p-3 md:flex-row md:items-center md:text-left md:gap-4 md:p-4 rounded-2xl">
                   <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{ background: "rgba(212, 184, 139, 0.15)", border: "1px solid rgba(212, 184, 139, 0.25)" }}>
                     <Icon className="w-6 h-6" style={{ color: "#D4B88B" }} />
                   </div>
                   <div>
-                    <div style={{ color: "#D4B88B", fontSize: "1.5rem", fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>{s.value}</div>
-                    <div style={{ color: "rgba(250, 248, 245, 0.7)", fontSize: "0.8rem", marginTop: "0.25rem" }}>{s.label}</div>
+                    <div style={{ color: "#D4B88B", fontSize: "clamp(1.2rem, 3vw, 1.5rem)", fontFamily: "'Playfair Display', serif", fontWeight: 600 }}>{s.value}</div>
+                    <div style={{ color: "rgba(250, 248, 245, 0.7)", fontSize: "0.75rem", marginTop: "0.1rem" }}>{s.label}</div>
                   </div>
                 </div>
               );
@@ -305,54 +300,47 @@ export function DesaJetisPage() {
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
       {/* ======================== ABOUT ======================== */}
-      <section className="py-24 relative overflow-hidden">
+      <section className="py-16 sm:py-24 relative overflow-hidden">
         <BatikBackground opacity={0.04} patternType="floral" />
         
-        {/* Decorative Elements */}
-        <div className="absolute top-40 right-0 w-96 h-96 rounded-full opacity-8" style={{ background: "radial-gradient(circle, #8B6F47 0%, transparent 70%)" }} />
-        
         <div className="container mx-auto px-6 relative z-10 max-w-7xl">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 sm:gap-16 items-center">
             {/* Image Side */}
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.7 }}
-              className="relative"
+              className="relative order-2 lg:order-1"
             >
-              {/* Decorative Corner Elements */}
-              <div className="absolute -top-4 -left-4 w-16 h-16 rounded-2xl" style={{ border: "2px solid rgba(212, 184, 139, 0.35)", borderRight: "none", borderBottom: "none" }} />
-              <div className="absolute -bottom-4 -right-4 w-16 h-16 rounded-2xl" style={{ border: "2px solid rgba(212, 184, 139, 0.35)", borderLeft: "none", borderTop: "none" }} />
-              
-              <div className="grid grid-cols-2 gap-5">
-                <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-5">
+                <div className="space-y-3 sm:space-y-5">
                   <motion.div
                     whileHover={{ scale: 1.02 }}
-                    className="h-64 rounded-3xl overflow-hidden shadow-xl"
+                    className="h-48 sm:h-64 rounded-3xl overflow-hidden shadow-xl"
                     style={{ border: "1px solid rgba(212, 184, 139, 0.3)" }}
                   >
                     <img src={artisanImg} alt="Pengrajin batik" className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                   </motion.div>
                   <motion.div
                     whileHover={{ scale: 1.02 }}
-                    className="h-44 rounded-3xl overflow-hidden shadow-xl"
+                    className="h-32 sm:h-44 rounded-3xl overflow-hidden shadow-xl"
                     style={{ border: "1px solid rgba(212, 184, 139, 0.3)" }}
                   >
                     <img src={storeImg} alt="Toko batik" className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                   </motion.div>
                 </div>
-                <div className="space-y-5 pt-10">
+                <div className="space-y-3 sm:space-y-5 pt-6 sm:pt-10">
                   <motion.div
                     whileHover={{ scale: 1.02 }}
-                    className="h-44 rounded-3xl overflow-hidden shadow-xl"
+                    className="h-32 sm:h-44 rounded-3xl overflow-hidden shadow-xl"
                     style={{ border: "1px solid rgba(212, 184, 139, 0.3)" }}
                   >
                     <img src={workshopImg} alt="Workshop batik" className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                   </motion.div>
                   <motion.div
                     whileHover={{ scale: 1.02 }}
-                    className="h-64 rounded-3xl overflow-hidden shadow-xl"
+                    className="h-48 sm:h-64 rounded-3xl overflow-hidden shadow-xl"
                     style={{ border: "1px solid rgba(212, 184, 139, 0.3)" }}
                   >
                     <img src={batikFabricImg} alt="Kain batik" className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
@@ -367,33 +355,32 @@ export function DesaJetisPage() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.7, delay: 0.2 }}
+              className="order-1 lg:order-2"
             >
-              <h2 className="mb-7" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2rem, 4vw, 2.75rem)", lineHeight: "1.2", fontWeight: 700 }}>
-                Mengapa RekaBatik Memilih Desa Jetis?
+              <div className="inline-block px-3 py-1 rounded-lg mb-4" style={{ background: "rgba(212, 184, 139, 0.15)", border: "1px solid rgba(212, 184, 139, 0.25)" }}>
+                <span className="text-[10px] font-bold tracking-widest text-[#8B6F47] uppercase">Warisan Budaya</span>
+              </div>
+              <h2 className="mb-6" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(1.75rem, 4.5vw, 2.75rem)", lineHeight: "1.2", fontWeight: 700 }}>
+                Mengapa RekaBatik<br className="hidden sm:block" /> Memilih Desa Jetis?
               </h2>
               
-              <div className="space-y-5 mb-8" style={{ color: "#7A6B5E", lineHeight: "1.9", fontSize: "1rem" }}>
+              <div className="space-y-5 mb-10 text-[13px] sm:text-base" style={{ color: "#7A6B5E", lineHeight: "1.8" }}>
                 <p>
                   Desa Batik Jetis di Sidoarjo, Jawa Timur, adalah salah satu sentra batik tertua dan terbaik di Indonesia. 
                   Sejak awal abad ke-20, pengrajin di sini telah mewarisi keahlian membatik secara turun-temurun.
                 </p>
                 <p>
                   Ciri khas batik Jetis adalah motif <span style={{ color: "#3D2B1F", fontWeight: 700, fontFamily: "'Playfair Display', serif" }}>Beras Utah</span> — butiran beras berserakan yang terinspirasi dari kelimpahan pertanian setempat. 
-                  Motif ini sudah mendapatkan Hak Kekayaan Intelektual (HAKI) dan menjadi ikon batik Sidoarjo.
-                </p>
-                <p>
-                  Di RekaBatik, kami percaya bahwa batik terbaik dibuat dengan tangan yang penuh cinta dan pengalaman. 
-                  Oleh karena itu, kami bekerja sama langsung dengan pengrajin lokal terbaik di Desa Jetis untuk memastikan setiap karya memiliki kualitas premium.
                 </p>
               </div>
 
-              {/* Features */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Features Grid - 2x2 on mobile */}
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 {[
-                  { icon: Award, text: "Kualitas Premium", desc: "Bahan dan pewarna terbaik" },
-                  { icon: Users, text: "Pengrajin Berpengalaman", desc: "Pengalaman turun temurun" },
-                  { icon: Heart, text: "Cinta & Dedikasi", desc: "Setiap karya dibuat dengan hati" },
-                  { icon: Sparkles, text: "Motif Tradisional", desc: "Motif khas Jawa Timur" },
+                  { icon: Award, text: "Premium", desc: "Kualitas terbaik" },
+                  { icon: Users, text: "Lokal", desc: "Asli Desa Jetis" },
+                  { icon: Heart, text: "Handmade", desc: "Dibuat manual" },
+                  { icon: Sparkles, text: "HAKI", desc: "Motif Terdaftar" },
                 ].map((item, i) => {
                   const Icon = item.icon;
                   return (
@@ -403,16 +390,15 @@ export function DesaJetisPage() {
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.4, delay: 0.2 + i * 0.1 }}
-                      className="p-5 rounded-2xl"
-                      style={{ background: "rgba(212, 184, 139, 0.1)", border: "1px solid rgba(212, 184, 139, 0.25)" }}
+                      className="p-3 sm:p-4 rounded-2xl bg-white border border-[#E8E1DA] hover:border-[#D4B88B] transition-colors"
                     >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(212, 184, 139, 0.25)" }}>
-                          <Icon className="w-5 h-5" style={{ color: "#8B6F47" }} />
+                      <div className="flex items-center gap-2.5 mb-1.5">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(212, 184, 139, 0.15)" }}>
+                          <Icon className="w-4 h-4" style={{ color: "#8B6F47" }} />
                         </div>
-                        <span style={{ color: "#3D2B1F", fontWeight: 600, fontSize: "1.05rem" }}>{item.text}</span>
+                        <span style={{ color: "#3D2B1F", fontWeight: 700, fontSize: "0.85rem" }}>{item.text}</span>
                       </div>
-                      <p style={{ color: "#7A6B5E", fontSize: "0.9rem" }}>{item.desc}</p>
+                      <p style={{ color: "#7A6B5E", fontSize: "0.7rem", fontWeight: 500 }}>{item.desc}</p>
                     </motion.div>
                   );
                 })}
@@ -425,16 +411,16 @@ export function DesaJetisPage() {
       <BatikDivider />
 
       {/* ======================== SEJARAH / TIMELINE ======================== */}
-      <section id="sejarah" className="py-20 relative overflow-hidden"
+      <section id="sejarah" className="py-16 sm:py-20 relative overflow-hidden"
         style={{ background: "#FAF8F5" }}>
         <BatikBackground opacity={0.04} patternType="kawung" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-14">
+        <div className="container mx-auto px-6 relative z-10">
+          <div className="text-center mb-10 sm:mb-14">
             <div className="inline-block px-4 py-1.5 rounded-full mb-4"
               style={{ background: "rgba(212, 184, 139, 0.2)", color: "#8B6F47" }}>
-              <span style={{ fontSize: "0.75rem", letterSpacing: "0.12em", fontWeight: "bold" }}>SEJARAH & PERJALANAN</span>
+              <span style={{ fontSize: "0.7rem", letterSpacing: "0.1em", fontWeight: "bold" }}>SEJARAH & PERJALANAN</span>
             </div>
-            <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "2.7rem", fontWeight: 600 }}>
+            <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(2rem, 5vw, 2.7rem)", fontWeight: 700 }}>
               Jejak Waktu Batik Jetis
             </h2>
           </div>
@@ -442,33 +428,38 @@ export function DesaJetisPage() {
           <div className="max-w-4xl mx-auto">
             <div className="relative">
               {/* Timeline line */}
-              <div className="absolute left-6 top-0 bottom-0 w-0.5"
+              <div className="absolute left-5 sm:left-6 top-0 bottom-0 w-0.5"
                 style={{ background: "linear-gradient(to bottom, #D4B88B, rgba(212, 184, 139, 0.2))" }} />
 
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {timeline.map((item, i) => (
-                  <div key={i} className="flex gap-6 group">
+                  <motion.div 
+                    key={i} 
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    className="flex gap-4 sm:gap-6 group"
+                  >
                     <div className="flex-shrink-0 relative">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center relative z-10 transition-all group-hover:scale-110"
-                        style={{ background: i === 0 || i === timeline.length - 1 ? "#D4B88B" : "white", border: "2px solid #D4B88B" }}>
-                        <span style={{ fontSize: "1rem", color: i === 0 || i === timeline.length - 1 ? "#3D2B1F" : "#8B6F47", fontFamily: "'Playfair Display', serif", fontWeight: "bold" }}>
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center relative z-10 transition-all group-hover:scale-110 bg-white border-2 border-[#D4B88B] shadow-sm">
+                        <span style={{ fontSize: "0.8rem", color: "#8B6F47", fontFamily: "'Playfair Display', serif", fontWeight: "bold" }}>
                           {item.year.slice(-2)}
                         </span>
                       </div>
                     </div>
                     {/* Item Year Content */}
-                    <div className="flex-1 pb-1">
-                      <div className="p-5 rounded-2xl transition-all group-hover:shadow-md overflow-hidden"
-                        style={{ background: "white", border: "1px solid #E8E1DA" }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.4rem", fontWeight: "bold" }}>
+                    <div className="flex-1 pb-2">
+                      <div className="p-4 sm:p-5 rounded-2xl transition-all group-hover:shadow-md overflow-hidden bg-white border border-[#E8E1DA]">
+                        <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                          <span style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.1rem sm:1.3rem", fontWeight: "bold" }}>
                             {item.year}
                           </span>
                         </div>
-                        <p style={{ color: "#7A6B5E", fontSize: "1rem", lineHeight: "1.75" }}>{item.event}</p>
+                        <p style={{ color: "#7A6B5E", fontSize: "0.85rem sm:0.95rem", lineHeight: "1.6" }}>{item.event}</p>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -477,117 +468,120 @@ export function DesaJetisPage() {
       </section>
 
       {/* ======================== TOKO-TOKO ======================== */}
-      <section id="toko" className="py-20 relative overflow-hidden max-w-[185vh] mx-auto">
+      <section id="toko" className="py-16 sm:py-20 relative overflow-hidden max-w-[185vh] mx-auto">
         <BatikBackground opacity={0.04} patternType="floral" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-10">
-            <h2 className="mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "2.55rem", fontWeight: 700 }}>
+        <div className="container mx-auto px-6 relative z-10">
+          <div className="text-center mb-8 sm:mb-10">
+            <h2 className="mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(1.8rem, 5vw, 2.55rem)", fontWeight: 700 }}>
               Toko Batik di Desa Jetis
             </h2>
-            <p style={{ color: "#7A6B5E", fontSize: "0.975rem" }}>
+            <p style={{ color: "#7A6B5E", fontSize: "0.9rem sm:0.975rem" }}>
               Temukan pengrajin dan toko batik terbaik di jantung sentra batik Sidoarjo
             </p>
           </div>
 
-          {/* Filter tags */}
-          <div className="flex flex-wrap gap-2 justify-center mb-9">
-            {allTags.map((tag) => (
-              <motion.button
-                key={tag}
-                onClick={() => setFilterTag(tag)}
-                className="px-5 py-2.5 rounded-full text-sm"
-                animate={{
-                  background: filterTag === tag ? "linear-gradient(135deg, #8B6F47, #A88967)" : "rgba(212, 184, 139, 0.15)",
-                  color: filterTag === tag ? "#FFFFFF" : "#7A6B5E",
-                  borderWidth: filterTag === tag ? 0 : 1,
-                  borderColor: filterTag === tag ? "transparent" : "rgba(212, 184, 139, 0.3)",
-                  scale: filterTag === tag ? 1.02 : 1,
-                }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{
-                  fontWeight: 600,
-                }}
-              >
-                {tag === "all" ? "Semua Toko" : tag}
-              </motion.button>
-            ))}
+          {/* Filter tags - Edge-to-edge scrollable on mobile */}
+          <div className="-mx-6 px-6 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] mb-8 sm:mb-10">
+            <div className="flex gap-2 min-w-max sm:justify-center">
+              {allTags.map((tag) => (
+                <motion.button
+                  key={tag}
+                  onClick={() => setFilterTag(tag)}
+                  className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-sm whitespace-nowrap"
+                  animate={{
+                    background: filterTag === tag ? "linear-gradient(135deg, #8B6F47, #A88967)" : "rgba(212, 184, 139, 0.12)",
+                    color: filterTag === tag ? "#FFFFFF" : "#7A6B5E",
+                    borderWidth: filterTag === tag ? 0 : 1,
+                    borderColor: filterTag === tag ? "transparent" : "rgba(212, 184, 139, 0.2)",
+                    scale: filterTag === tag ? 1.02 : 1,
+                  }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  style={{ fontWeight: 600 }}
+                >
+                  {tag === "all" ? "Semua Toko" : tag}
+                </motion.button>
+              ))}
+            </div>
           </div>
 
-          {/* All stores grid - semua card sama besar */}
+          {/* All stores grid - Shopee style grid 2 kolom di mobile */}
           {loading ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="rounded-2xl overflow-hidden bg-white border border-[#E8E1DA]">
-                  <Skeleton className="h-48 w-full rounded-none" style={{ background: "#FAF8F5" }} />
-                  <div className="p-5 space-y-3">
-                    <Skeleton className="h-5 w-3/4" style={{ background: "#FAF8F5" }} />
-                    <Skeleton className="h-4 w-full" style={{ background: "#FAF8F5" }} />
-                    <Skeleton className="h-4 w-full" style={{ background: "#FAF8F5" }} />
-                    <Skeleton className="h-4 w-1/2" style={{ background: "#FAF8F5" }} />
-                    <Skeleton className="h-9 w-full rounded-xl" style={{ background: "#FAF8F5" }} />
+                  <Skeleton className="h-32 sm:h-48 w-full rounded-none" style={{ background: "#FAF8F5" }} />
+                  <div className="p-3 sm:p-5 space-y-3">
+                    <Skeleton className="h-4 w-3/4" style={{ background: "#FAF8F5" }} />
+                    <Skeleton className="h-3 w-full" style={{ background: "#FAF8F5" }} />
+                    <Skeleton className="h-3 w-full" style={{ background: "#FAF8F5" }} />
+                    <Skeleton className="h-8 w-full rounded-xl" style={{ background: "#FAF8F5" }} />
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {filteredStores.map((store) => (
                 <MotionLink
                   key={store.id}
                   to={`/desa-jetis/${store.id}`}
-                  className="rounded-2xl overflow-hidden transition-all"
-                  whileHover={{ y: -8, boxShadow: "0 20px 40px rgba(61, 43, 31, 0.15)" }}
+                  className="rounded-2xl overflow-hidden transition-all flex flex-col h-full"
+                  whileHover={{ y: -5, boxShadow: "0 15px 30px rgba(61, 43, 31, 0.1)" }}
                   transition={{ duration: 0.3, ease: "easeOut" }}
-                  style={{ background: "white", border: "1px solid #E8E1DA", boxShadow: "0 2px 12px rgba(61, 43, 31, 0.06)" }}
+                  style={{ background: "white", border: "1px solid #E8E1DA", boxShadow: "0 2px 8px rgba(61, 43, 31, 0.04)" }}
                 >
-                  <div className="h-48 relative overflow-hidden">
+                  <div className="h-36 sm:h-48 relative overflow-hidden flex-shrink-0">
                     <img src={store.image} alt={store.name} className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" />
-                    <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(61, 43, 31, 0.9) 0%, rgba(61, 43, 31, 0.4) 60%, transparent 80%)" }} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
                     <button
                       onClick={(e) => toggleFavoriteStore(store.id, e)}
-                      className="absolute top-4 right-4 p-2 rounded-full bg-white/90 shadow-sm hover:scale-110 transition-all z-10"
-                      title={favoriteStoreIds.includes(store.id) ? "Hapus dari favorit" : "Tambah ke favorit"}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 shadow-sm hover:scale-110 transition-all z-10"
                     >
                       <Heart
-                        className="w-5 h-5"
+                        className="w-3.5 h-3.5"
                         fill={favoriteStoreIds.includes(store.id) ? "#EF4444" : "none"}
                         style={{ color: favoriteStoreIds.includes(store.id) ? "#EF4444" : "#3D2B1F" }}
                       />
                     </button>
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <h3 style={{ color: "#FAF8F5", fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700 }}>
-                        {store.name}
-                      </h3>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <StarRating rating={store.rating} />
-                        <span style={{ color: "rgba(250, 248, 245, 0.8)", fontSize: "0.75rem", fontWeight: 500 }}>
-                          ({store.review_count} ulasan)
-                        </span>
+                    {store.featured && (
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-[#D4B88B] text-white text-[9px] font-bold tracking-wider shadow-sm">
+                        PREMIUM
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="p-5">
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {store.tags?.slice(0, 2).map((t, ti) => (
-                        <span key={ti} className="px-2.5 py-1 rounded-full"
-                          style={{ background: "rgba(212, 184, 139, 0.18)", color: "#8B6F47", fontSize: "0.725rem", fontWeight: 600, border: "1px solid rgba(212, 184, 139, 0.3)" }}>
+                  <div className="p-3 sm:p-4 flex flex-col flex-1">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      {store.tags?.slice(0, 1).map((t, ti) => (
+                        <span key={ti} className="px-2 py-0.5 rounded-md"
+                          style={{ background: "rgba(212, 184, 139, 0.12)", color: "#8B6F47", fontSize: "0.65rem", fontWeight: 700, border: "1px solid rgba(212, 184, 139, 0.2)" }}>
                           {t}
                         </span>
                       ))}
+                      <div className="flex items-center gap-1 ml-auto">
+                        <Star className="w-2.5 h-2.5 fill-[#D4B88B] text-[#D4B88B]" />
+                        <span style={{ color: "#3D2B1F", fontSize: "0.7rem", fontWeight: 700 }}>{store.rating}</span>
+                      </div>
                     </div>
-                    <p className="line-clamp-2 mb-4" style={{ color: "#7A6B5E", fontSize: "0.875rem", lineHeight: "1.7" }}>
+                    
+                    <h3 className="font-bold text-[#3D2B1F] text-xs sm:text-sm mb-1.5 line-clamp-1" style={{ fontFamily: "'Inter', sans-serif" }}>
+                      {store.name}
+                    </h3>
+                    
+                    <p className="line-clamp-2 mb-3 text-[10px] sm:text-[11px] leading-relaxed" style={{ color: "#7A6B5E" }}>
                       {store.description}
                     </p>
-                    <div className="flex items-center gap-1.5 mb-3" style={{ color: "#A89B8F", fontSize: "0.775rem" }}>
-                      <Clock className="w-3.5 h-3.5" style={{ color: "#D4B88B" }} />
-                      {store.hours}
-                    </div>
-                    <div className="flex items-center justify-between pt-2" style={{ borderTop: "1px solid rgba(212, 184, 139, 0.25)" }}>
-                      <span style={{ color: "#3D2B1F", fontSize: "1.05rem", fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>
-                        {store.price_range}
-                      </span>
-                      <ChevronRight className="w-4 h-4" style={{ color: "#D4B88B" }} />
+
+                    <div className="flex items-center justify-between pt-2.5 mt-auto border-t border-[#F0EBE5]">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] text-[#A89B8F] font-semibold uppercase tracking-wider">Mulai</span>
+                        <span className="text-[#8B6F47] text-[11px] sm:text-xs font-bold">
+                          {store.price_range ? store.price_range.split("-")[0].trim() : "Hubungi Kami"}
+                        </span>
+                      </div>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center bg-[#FAF8F5] group-hover:bg-[#8B6F47] group-hover:text-white transition-colors">
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
                     </div>
                   </div>
                 </MotionLink>
@@ -600,11 +594,8 @@ export function DesaJetisPage() {
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
       {/* ======================== WISATA INFO ======================== */}
-      <section className="py-24 relative overflow-hidden" style={{ background: "#3D2B1F" }}>
+      <section className="py-16 sm:py-24 relative overflow-hidden" style={{ background: "#3D2B1F" }}>
         <BatikBackground opacity={0.08} patternType="parang" />
-        {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
-        <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
         
         <div className="container mx-auto px-6 relative z-10 max-w-7xl">
           <motion.div 
@@ -612,55 +603,50 @@ export function DesaJetisPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-16"
+            className="text-center mb-10 sm:mb-16"
           >
-            <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#FAF8F5", fontSize: "clamp(2rem, 4vw, 2.75rem)", marginBottom: "1rem" }}>
-              Jelajahi Keajaiban Desa Jetis
+            <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#FAF8F5", fontSize: "clamp(1.8rem, 5vw, 2.75rem)", marginBottom: "0.75rem" }}>
+              Jelajahi Desa Jetis
             </h2>
-            <p style={{ color: "rgba(250, 248, 245, 0.75)", fontSize: "1.05rem", maxWidth: "600px", margin: "0 auto" }}>
+            <p style={{ color: "rgba(250, 248, 245, 0.75)", fontSize: "0.95rem sm:1.05rem", maxWidth: "600px", margin: "0 auto" }}>
               Nikmati pengalaman wisata budaya batik yang tak terlupakan
             </p>
           </motion.div>
 
-          <div className="grid lg:grid-cols-3 gap-8">
+          <div className="grid lg:grid-cols-3 gap-5 sm:gap-8">
             {/* Cara sampai */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              whileHover={{ y: -8 }}
-              className="group p-8 rounded-3xl"
+              className="p-6 sm:p-8 rounded-3xl"
               style={{
-                background: "linear-gradient(145deg, rgba(212, 184, 139, 0.15), rgba(212, 184, 139, 0.05))",
-                border: "1px solid rgba(212, 184, 139, 0.25)",
+                background: "linear-gradient(145deg, rgba(212, 184, 139, 0.12), rgba(212, 184, 139, 0.05))",
+                border: "1px solid rgba(212, 184, 139, 0.2)",
                 backdropFilter: "blur(10px)"
               }}
             >
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ background: "rgba(212,184,139,0.2)" }}>
-                <MapPin className="w-8 h-8" style={{ color: "#D4B88B" }} />
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 sm:mb-6" style={{ background: "rgba(212,184,139,0.2)" }}>
+                <MapPin className="w-6 h-6" style={{ color: "#D4B88B" }} />
               </div>
-              <h3 className="mb-5" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.35rem", fontWeight: 700 }}>
+              <h3 className="mb-4 sm:mb-5" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.2rem sm:1.3rem", fontWeight: 700 }}>
                 Menuju Desa Jetis
               </h3>
-              <ul className="space-y-4">
+              <ul className="space-y-3.5 sm:space-y-4">
                 {[
-                  { icon: Car, text: "Dari Surabaya: ±30 menit via Tol Waru-Sidoarjo" },
-                  { icon: Bus, text: "Bus Surabaya-Sidoarjo, turun Terminal Purabaya" },
-                  { icon: Bike, text: "Ojek online dari Alun-alun: ±10 menit" },
-                  { icon: MapPin, text: "Koordinat: -7.4458°S, 112.7168°E" }
+                  { icon: Car, text: "±30 menit via Tol Sidoarjo" },
+                  { icon: Bus, text: "Turun di Terminal Purabaya" },
+                  { icon: Bike, text: "Ojek online dari pusat kota" },
                 ].map((item, i) => (
-                  <motion.li 
-                    key={i} 
-                    className="flex items-start gap-4"
-                    whileHover={{ x: 4 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#D4B88B" }} />
-                    <span style={{ color: "rgba(250, 248, 245, 0.85)", fontSize: "0.95rem", lineHeight: "1.6" }}>
+                  <li key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(212, 184, 139, 0.1)" }}>
+                      <item.icon className="w-3 h-3" style={{ color: "#D4B88B" }} />
+                    </div>
+                    <span style={{ color: "rgba(250, 248, 245, 0.8)", fontSize: "0.85rem", fontWeight: 500 }}>
                       {item.text}
                     </span>
-                  </motion.li>
+                  </li>
                 ))}
               </ul>
             </motion.div>
@@ -671,38 +657,33 @@ export function DesaJetisPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              whileHover={{ y: -8 }}
-              className="group p-8 rounded-3xl"
+              className="p-6 sm:p-8 rounded-3xl"
               style={{
-                background: "linear-gradient(145deg, rgba(212, 184, 139, 0.15), rgba(212, 184, 139, 0.05))",
-                border: "1px solid rgba(212, 184, 139, 0.25)",
+                background: "linear-gradient(145deg, rgba(212, 184, 139, 0.12), rgba(212, 184, 139, 0.05))",
+                border: "1px solid rgba(212, 184, 139, 0.2)",
                 backdropFilter: "blur(10px)"
               }}
             >
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ background: "rgba(212,184,139,0.2)" }}>
-                <Camera className="w-8 h-8" style={{ color: "#D4B88B" }} />
+              <div className="w-12 rounded-2xl flex items-center justify-center mb-5 sm:mb-6" style={{ height: "3rem", background: "rgba(212,184,139,0.2)" }}>
+                <Camera className="w-6 h-6" style={{ color: "#D4B88B" }} />
               </div>
-              <h3 className="mb-5" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.35rem", fontWeight: 700 }}>
+              <h3 className="mb-4 sm:mb-5" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.2rem sm:1.3rem", fontWeight: 700 }}>
                 Tips Berkunjung
               </h3>
-              <ul className="space-y-4">
+              <ul className="space-y-3.5 sm:space-y-4">
                 {[
-                  { icon: Watch, text: "Pagi hari (08.00–11.00) saat pengrajin aktif" },
-                  { icon: Camera, text: "Tanyakan izin sebelum memotret proses" },
-                  { icon: Wallet, text: "Bawa uang tunai untuk transaksi mudah" },
-                  { icon: Sparkles, text: "Workshop batik mulai Rp 75.000/orang" }
+                  { icon: Watch, text: "Datang pagi saat pengrajin aktif" },
+                  { icon: Camera, text: "Minta izin sebelum memotret" },
+                  { icon: Wallet, text: "Siapkan uang tunai secukupnya" },
                 ].map((item, i) => (
-                  <motion.li 
-                    key={i} 
-                    className="flex items-start gap-4"
-                    whileHover={{ x: 4 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "#D4B88B" }} />
-                    <span style={{ color: "rgba(250, 248, 245, 0.85)", fontSize: "0.95rem", lineHeight: "1.6" }}>
+                  <li key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(212, 184, 139, 0.1)" }}>
+                      <item.icon className="w-3 h-3" style={{ color: "#D4B88B" }} />
+                    </div>
+                    <span style={{ color: "rgba(250, 248, 245, 0.8)", fontSize: "0.85rem", fontWeight: 500 }}>
                       {item.text}
                     </span>
-                  </motion.li>
+                  </li>
                 ))}
               </ul>
             </motion.div>
@@ -713,42 +694,38 @@ export function DesaJetisPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              whileHover={{ y: -8 }}
-              className="group p-8 rounded-3xl relative overflow-hidden"
+              className="p-6 sm:p-8 rounded-3xl relative overflow-hidden"
               style={{
                 background: "linear-gradient(135deg, rgba(212, 184, 139, 0.25), rgba(139, 111, 71, 0.1))",
                 border: "2px solid rgba(212, 184, 139, 0.4)",
                 backdropFilter: "blur(10px)"
               }}
             >
-              <div className="absolute top-0 right-0 w-32 h-32 opacity-20" style={{ transform: "translate(30%, -30%)" }}>
-                <div className="w-full h-full rounded-full" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
-              </div>
               <div className="relative z-10">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ background: "rgba(212,184,139,0.3)" }}>
-                  <ExternalLink className="w-8 h-8" style={{ color: "#D4B88B" }} />
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-5 sm:mb-6" style={{ background: "rgba(212,184,139,0.3)" }}>
+                  <ExternalLink className="w-6 h-6 sm:w-8 sm:h-8" style={{ color: "#D4B88B" }} />
                 </div>
-                <h3 className="mb-4" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.35rem", fontWeight: 700 }}>
-                  Pesan via RekaBatik
+                <h3 className="mb-3 sm:mb-4" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif", fontSize: "1.2rem sm:1.35rem", fontWeight: 700 }}>
+                  Pesan Online
                 </h3>
-                <p className="mb-7" style={{ color: "rgba(250, 248, 245, 0.88)", fontSize: "0.98rem", lineHeight: "1.75" }}>
-                  Tidak bisa datang langsung? Kustomisasi batik impian Anda secara online dan kami hubungkan dengan pengrajin terbaik di Desa Jetis.
+                <p className="mb-6 sm:mb-7" style={{ color: "rgba(250, 248, 245, 0.88)", fontSize: "0.85rem sm:0.98rem", lineHeight: "1.6" }}>
+                  Kustomisasi batik impian Anda secara online dan kami hubungkan dengan pengrajin Desa Jetis.
                 </p>
                 <MotionLink
                   to="/custom"
-                  className="inline-flex items-center justify-center gap-3 px-7 py-4 rounded-2xl w-full"
-                  whileHover={{ scale: 1.03 }}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full w-full"
+                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
                   style={{ 
                     background: "linear-gradient(135deg, #D4B88B, #C9AB7F)",
                     color: "#3D2B1F",
                     fontWeight: 700,
-                    boxShadow: "0 8px 24px rgba(212, 184, 139, 0.35)"
+                    fontSize: "0.9rem",
+                    boxShadow: "0 8px 20px rgba(212, 184, 139, 0.3)"
                   }}
                 >
-                  <span>Mulai Kustomisasi</span>
-                  <ChevronRight className="w-5 h-5" />
+                  <span>Mulai Sekarang</span>
+                  <ChevronRight className="w-4 h-4" />
                 </MotionLink>
               </div>
             </motion.div>

@@ -46,6 +46,9 @@ const statusConfig = {
 
 const stepLabels = ["Pesanan Diterima", "Pengrajin Membatik", "Siap Kirim", "Terkirim"];
 
+const SHIPPING_COST = 20000;
+const SERVICE_FEE = 1000;
+
 const paymentMethodLabel: Record<string, React.ReactNode> = {
   transfer_bca: <span className="flex items-center gap-2"><img src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Bank_Central_Asia.svg" alt="BCA" className="h-4 object-contain inline-block" /> Transfer BCA</span>,
   transfer_mandiri: <span className="flex items-center gap-2"><img src="https://upload.wikimedia.org/wikipedia/commons/a/ad/Bank_Mandiri_logo_2016.svg" alt="Mandiri" className="h-3.5 object-contain inline-block" /> Transfer Mandiri</span>,
@@ -197,6 +200,8 @@ function PaymentModal({ order, onClose, onPaid }: { order: Order; onClose: () =>
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const subtotal = Math.max(0, order.total - SHIPPING_COST - SERVICE_FEE);
+
   const methods = [
     { key: "transfer_bca", label: "Transfer BCA", icon: <img src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Bank_Central_Asia.svg" alt="BCA" className="h-5 object-contain" />, detail: "1234567890 a/n RekaBatik", color: "#0056A0" },
     { key: "transfer_mandiri", label: "Transfer Mandiri", icon: <img src="https://upload.wikimedia.org/wikipedia/commons/a/ad/Bank_Mandiri_logo_2016.svg" alt="Mandiri" className="h-4 object-contain" />, detail: "9876543210 a/n RekaBatik", color: "#003087" },
@@ -213,25 +218,47 @@ function PaymentModal({ order, onClose, onPaid }: { order: Order; onClose: () =>
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-0"
       style={{ background: "rgba(61,43,31,0.55)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
     >
       <motion.div
         initial={{ y: 40, scale: 0.96 }} animate={{ y: 0, scale: 1 }} exit={{ y: 40, scale: 0.96 }}
-        className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden"
         style={{ boxShadow: "0 -20px 60px rgba(61,43,31,0.2)" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white rounded-t-3xl flex items-center justify-between px-6 py-4 z-10" style={{ borderBottom: "1px solid rgba(212,184,139,0.2)" }}>
-          <div>
-            <h3 className="font-bold" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Pilih Metode Pembayaran</h3>
-            <p className="text-xs mt-0.5" style={{ color: "#A89B8F" }}>Total: <strong style={{ color: "#8B6F47", fontSize: "0.95rem" }}>Rp {order.total.toLocaleString("id-ID")}</strong></p>
+        <div className="sticky top-0 bg-white rounded-t-3xl px-6 py-4 z-10" style={{ borderBottom: "1px solid rgba(212,184,139,0.2)" }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Metode Pembayaran</h3>
+              <p className="text-[10px] mt-0.5" style={{ color: "#A89B8F" }}>Pesanan: <span className="font-mono text-[9px]">{order.id}</span></p>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+              <X className="w-5 h-5" style={{ color: "#7A6B5E" }} />
+            </button>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-            <X className="w-5 h-5" style={{ color: "#7A6B5E" }} />
-          </button>
+          
+          {/* Ringkasan Biaya di Modal Pembayaran */}
+          <div className="mt-4 p-3 rounded-2xl bg-[#FAF8F5] border border-stone-100 space-y-1.5">
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="text-stone-400">Subtotal ({order.quantity || 1}x)</span>
+              <span className="text-stone-600 font-medium">Rp {subtotal.toLocaleString("id-ID")}</span>
+            </div>
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="text-stone-400">Biaya Pengiriman</span>
+              <span className="text-stone-600 font-medium">Rp {SHIPPING_COST.toLocaleString("id-ID")}</span>
+            </div>
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="text-stone-400">Biaya Layanan</span>
+              <span className="text-stone-600 font-medium">Rp {SERVICE_FEE.toLocaleString("id-ID")}</span>
+            </div>
+            <div className="flex justify-between items-center pt-1.5 mt-1.5 border-t border-stone-200">
+              <span className="text-xs font-bold text-stone-700">Total Bayar</span>
+              <span className="text-sm font-bold text-[#8B6F47]">Rp {order.total.toLocaleString("id-ID")}</span>
+            </div>
+          </div>
         </div>
 
         <div className="px-6 py-5 space-y-3">
@@ -302,6 +329,8 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
   const isExpired = order.payment_status === "pending" && order.status !== "cancelled" && new Date(order.date).getTime() + 86400000 < Date.now();
   const isUnpaid = order.payment_status === "pending" && order.total > 0 && order.status !== "negotiating" && order.status !== "cancelled" && !isExpired;
 
+  const subtotal = Math.max(0, order.total - SHIPPING_COST - SERVICE_FEE);
+
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = "unset"; };
@@ -316,129 +345,61 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
     >
       <motion.div
         initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-        className="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        className="bg-white rounded-3xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         style={{ boxShadow: "0 30px 80px rgba(61,43,31,0.2)" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 flex items-center justify-between px-6 py-4 bg-white rounded-t-3xl z-10" style={{ borderBottom: "1px solid rgba(212,184,139,0.2)" }}>
-          <div>
-            <p className="text-xs font-medium" style={{ color: "#A89B8F" }}>Nomor Pesanan</p>
-            <p className="font-mono font-bold" style={{ color: "#3D2B1F" }}>{order.id}</p>
+        <div className="sticky top-0 flex items-center justify-between px-5 py-3.5 bg-white rounded-t-3xl z-10 border-b" style={{ borderColor: "rgba(212,184,139,0.2)" }}>
+          <div className="min-w-0 pr-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#8B6F47]/10 flex items-center justify-center text-[#8B6F47] flex-shrink-0">
+              <Package className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-mono font-bold text-xs truncate" style={{ color: "#3D2B1F" }}>{order.id}</p>
+              <p className="text-[9px] font-medium" style={{ color: "#A89B8F" }}>{new Date(order.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><X className="w-5 h-5" style={{ color: "#7A6B5E" }} /></button>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"><X className="w-5 h-5" style={{ color: "#7A6B5E" }} /></button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
-          {/* Pay Now Banner (if unpaid) */}
-          {isUnpaid && (
+        <div className="p-4 space-y-4">
+          {/* Pay Now / Expired Banners (Compact) */}
+          {(isUnpaid || isExpired) && (
             <motion.div
               initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-              className="p-4 rounded-2xl flex items-center gap-3"
-              style={{ background: "linear-gradient(135deg, #FFF7ED, #FFFBF5)", border: "2px solid rgba(217,119,6,0.25)" }}
+              className="p-3 rounded-xl flex items-center gap-3"
+              style={{ 
+                background: isUnpaid ? "linear-gradient(135deg, #FFF7ED, #FFFBF5)" : "linear-gradient(135deg, #FEF2F2, #FFF5F5)", 
+                border: `1.5px solid ${isUnpaid ? "rgba(217,119,6,0.2)" : "rgba(239,68,68,0.2)"}` 
+              }}
             >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(217,119,6,0.12)" }}>
-                <BanknoteIcon className="w-5 h-5" style={{ color: "#D97706" }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: isUnpaid ? "rgba(217,119,6,0.1)" : "rgba(239,68,68,0.1)" }}>
+                {isUnpaid ? <BanknoteIcon className="w-4 h-4 text-[#D97706]" /> : <AlertCircle className="w-4 h-4 text-[#EF4444]" />}
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold" style={{ color: "#92400E" }}>Menunggu Pembayaran</p>
-                <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                  <p className="text-xs font-semibold" style={{ color: "#B45309" }}>Total: Rp {order.total.toLocaleString("id-ID")}</p>
-                  <PaymentTimer orderDate={order.date} />
-                </div>
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                onClick={() => { onClose(); onPay(order); }}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, #D97706, #F59E0B)" }}
-              >
-                Bayar Sekarang
-              </motion.button>
-            </motion.div>
-          )}
-
-          {/* Expired Banner */}
-          {isExpired && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-              className="p-4 rounded-2xl flex items-center gap-3"
-              style={{ background: "linear-gradient(135deg, #FEF2F2, #FFF5F5)", border: "2px solid rgba(239,68,68,0.25)" }}
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(239,68,68,0.12)" }}>
-                <AlertCircle className="w-5 h-5" style={{ color: "#EF4444" }} />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold" style={{ color: "#991B1B" }}>Batas Waktu Pembayaran Habis</p>
-                <p className="text-xs mt-0.5" style={{ color: "#B91C1C" }}>Pesanan ini dibatalkan secara otomatis karena tidak dibayar dalam 24 jam.</p>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Estimated Date (custom orders) */}
-          {(order as any).estimated_date && (
-            <div className="p-3 rounded-xl flex items-center gap-3" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)" }}>
-              <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: "#3B82F6" }} />
-              <div>
-                <p className="text-xs font-medium" style={{ color: "#3B82F6" }}>Estimasi Selesai</p>
-                <p className="text-sm font-bold" style={{ color: "#1D4ED8" }}>
-                  {new Date((order as any).estimated_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold" style={{ color: isUnpaid ? "#92400E" : "#991B1B" }}>
+                  {isUnpaid ? "Menunggu Pembayaran" : "Waktu Bayar Habis"}
                 </p>
+                {isUnpaid && <PaymentTimer orderDate={order.date} />}
               </div>
-            </div>
+              {isUnpaid && (
+                <button
+                  onClick={() => { onClose(); onPay(order); }}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white flex-shrink-0"
+                  style={{ background: "linear-gradient(135deg, #D97706, #F59E0B)" }}
+                >
+                  Bayar
+                </button>
+              )}
+            </motion.div>
           )}
-          {!(order as any).estimated_date && order.status === "processing" && (
-            <div className="p-3 rounded-xl flex items-center gap-3" style={{ background: "rgba(156,163,175,0.06)", border: "1px solid rgba(156,163,175,0.2)" }}>
-              <Clock className="w-4 h-4 flex-shrink-0" style={{ color: "#9CA3AF" }} />
-              <p className="text-xs" style={{ color: "#9CA3AF" }}>Menunggu estimasi dari pengrajin</p>
-            </div>
-          )}
 
-          {/* Status Badge */}
-          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: sc.bg, border: `1px solid ${sc.border}` }}>
-            <sc.icon className="w-5 h-5" style={{ color: sc.color }} />
-            <div>
-              <p className="font-semibold text-sm" style={{ color: sc.color }}>{sc.label}</p>
-              <p className="text-xs" style={{ color: "#7A6B5E" }}>
-                {order.status === "processing" && "Pengrajin sedang memproses pesanan Anda"}
-                {order.status === "shipping" && "Paket dalam perjalanan menuju Anda"}
-                {order.status === "delivered" && `Diterima ${order.delivered_date ? new Date(order.delivered_date).toLocaleDateString("id-ID") : ""}`}
-                {order.status === "negotiating" && "Menunggu konfirmasi harga dari pengrajin"}
-              </p>
-            </div>
-          </div>
-
-          {/* Progress Tracker */}
-          <div>
-            <p className="text-sm font-semibold mb-3" style={{ color: "#5A4A3E" }}>Tracking Pesanan</p>
-            <div className="space-y-3">
-              {stepLabels.map((label, i) => {
-                const done = sc.steps[i];
-                return (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="flex flex-col items-center">
-                      <motion.div
-                        animate={{ background: done ? (i === sc.steps.filter(Boolean).length - 1 ? sc.color : "#8B6F47") : "#E8E1DA" }}
-                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                      >
-                        {done ? <CheckCircle2 className="w-4 h-4 text-white" /> : <div className="w-2 h-2 rounded-full bg-gray-300" />}
-                      </motion.div>
-                      {i < stepLabels.length - 1 && (
-                        <div className="w-0.5 h-6 mt-1" style={{ background: sc.steps[i + 1] ? "#8B6F47" : "#E8E1DA" }} />
-                      )}
-                    </div>
-                    <p className="text-sm pb-5" style={{ color: done ? "#3D2B1F" : "#B8A898", fontWeight: done ? 500 : 400 }}>{label}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Item Info */}
-          <div className="p-4 rounded-xl" style={{ background: "#FAF8F5", border: "1px solid rgba(212,184,139,0.2)" }}>
-            <div className="flex gap-3 items-center">
+          {/* Compact Info Card: Item + Status */}
+          <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-stone-100">
+            <div className="flex gap-3.5 items-start">
               <div
-                className={`w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 flex items-center justify-center border border-stone-100 ${order.bg_color?.startsWith("data:image") ? "cursor-zoom-in hover:opacity-90" : ""}`}
+                className={`w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 flex items-center justify-center border border-stone-200 ${order.bg_color?.startsWith("data:image") ? "cursor-zoom-in hover:opacity-90" : ""}`}
                 style={{ background: order.bg_color?.startsWith("data:image") ? undefined : order.bg_color }}
                 onClick={() => { if (order.bg_color?.startsWith("data:image")) onViewFullPreview(order.bg_color, order.item); }}
               >
@@ -448,132 +409,117 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
                   <PatternMini primary={order.primary_color} secondary={order.secondary_color} bg={order.bg_color} type={order.type} />
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate" style={{ color: "#3D2B1F" }}>{order.item}</p>
-                <p className="text-xs" style={{ color: "#A89B8F" }}>
-                  {order.quantity ? `Qty: ${order.quantity}` : ""} · Pengrajin: {order.artisan}
-                </p>
+              <div className="flex-1 min-w-0 pt-0.5">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border flex items-center gap-1"
+                    style={{ background: sc.bg, color: sc.color, borderColor: sc.border }}>
+                    <sc.icon className="w-2.5 h-2.5" /> {sc.label}
+                  </span>
+                  <span className="text-[10px] font-bold text-[#8B6F47]">Rp {order.total.toLocaleString("id-ID")}</span>
+                </div>
+                <h4 className="font-bold text-sm text-[#3D2B1F] truncate">{order.item}</h4>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[9px] px-1.5 py-0.5 bg-white border border-stone-200 rounded text-stone-500 font-medium">{order.quantity || 1}x Item</span>
+                  <span className="text-[9px] text-stone-400 truncate">· {order.artisan}</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Payment Info */}
-          <div className="p-4 rounded-xl space-y-2" style={{ background: "#FAF8F5", border: "1px solid rgba(212,184,139,0.2)" }}>
-            <p className="text-sm font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#5A4A3E" }}><CreditCard className="w-4 h-4" />Info Pembayaran</p>
-            <div className="flex justify-between text-sm">
-              <span style={{ color: "#7A6B5E" }}>Metode</span>
-              <span style={{ color: "#3D2B1F" }}>{paymentMethodLabel[order.payment_method || ""] || "—"}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span style={{ color: "#7A6B5E" }}>Status Bayar</span>
-              <span className={`font-semibold ${order.payment_status === "paid" ? "text-green-600" : order.payment_status === "awaiting_verification" ? "text-amber-500 animate-pulse font-bold" : order.payment_status === "failed" ? "text-red-500" : "text-amber-600"}`}>
-                {order.payment_status === "paid" ? "✓ Lunas" : order.payment_status === "awaiting_verification" ? "⏳ Menunggu Verifikasi" : order.payment_status === "failed" ? "✗ Gagal" : "⏳ Menunggu Pembayaran"}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm font-bold pt-1 border-t" style={{ borderColor: "rgba(212,184,139,0.2)" }}>
-              <span style={{ color: "#5A4A3E" }}>Total Bayar</span>
-              <span style={{ color: "#8B6F47" }}>Rp {order.total.toLocaleString("id-ID")}</span>
-            </div>
-          </div>
-
-          {/* Shipping Address */}
-          {order.shipping_address && (
-            <div className="p-4 rounded-xl" style={{ background: "#FAF8F5", border: "1px solid rgba(212,184,139,0.2)" }}>
-              <p className="text-sm font-semibold mb-2 flex items-center gap-1.5" style={{ color: "#5A4A3E" }}><MapPin className="w-4 h-4" />Alamat Pengiriman</p>
-              <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>{order.shipping_address.name} · {order.shipping_address.phone}</p>
-              <p className="text-sm" style={{ color: "#7A6B5E" }}>
-                {order.shipping_address.street}, {order.shipping_address.city}, {order.shipping_address.province} {order.shipping_address.postal_code}
+          {/* Quick Details Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Payment Summary */}
+            <div className="space-y-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#8B6F47] flex items-center gap-1.5 px-1">
+                <CreditCard className="w-3 h-3" /> Pembayaran
               </p>
-            </div>
-          )}
-
-          {/* Shipping tracking info */}
-          {order.tracking_number && (
-            <div className="p-4 rounded-xl space-y-2 bg-[#FAF8F5] border" style={{ borderColor: "rgba(59,130,246,0.15)" }}>
-              <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "#3B82F6" }}><Truck className="w-4 h-4" />Informasi Pengiriman</p>
-              <div className="flex justify-between text-sm">
-                <span style={{ color: "#7A6B5E" }}>Kurir</span>
-                <span className="font-semibold" style={{ color: "#3D2B1F" }}>{order.courier}</span>
+              <div className="p-3.5 rounded-xl bg-white border border-stone-100 shadow-sm space-y-2">
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-stone-400">Metode</span>
+                  <span className="font-semibold text-stone-700 truncate ml-2 text-right">{paymentMethodLabel[order.payment_method || ""] || "—"}</span>
+                </div>
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-stone-400">Subtotal</span>
+                  <span className="text-stone-600">Rp {subtotal.toLocaleString("id-ID")}</span>
+                </div>
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-stone-400">Biaya Pengiriman</span>
+                  <span className="text-stone-600">Rp {SHIPPING_COST.toLocaleString("id-ID")}</span>
+                </div>
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-stone-400">Biaya Layanan</span>
+                  <span className="text-stone-600">Rp {SERVICE_FEE.toLocaleString("id-ID")}</span>
+                </div>
+                <div className="pt-2 mt-1 border-t border-stone-50 flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-stone-700">Total</span>
+                  <span className="text-xs font-bold text-[#8B6F47]">Rp {order.total.toLocaleString("id-ID")}</span>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span style={{ color: "#7A6B5E" }}>Nomor Resi</span>
-                <span className="font-mono font-bold select-all text-blue-600" style={{ color: "#2563EB" }}>{order.tracking_number}</span>
+            </div>
+
+            {/* Shipping Summary */}
+            <div className="space-y-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#8B6F47] flex items-center gap-1.5 px-1">
+                <MapPin className="w-3 h-3" /> Pengiriman
+              </p>
+              <div className="p-3.5 rounded-xl bg-white border border-stone-100 shadow-sm min-h-[105px] flex flex-col justify-center">
+                {order.shipping_address ? (
+                  <>
+                    <p className="text-[10px] font-bold text-stone-700 truncate">{order.shipping_address.name}</p>
+                    <p className="text-[9px] text-stone-500 mt-1 line-clamp-2 leading-relaxed">
+                      {order.shipping_address.street}, {order.shipping_address.city}
+                    </p>
+                    {order.tracking_number && (
+                      <div className="mt-2 pt-2 border-t border-stone-50 flex justify-between items-center">
+                        <span className="text-[8px] text-blue-500 font-bold uppercase">{order.courier}</span>
+                        <span className="text-[9px] font-mono font-bold text-blue-600 truncate max-w-[80px] text-right">{order.tracking_number}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[10px] text-stone-400 italic text-center">Belum diatur</p>
+                )}
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Notes */}
-          {order.notes && (
-            <div className="p-4 rounded-xl" style={{ background: "rgba(212,184,139,0.08)", border: "1px solid rgba(212,184,139,0.2)" }}>
-              <p className="text-xs font-medium mb-1" style={{ color: "#A89B8F" }}>Catatan Pesanan</p>
-              <p className="text-sm italic" style={{ color: "#7A6B5E" }}>{order.notes}</p>
-            </div>
-          )}
-
-          {/* Review Info (if reviewed) */}
-          {order.reviewed && (
-            <div className="p-4 rounded-xl space-y-2 bg-[#FAF8F5]" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
-              <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "#8B6F47" }}><Star className="w-4 h-4 fill-amber-500 text-amber-500" />Ulasan Anda</p>
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} className="w-4 h-4" style={{ color: star <= (order.review_rating || 0) ? "#F59E0B" : "#E5E7EB", fill: star <= (order.review_rating || 0) ? "#F59E0B" : "transparent" }} />
-                ))}
-              </div>
-              {order.review_comment && (
-                <p className="text-xs italic text-stone-500">"{order.review_comment}"</p>
-              )}
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-2">
-            {isUnpaid && (
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                onClick={() => { onClose(); onPay(order); }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white cursor-pointer"
-                style={{ background: "linear-gradient(135deg, #D97706, #F59E0B)", boxShadow: "0 4px 16px rgba(217,119,6,0.3)" }}
-              >
-                <Wallet className="w-4 h-4" />Bayar Sekarang
-              </motion.button>
-            )}
+          {/* Action Buttons (Compact) */}
+          <div className="flex gap-2.5 pt-2">
             <motion.button
               whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => { onClose(); navigate("/chat"); }}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all cursor-pointer"
-              style={{ border: "1.5px solid rgba(139,111,71,0.3)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px] transition-all"
+              style={{ border: "1.5px solid rgba(139,111,71,0.2)", color: "#8B6F47", background: "rgba(139,111,71,0.03)" }}
             >
-              <MessageCircle className="w-4 h-4" />Hubungi Toko
+              <MessageCircle className="w-3.5 h-3.5" /> Chat
             </motion.button>
-            {order.status === "shipping" && (
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                onClick={() => { onClose(); onConfirmReceived(order.id); }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white cursor-pointer"
-                style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}
-              >
-                <CheckCircle2 className="w-4 h-4" />Konfirmasi Terima
-              </motion.button>
-            )}
-            {order.status === "delivered" && order.can_review && !order.reviewed && (
+
+            {order.status === "delivered" && order.can_review && !order.reviewed ? (
               <motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={() => { onClose(); onReview?.(order); }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white cursor-pointer"
-                style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", boxShadow: "0 4px 16px rgba(139,111,71,0.2)" }}
+                className="flex-[1.5] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px] text-white"
+                style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)" }}
               >
-                <Star className="w-4 h-4 fill-white" />Tulis Ulasan
+                <Star className="w-3.5 h-3.5 fill-white" /> Ulasan
               </motion.button>
-            )}
-            {order.status === "delivered" && (
+            ) : order.status === "shipping" ? (
               <motion.button
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                disabled={buyingAgain}
-                onClick={async () => { setBuyingAgain(true); await onBuyAgain(order); setBuyingAgain(false); onClose(); }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white disabled:opacity-70 cursor-pointer"
+                onClick={() => { onClose(); onConfirmReceived(order.id); }}
+                className="flex-[1.5] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px] text-white"
+                style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> Konfirmasi
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                onClick={async () => { await onBuyAgain(order); onClose(); }}
+                className="flex-[1.5] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px] text-white"
                 style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}
               >
-                {buyingAgain ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ShoppingCart className="w-4 h-4" />Beli Lagi</>}
+                <ShoppingCart className="w-3.5 h-3.5" /> Beli Lagi
               </motion.button>
             )}
           </div>
@@ -601,24 +547,24 @@ function ImageLightbox({ src, title, onClose }: { src: string; title: string; on
       style={{ background: "rgba(15, 10, 8, 0.85)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
-      <div className="relative max-w-2xl w-full max-h-[85vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
+      <div className="relative w-full sm:max-w-2xl max-h-[85vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
         <div className="w-full flex items-center justify-between mb-4 text-white">
-          <div>
-            <h4 className="font-bold text-lg" style={{ color: "#FAF8F5", fontFamily: "'Playfair Display', serif" }}>Preview {title}</h4>
-            <p className="text-xs text-stone-400">Desain Batik Kustom Anda</p>
+          <div className="min-w-0 pr-4">
+            <h4 className="font-bold text-sm sm:text-lg truncate" style={{ color: "#FAF8F5", fontFamily: "'Playfair Display', serif" }}>Preview {title}</h4>
+            <p className="text-[10px] sm:text-xs text-stone-400">Desain Batik Kustom Anda</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleDownload} className="p-2 rounded-xl transition-all hover:bg-stone-800 text-stone-200 hover:text-white flex items-center gap-1.5 border border-stone-700 bg-stone-900/50">
-              <Download className="w-4 h-4" />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={handleDownload} className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all hover:bg-stone-800 text-stone-200 hover:text-white flex items-center gap-1.5 border border-stone-700 bg-stone-900/50">
+              <Download className="w-3.5 h-3.5 sm:w-4 h-4" />
               <span className="hidden sm:inline text-xs font-semibold">Unduh</span>
             </button>
-            <button onClick={onClose} className="p-2 rounded-full hover:bg-stone-800 text-stone-400 hover:text-white transition-colors border border-stone-800">
-              <X className="w-5 h-5" />
+            <button onClick={onClose} className="p-1.5 sm:p-2 rounded-full hover:bg-stone-800 text-stone-400 hover:text-white transition-colors border border-stone-800">
+              <X className="w-4 h-4 sm:w-5 h-5" />
             </button>
           </div>
         </div>
-        <div className="w-full bg-[#FAF8F5] rounded-3xl p-5 md:p-8 overflow-hidden flex items-center justify-center border" style={{ borderColor: "rgba(212,184,139,0.2)", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }}>
-          <img src={src} alt={title} className="max-h-[60vh] max-w-full object-contain rounded-2xl shadow-md" />
+        <div className="w-full bg-[#FAF8F5] rounded-2xl sm:rounded-3xl p-3 sm:p-8 overflow-hidden flex items-center justify-center border" style={{ borderColor: "rgba(212,184,139,0.2)", boxShadow: "0 25px 50px rgba(0,0,0,0.5)" }}>
+          <img src={src} alt={title} className="max-h-[50vh] sm:max-h-[60vh] max-w-full object-contain rounded-xl sm:rounded-2xl shadow-md" />
         </div>
       </div>
     </motion.div>
@@ -649,7 +595,7 @@ function ConfirmReceivedDialog({ onConfirm, onCancel }: { onConfirm: () => void;
     >
       <motion.div
         initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-        className="bg-white rounded-3xl w-full max-w-md p-6"
+        className="bg-white rounded-3xl w-full sm:max-w-md p-5 sm:p-6"
         style={{ boxShadow: "0 30px 80px rgba(61,43,31,0.25)" }}
         onClick={e => e.stopPropagation()}
       >
@@ -686,6 +632,45 @@ function ConfirmReceivedDialog({ onConfirm, onCancel }: { onConfirm: () => void;
       </motion.div>
     </motion.div>
   );
+}
+
+function getStatusProperties(order: Order, isExpired: boolean, isUnpaid: boolean) {
+  if (isExpired) {
+    return {
+      label: "Batal (Waktu Habis)",
+      bg: "rgba(239, 68, 68, 0.08)",
+      text: "#EF4444",
+      border: "rgba(239, 68, 68, 0.2)",
+      icon: X
+    };
+  }
+  if (order.payment_status === "awaiting_verification") {
+    return {
+      label: "Verifikasi",
+      bg: "rgba(245, 158, 11, 0.08)",
+      text: "#D97706",
+      border: "rgba(245, 158, 11, 0.2)",
+      icon: Clock
+    };
+  }
+  if (isUnpaid) {
+    return {
+      label: "Belum Bayar",
+      bg: "rgba(249, 115, 22, 0.08)",
+      text: "#EA580C",
+      border: "rgba(249, 115, 22, 0.2)",
+      icon: AlertCircle
+    };
+  }
+
+  const sc = (statusConfig as any)[order.status] || statusConfig.processing;
+  return {
+    label: sc.label,
+    bg: sc.bg,
+    text: sc.color,
+    border: sc.border,
+    icon: sc.icon
+  };
 }
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
@@ -852,7 +837,7 @@ export function OrdersPage() {
   ];
 
   return (
-    <div className="min-h-screen relative" style={{ background: "#FAF8F5" }}>
+    <div className="min-h-screen relative overflow-x-hidden" style={{ background: "#FAF8F5" }}>
       <Toaster position="top-right" richColors />
       <BatikBackground opacity={0.03} patternType="mega" />
       <div className="absolute top-0 left-0 w-[500px] h-[500px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(212,184,139,0.08) 0%, transparent 70%)" }} />
@@ -876,7 +861,7 @@ export function OrdersPage() {
 
         {/* Stats */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8"
         >
           {[
             { label: "Total Pesanan", value: orders.length, icon: Package, color: "#8B6F47" },
@@ -887,33 +872,40 @@ export function OrdersPage() {
             const Icon = s.icon;
             return (
               <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }}
-                className="p-4 rounded-2xl bg-white"
+                className="p-3 sm:p-4 rounded-2xl bg-white"
                 style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
               >
-                <div className="flex items-center gap-2.5 mb-2">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${s.color}18` }}>
-                    <Icon className="w-4 h-4" style={{ color: s.color }} />
+                <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${s.color}18` }}>
+                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: s.color }} />
                   </div>
-                  <span className="text-xs font-medium" style={{ color: "#A89B8F" }}>{s.label}</span>
+                  <span className="text-[10px] sm:text-xs font-medium truncate" style={{ color: "#A89B8F" }}>{s.label}</span>
                 </div>
-                <p className="text-xl font-bold" style={{ color: "#3D2B1F" }}>{s.value}</p>
+                <p className="text-sm sm:text-xl font-bold truncate" style={{ color: "#3D2B1F" }}>{s.value}</p>
               </motion.div>
             );
           })}
         </motion.div>
 
         {/* Search + Filter */}
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mb-6 space-y-3">
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ delay: 0.2 }} 
+          className="mb-6 space-y-4 max-w-full"
+        >
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#A89B8F" }} />
             <input
               type="text" value={searchId} onChange={e => setSearchId(e.target.value)}
               placeholder="Cari nomor pesanan atau nama produk..."
-              className="w-full pl-11 pr-4 py-3 rounded-xl outline-none text-sm"
+              className="w-full pl-11 pr-4 py-3.5 rounded-2xl outline-none text-sm transition-all focus:ring-2 focus:ring-[#8B6F47]/20"
               style={{ border: "1px solid rgba(212,184,139,0.25)", background: "#FFFFFF", color: "#3D2B1F" }}
             />
           </div>
-          <div className="flex gap-2 flex-wrap">
+          
+          <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex overflow-x-auto pb-2 gap-2 scrollbar-hide px-4 sm:px-0 -mx-4 sm:mx-0">
             {FILTER_TABS.map(tab => {
               const Icon = tab.icon;
               const active = filterStatus === tab.key;
@@ -921,7 +913,7 @@ export function OrdersPage() {
               return (
                 <motion.button key={tab.key} whileTap={{ scale: 0.97 }}
                   onClick={() => setFilterStatus(tab.key)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap"
                   style={{
                     background: active ? tab.color : "rgba(255,255,255,0.9)",
                     color: active ? "#FFFFFF" : "#7A6B5E",
@@ -931,19 +923,20 @@ export function OrdersPage() {
                 >
                   <Icon className="w-3.5 h-3.5" />
                   {tab.label}
-                  <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: active ? "rgba(255,255,255,0.25)" : "rgba(139,111,71,0.1)", color: active ? "#fff" : "#8B6F47" }}>
+                  <span className="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full" style={{ background: active ? "rgba(255,255,255,0.25)" : "rgba(139,111,71,0.1)", color: active ? "#fff" : "#8B6F47" }}>
                     {count}
                   </span>
                 </motion.button>
               );
             })}
+            </div>
           </div>
         </motion.div>
 
         {/* Orders List */}
         {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
+          <div className="grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-48 sm:h-64 w-full rounded-2xl" />)}
           </div>
         ) : filtered.length === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -969,53 +962,13 @@ export function OrdersPage() {
             </Link>
           </motion.div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6 w-full">
             {filtered.map((order, idx) => {
               const isExpired = order.payment_status === "pending" && order.status !== "cancelled" && new Date(order.date).getTime() + 86400000 < Date.now();
               const isUnpaid = order.payment_status === "pending" && order.total > 0 && order.status !== "negotiating" && order.status !== "cancelled" && !isExpired;
 
               // Determine status badge properties
-              const getStatusProperties = () => {
-                if (isExpired) {
-                  return {
-                    label: "Batal (Waktu Habis)",
-                    bg: "rgba(239, 68, 68, 0.08)",
-                    text: "#EF4444",
-                    border: "rgba(239, 68, 68, 0.2)",
-                    icon: X
-                  };
-                }
-                if (order.payment_status === "awaiting_verification") {
-                  return {
-                    label: "Verifikasi Pembayaran",
-                    bg: "rgba(245, 158, 11, 0.08)",
-                    text: "#D97706",
-                    border: "rgba(245, 158, 11, 0.2)",
-                    icon: Clock
-                  };
-                }
-                if (isUnpaid) {
-                  return {
-                    label: "Belum Dibayar",
-                    bg: "rgba(249, 115, 22, 0.08)",
-                    text: "#EA580C",
-                    border: "rgba(249, 115, 22, 0.2)",
-                    icon: AlertCircle
-                  };
-                }
-
-                // If paid or COD, show standard order status config
-                const sc = (statusConfig as any)[order.status] || statusConfig.processing;
-                return {
-                  label: sc.label,
-                  bg: sc.bg,
-                  text: sc.color,
-                  border: sc.border,
-                  icon: sc.icon
-                };
-              };
-
-              const badge = getStatusProperties();
+              const badge = getStatusProperties(order, isExpired, isUnpaid);
               const StatusIcon = badge.icon;
 
               return (
@@ -1026,56 +979,42 @@ export function OrdersPage() {
                   transition={{ delay: idx * 0.04 }}
                   onClick={() => setSelectedOrder(order)}
                   whileHover={{ y: -3, boxShadow: "0 12px 30px rgba(61,43,31,0.06)" }}
-                  className="bg-white rounded-3xl border border-stone-100 hover:border-amber-900/10 cursor-pointer overflow-hidden transition-all duration-300 flex flex-col"
+                  className="bg-white rounded-2xl sm:rounded-3xl border border-stone-100 hover:border-amber-900/10 cursor-pointer overflow-hidden transition-all duration-300 flex flex-col min-w-0"
                   style={{
                     boxShadow: "0 4px 20px rgba(61,43,31,0.02)",
                   }}
                 >
                   {/* Card Header: Shop details and Status badge */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 bg-stone-50/50 border-b border-stone-100">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-[#8B6F47]/10 flex items-center justify-center text-[#8B6F47]">
-                        <ShoppingBag className="w-4 h-4" />
+                  <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-stone-50/50 border-b border-stone-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-[#8B6F47]/10 flex items-center justify-center text-[#8B6F47] flex-shrink-0">
+                        <ShoppingBag className="w-3.5 h-3.5 sm:w-4 h-4" />
                       </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-[#3D2B1F]">{order.artisan}</h4>
-                        <p className="text-[10px] text-[#A89B8F] mt-0.5">
+                      <div className="min-w-0">
+                        <h4 className="text-[11px] sm:text-sm font-bold text-[#3D2B1F] truncate">{order.artisan}</h4>
+                        <p className="text-[9px] sm:text-[10px] text-[#A89B8F]">
                           {new Date(order.date).toLocaleDateString("id-ID", {
                             day: "numeric",
-                            month: "long",
-                            year: "numeric",
+                            month: "short",
                           })}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {order.type === "custom" ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-[#8B6F47] border border-amber-200/60 flex items-center gap-1">
-                          ✨ Kustom
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-stone-100 text-[#7A6B5E] border border-stone-200/40">
-                          Katalog
-                        </span>
-                      )}
-
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1"
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                      <span className="px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[8px] sm:text-[10px] font-bold border flex items-center gap-1"
                         style={{ background: badge.bg, color: badge.text, borderColor: badge.border }}>
-                        <StatusIcon className="w-3.5 h-3.5" />
-                        {badge.label}
+                        <StatusIcon className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
+                        <span className="truncate max-w-[60px] xs:max-w-none">{badge.label}</span>
                       </span>
                     </div>
                   </div>
 
                   {/* Card Body */}
-                  <div className="p-6 flex flex-col md:flex-row gap-5 items-start">
+                  <div className="p-3 sm:p-6 flex flex-col gap-3 sm:gap-5 items-start">
                     {/* Image / Canvas Thumbnail */}
                     <div
-                      className={`relative w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-stone-100 bg-stone-50/80 group/thumb ${order.bg_color?.startsWith("data:image") ? "cursor-zoom-in hover:opacity-90" : ""}`}
-                      style={{
-                        boxShadow: "0 2px 8px rgba(61,43,31,0.03)",
-                      }}
+                      className={`relative w-full aspect-[4/3] sm:aspect-square lg:aspect-video rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-stone-100 bg-stone-50/80 group/thumb ${order.bg_color?.startsWith("data:image") ? "cursor-zoom-in hover:opacity-90" : ""}`}
                       onClick={(e) => {
                         if (order.bg_color?.startsWith("data:image")) {
                           e.stopPropagation();
@@ -1096,221 +1035,61 @@ export function OrdersPage() {
                     </div>
 
                     {/* Middle details */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-base text-[#3D2B1F] leading-snug">{order.item}</h3>
+                    <div className="flex-1 min-w-0 w-full">
+                      <h3 className="font-bold text-xs sm:text-base text-[#3D2B1F] leading-tight truncate sm:whitespace-normal">{order.item}</h3>
                       
-                      {/* ID Pesanan copyable */}
-                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-[#A89B8F] font-mono">
-                        <span>ID: {order.id.slice(0, 18)}...</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyToClipboard(order.id, "ID Pesanan");
-                          }}
-                          className="p-1 rounded hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors"
-                          title="Salin ID Pesanan"
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] sm:text-[11px] font-semibold px-1.5 py-0.5 rounded bg-stone-100 text-[#5A4A3E]">
+                            {order.quantity || 1}x
+                          </span>
+                          <span className="font-bold text-[11px] sm:text-base text-[#8B6F47]">
+                            {order.total > 0 ? `Rp ${order.total.toLocaleString("id-ID")}` : "Nego"}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3">
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-stone-100 text-[#5A4A3E]">
-                          Qty: {order.quantity || 1}
-                        </span>
-
-                        {order.payment_method && (
-                          <span className="flex items-center gap-1 text-[11px] text-[#A89B8F]">
-                            <CreditCard className="w-3 h-3 text-[#8B6F47]" />
-                            {paymentMethodLabel[order.payment_method] || order.payment_method.replace("transfer_", "").toUpperCase()}
-                          </span>
-                        )}
-
+                      {/* Info tambahan (city/method) - Visible on larger screens or adjusted for grid */}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2.5 sm:mt-3 border-t border-stone-50 pt-2.5">
                         {order.shipping_address?.city && (
-                          <span className="flex items-center gap-1 text-[11px] text-[#A89B8F]">
-                            <MapPin className="w-3 h-3 text-[#8B6F47]" />
-                            {order.shipping_address.city}
+                          <span className="flex items-center gap-1 text-[9px] sm:text-[11px] text-[#A89B8F]">
+                            <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#8B6F47]" />
+                            <span className="truncate max-w-[80px] sm:max-w-none">{order.shipping_address.city}</span>
                           </span>
                         )}
-
-                        {order.reviewed && order.review_rating && (
-                          <div className="flex items-center gap-0.5 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5">
-                            <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                            <span className="text-[10px] font-bold text-amber-700">{order.review_rating}</span>
-                          </div>
+                        {order.payment_method && (
+                          <span className="flex items-center gap-1 text-[9px] sm:text-[11px] text-[#A89B8F]">
+                            <CreditCard className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#8B6F47]" />
+                            <span className="truncate max-w-[80px] sm:max-w-none">{paymentMethodLabel[order.payment_method] || order.payment_method.replace("transfer_", "").toUpperCase()}</span>
+                          </span>
                         )}
                       </div>
-
-                      {/* Shipment Tracking details */}
-                      {order.status === "shipping" && order.tracking_number && (
-                        <div className="mt-3.5 p-3 rounded-2xl bg-blue-50/50 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 max-w-md">
-                          <div>
-                            <p className="text-[10px] text-blue-500 font-medium">Ekspedisi: {order.courier}</p>
-                            <p className="text-xs font-mono font-bold text-blue-900 select-all mt-0.5">{order.tracking_number}</p>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(order.tracking_number || "", "Nomor resi");
-                            }}
-                            className="px-2.5 py-1 bg-white border border-blue-200 hover:bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 shadow-sm self-start sm:self-auto cursor-pointer"
-                          >
-                            <Copy className="w-2.5 h-2.5" /> Salin Resi
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Estimated finish details */}
-                      {order.status === "processing" && (order as any).estimated_date && (
-                        <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-blue-600 font-medium bg-blue-50/50 border border-blue-100 px-2.5 py-1 rounded-xl">
-                          <Calendar className="w-3 h-3" />
-                          <span>Estimasi Selesai: <strong>{new Date((order as any).estimated_date).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</strong></span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right side: Price */}
-                    <div className="w-full md:w-auto flex md:flex-col items-center md:items-end justify-between md:justify-center pt-3 md:pt-0 border-t md:border-t-0 border-stone-100 md:h-20">
-                      <span className="text-xs text-[#A89B8F]">Total Belanja</span>
-                      <span className="font-bold text-base md:text-lg text-[#8B6F47] mt-0.5">
-                        {order.total > 0
-                          ? `Rp ${order.total.toLocaleString("id-ID")}`
-                          : "Negosiasi"
-                        }
-                      </span>
                     </div>
                   </div>
 
-                  {/* Warning Alerts */}
-                  {isUnpaid && (
-                    <div className="mx-6 mb-4 p-4 rounded-2xl bg-amber-50/60 border border-amber-200/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 flex-shrink-0">
-                          <Clock className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-amber-900">Menunggu Pembayaran</p>
-                          <p className="text-[10px] text-amber-700/80 mt-0.5">Harap lakukan pembayaran dalam waktu 24 jam.</p>
-                        </div>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <PaymentTimer orderDate={order.date} />
-                      </div>
-                    </div>
-                  )}
-
-                  {order.payment_status === "awaiting_verification" && (
-                    <div className="mx-6 mb-4 p-3 rounded-2xl bg-blue-50/60 border border-blue-200/40 flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
-                        <Clock className="w-3.5 h-3.5 animate-spin" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-blue-900">Pembayaran Menunggu Verifikasi</p>
-                        <p className="text-[10px] text-blue-700/80">Bukti transfer sedang divalidasi oleh pengrajin.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {isExpired && (
-                    <div className="mx-6 mb-4 p-3 rounded-2xl bg-red-50/60 border border-red-200/40 flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center text-red-600 flex-shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-red-900">Batas Waktu Habis</p>
-                        <p className="text-[10px] text-red-700/80">Pesanan dibatalkan secara otomatis karena waktu pembayaran habis.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Actions Footer */}
-                  <div className="px-6 py-4 bg-stone-50/30 border-t border-stone-100 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex gap-2">
+                  {/* Actions Footer - Simplified for Grid */}
+                  <div className="mt-auto px-3 py-3 bg-stone-50/30 border-t border-stone-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedOrder(order);
+                      }}
+                      className="flex-1 py-1.5 sm:py-2 border border-stone-200 hover:bg-stone-50 text-[#7A6B5E] text-[10px] sm:text-xs font-bold rounded-lg transition-all"
+                    >
+                      Detail
+                    </button>
+                    {isUnpaid && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedOrder(order);
+                          setPayingOrder(order);
                         }}
-                        className="px-4 py-2 border border-stone-200 hover:bg-stone-50 text-[#7A6B5E] hover:text-[#3D2B1F] text-xs font-bold rounded-xl transition-all cursor-pointer"
+                        className="flex-1 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-bold text-white shadow-sm"
+                        style={{ background: "linear-gradient(135deg, #D97706, #F59E0B)" }}
                       >
-                        Detail Pesanan
+                        Bayar
                       </button>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate("/chat");
-                        }}
-                        className="px-4 py-2 border border-stone-200 hover:bg-stone-50 text-[#8B6F47] hover:text-[#735b36] text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" /> Hubungi Toko
-                      </button>
-                    </div>
-
-                    <div className="flex gap-2">
-                      {isUnpaid && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPayingOrder(order);
-                          }}
-                          className="px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-1.5"
-                          style={{
-                            background: "linear-gradient(135deg, #D97706, #F59E0B)",
-                            boxShadow: "0 4px 12px rgba(217,119,6,0.2)",
-                          }}
-                        >
-                          <Wallet className="w-3.5 h-3.5" /> Bayar Sekarang
-                        </button>
-                      )}
-
-                      {order.status === "shipping" && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConfirmingReceived(order.id);
-                          }}
-                          className="px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-1.5"
-                          style={{
-                            background: "linear-gradient(135deg, #16A34A, #15803D)",
-                            boxShadow: "0 4px 12px rgba(22,163,74,0.2)",
-                          }}
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Konfirmasi Terima
-                        </button>
-                      )}
-
-                      {order.status === "delivered" && order.can_review && !order.reviewed && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReviewingOrder(order);
-                          }}
-                          className="px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-1.5"
-                          style={{
-                            background: "linear-gradient(135deg, #8B6F47, #A88967)",
-                            boxShadow: "0 4px 12px rgba(139,111,71,0.2)",
-                          }}
-                        >
-                          <Star className="w-3.5 h-3.5 fill-white" /> Tulis Ulasan
-                        </button>
-                      )}
-
-                      {order.status === "delivered" && (
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            await handleBuyAgain(order);
-                          }}
-                          className="px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 cursor-pointer flex items-center gap-1.5"
-                          style={{
-                            background: "linear-gradient(135deg, #3D2B1F, #8B6F47)",
-                          }}
-                        >
-                          <ShoppingCart className="w-3.5 h-3.5" /> Beli Lagi
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </motion.div>
               );

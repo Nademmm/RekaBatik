@@ -442,7 +442,7 @@ export function AuthPage() {
                         onClick={() => setSelectedRole(role)}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className="flex flex-col items-center gap-2 p-4 rounded-xl text-center transition-all"
+                        className="relative flex flex-col items-center gap-2 p-4 rounded-xl text-center transition-all"
                         style={{
                           border: `2px solid ${selectedRole === role ? "#8B6F47" : "rgba(139,111,71,0.15)"}`,
                           background: selectedRole === role ? "rgba(139,111,71,0.08)" : "#FAFAF8",

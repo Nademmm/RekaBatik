@@ -36,6 +36,8 @@ import {
   Minimize2,
   FlipHorizontal,
   FlipVertical,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
 import { useNavigate, useSearchParams, useBlocker } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -802,6 +804,7 @@ export function CustomBatikPage() {
   const [showSuccessModal, setShowSuccessModal] = useState<"saved" | "cart" | "order" | null>(null);
   const [showProjectModal, setShowProjectModal] = useState<"save" | "cart" | "order" | null>(null);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
   const [projectInfo, setProjectInfo] = useState({ name: "", description: "", fabric: "Katun Primisima" });
   const [savedDesignId, setSavedDesignId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -810,8 +813,9 @@ export function CustomBatikPage() {
   const [patternHistoryIndex, setPatternHistoryIndex] = useState(-1);
   const [patternHistoryLength, setPatternHistoryLength] = useState(0);
   const [hasOffscreenContent, setHasOffscreenContent] = useState(false);
+  const [isProceeding, setIsProceeding] = useState(false);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    return hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname;
+    return !isProceeding && hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname;
   });
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -1081,10 +1085,16 @@ export function CustomBatikPage() {
 
   const checkOffscreenHasContent = () => {
     const offscreen = offscreenRef.current;
+    if (!offscreen) return false;
+    
+    // If we have history beyond the initial state, it's definitely not "empty" in terms of user action
+    if (offscreenHistoryIndexRef.current > 0) return true;
+
     const initial = initialOffscreenImageDataRef.current;
-    if (!offscreen || !initial) return false;
+    if (!initial) return false;
+    
     const ctx = offscreen.getContext("2d")!;
-    // Only check the center 800x600 region which is what gets exported
+    // Check the center 800x600 region for visual content
     const current = ctx.getImageData(1600, 1200, 800, 600);
     return !isImageDataEqual(initial, current);
   };
@@ -1096,69 +1106,52 @@ export function CustomBatikPage() {
     if (!display || !offscreen || !fc) return;
 
     const ctx = display.getContext("2d")!;
-    ctx.clearRect(0, 0, 800, 600);
+    const dw = display.width;
+    const dh = display.height;
+    ctx.clearRect(0, 0, dw, dh);
 
     const vpt = fc.viewportTransform;
     if (!vpt) return;
 
     const zoom = fc.getZoom() || 1;
-    const baseScale = baseScaleRef.current || 1;
-    const extraScale = zoom / baseScale;
-
-    // Calculate source rect from offscreen canvas (4000x3000)
-    // Center point is (2000, 1500), which represents the center of the 800x600 logical workspace (400, 300)
-    // Thus, logical (0, 0) corresponds to virtual (1600, 1200)
-    const srcW = 800 / extraScale;
-    const srcH = 600 / extraScale;
+    const srcW = dw / zoom;
+    const srcH = dh / zoom;
     const srcX = 1600 - (vpt[4] / zoom);
     const srcY = 1200 - (vpt[5] / zoom);
 
-    ctx.drawImage(offscreen, srcX, srcY, srcW, srcH, 0, 0, 800, 600);
+    ctx.drawImage(offscreen, srcX, srcY, srcW, srcH, 0, 0, dw, dh);
   }, []);
 
   const updateScrollbars = useCallback(() => {
     const fc = fabricCanvasRef.current;
     if (!fc) return;
-
     const hThumb = horizontalScrollThumbRef.current;
     const vThumb = verticalScrollThumbRef.current;
     if (!hThumb || !vThumb) return;
-
     const vpt = fc.viewportTransform;
     if (!vpt) return;
 
     const zoom = fc.getZoom() || 1;
-    const baseScale = baseScaleRef.current || 1;
-    const extraScale = zoom / baseScale;
-
-    // Total virtual bounds: 4000 x 3000
     const virtualW = 4000;
     const virtualH = 3000;
+    const visibleW = fc.getWidth() / zoom;   // ← dynamic, bukan 800/extraScale
+    const visibleH = fc.getHeight() / zoom;  // ← dynamic, bukan 600/extraScale
 
-    // Visible logical bounds: 800 / extraScale, 600 / extraScale
-    const visibleW = 800 / extraScale;
-    const visibleH = 600 / extraScale;
-
-    // Current logical top-left:
     const leftX = 1600 - (vpt[4] / zoom);
-    const topY = 1200 - (vpt[5] / zoom);
+    const topY  = 1200 - (vpt[5] / zoom);
 
-    // Thumb width & height percentages (clamped between 10% and 100%)
-    const hThumbWidthPct = Math.max(10, Math.min(100, (visibleW / virtualW) * 100));
+    const hThumbWidthPct  = Math.max(10, Math.min(100, (visibleW / virtualW) * 100));
     const vThumbHeightPct = Math.max(10, Math.min(100, (visibleH / virtualH) * 100));
-
-    // Thumb positions percentages relative to scrollable area
     const maxLeftX = virtualW - visibleW;
-    const maxTopY = virtualH - visibleH;
+    const maxTopY  = virtualH - visibleH;
 
     const hPosPct = maxLeftX > 0 ? Math.max(0, Math.min(100, (leftX / maxLeftX) * (100 - hThumbWidthPct))) : 0;
-    const vPosPct = maxTopY > 0 ? Math.max(0, Math.min(100, (topY / maxTopY) * (100 - vThumbHeightPct))) : 0;
+    const vPosPct = maxTopY  > 0 ? Math.max(0, Math.min(100, (topY  / maxTopY)  * (100 - vThumbHeightPct))) : 0;
 
-    hThumb.style.width = `${hThumbWidthPct}%`;
-    hThumb.style.left = `${hPosPct}%`;
-
+    hThumb.style.width  = `${hThumbWidthPct}%`;
+    hThumb.style.left   = `${hPosPct}%`;
     vThumb.style.height = `${vThumbHeightPct}%`;
-    vThumb.style.top = `${vPosPct}%`;
+    vThumb.style.top    = `${vPosPct}%`;
   }, []);
 
   const clampViewport = useCallback((vpt: number[]) => {
@@ -1174,7 +1167,8 @@ export function CustomBatikPage() {
     let minVpt4 = w - 2400 * zoom;
     let maxVpt4 = 1600 * zoom;
     if (minVpt4 > maxVpt4) {
-      vpt[4] = (w - 800 * zoom) / 2;
+      // Center the 4000px virtual area if it fits on screen
+      vpt[4] = w / 2 - 400 * zoom;
     } else {
       vpt[4] = Math.max(minVpt4, Math.min(maxVpt4, vpt[4]));
     }
@@ -1182,7 +1176,8 @@ export function CustomBatikPage() {
     let minVpt5 = h - 1800 * zoom;
     let maxVpt5 = 1200 * zoom;
     if (minVpt5 > maxVpt5) {
-      vpt[5] = (h - 600 * zoom) / 2;
+      // Center the 3000px virtual area if it fits on screen
+      vpt[5] = h / 2 - 300 * zoom;
     } else {
       vpt[5] = Math.max(minVpt5, Math.min(maxVpt5, vpt[5]));
     }
@@ -1199,14 +1194,11 @@ export function CustomBatikPage() {
     const clickPct = (clientX - rect.left) / rect.width;
 
     const zoom = fc.getZoom() || 1;
-    const baseScale = baseScaleRef.current || 1;
-    const extraScale = zoom / baseScale;
-
     const virtualW = 4000;
-    const visibleW = 800 / extraScale;
+    const visibleW = fc.getWidth() / zoom;
 
     const leftX = (clickPct * virtualW) - (visibleW / 2);
-    const clampedLeftX = Math.max(0, Math.min(4000 - visibleW, leftX));
+    const clampedLeftX = Math.max(0, Math.min(virtualW - visibleW, leftX));
     const nextPanX = (1600 - clampedLeftX) * zoom;
 
     const vpt = fc.viewportTransform;
@@ -1227,14 +1219,11 @@ export function CustomBatikPage() {
     const clickPct = (clientY - rect.top) / rect.height;
 
     const zoom = fc.getZoom() || 1;
-    const baseScale = baseScaleRef.current || 1;
-    const extraScale = zoom / baseScale;
-
     const virtualH = 3000;
-    const visibleH = 600 / extraScale;
+    const visibleH = fc.getHeight() / zoom;
 
     const topY = (clickPct * virtualH) - (visibleH / 2);
-    const clampedTopY = Math.max(0, Math.min(3000 - visibleH, topY));
+    const clampedTopY = Math.max(0, Math.min(virtualH - visibleH, topY));
     const nextPanY = (1200 - clampedTopY) * zoom;
 
     const vpt = fc.viewportTransform;
@@ -1450,6 +1439,7 @@ export function CustomBatikPage() {
     offscreenHistoryIndexRef.current--;
     applyBrushSnapshot(offscreenHistoryRef.current[offscreenHistoryIndexRef.current]);
     setHistoryIndex(offscreenHistoryIndexRef.current);
+    setHasOffscreenContent(checkOffscreenHasContent());
   }, [applyBrushSnapshot]);
 
   const redoBrush = useCallback(() => {
@@ -1457,6 +1447,7 @@ export function CustomBatikPage() {
     offscreenHistoryIndexRef.current++;
     applyBrushSnapshot(offscreenHistoryRef.current[offscreenHistoryIndexRef.current]);
     setHistoryIndex(offscreenHistoryIndexRef.current);
+    setHasOffscreenContent(true);
   }, [applyBrushSnapshot]);
 
   const undoPattern = useCallback(() => {
@@ -1495,6 +1486,7 @@ export function CustomBatikPage() {
       offscreenHistoryIndexRef.current--;
       applyBrushSnapshot(offscreenHistoryRef.current[offscreenHistoryIndexRef.current]);
       setHistoryIndex(offscreenHistoryIndexRef.current);
+      setHasOffscreenContent(checkOffscreenHasContent());
     }
     setCanUndo(actionStackRef.current.length > 0);
     setCanRedo(redoStackRef.current.length > 0);
@@ -1523,6 +1515,7 @@ export function CustomBatikPage() {
         offscreenHistoryIndexRef.current++;
         applyBrushSnapshot(offscreenHistoryRef.current[offscreenHistoryIndexRef.current]);
         setHistoryIndex(offscreenHistoryIndexRef.current);
+        setHasOffscreenContent(true);
       }
     }
     setCanUndo(actionStackRef.current.length > 0);
@@ -2208,6 +2201,7 @@ export function CustomBatikPage() {
       if (tool !== "brush" && tool !== "eraser") return;
       if (e instanceof TouchEvent) e.preventDefault();
       isDrawingRef.current = true;
+      setHasOffscreenContent(true); // Hide "empty" placeholder immediately when starting to draw
       lastPosRef.current = pos;
       lastMidRef.current = pos;
       startStroke(pos, tool);
@@ -2530,11 +2524,18 @@ export function CustomBatikPage() {
     const display = displayCanvasRef.current;
     const fc = fabricCanvasRef.current;
     if (!container || !fc || !display) return;
-    const { width: containerWidth } = container.getBoundingClientRect();
-    if (containerWidth <= 0) return; // container not laid out yet (e.g. mid fullmode transition)
+    const rect = container.getBoundingClientRect();
+    const containerWidth = rect.width;
+    if (containerWidth <= 0) return;
 
-    const fitWidth = containerWidth;
-    const fitHeight = containerWidth * 0.75;
+    let fitWidth: number, fitHeight: number;
+    if (isFullModeRef.current && rect.height > 0) {
+      fitWidth = containerWidth;
+      fitHeight = rect.height;          // ← isi penuh layar, bukan paksa 4:3
+    } else {
+      fitWidth = containerWidth;
+      fitHeight = containerWidth * 0.75;
+    }
 
     const newBaseScale = fitWidth / 800;
     const oldBaseScale = baseScaleRef.current || newBaseScale;
@@ -2543,6 +2544,10 @@ export function CustomBatikPage() {
     fc.setWidth(fitWidth);
     fc.setHeight(fitHeight);
 
+    // ← Update pixel buffer display canvas agar syncDisplay bisa pakai dimensi penuh
+    display.width = Math.round(fitWidth);
+    display.height = Math.round(fitHeight);
+
     const ratio = newBaseScale / oldBaseScale;
     const newScale = (oldVpt[0] || oldBaseScale) * ratio;
     const newPanX = (oldVpt[4] || 0) * ratio;
@@ -2550,10 +2555,15 @@ export function CustomBatikPage() {
     baseScaleRef.current = newBaseScale;
     fc.setViewportTransform(clampViewport([newScale, 0, 0, newScale, newPanX, newPanY]));
 
-    display.style.width = `${fitWidth}px`; display.style.height = `${fitHeight}px`;
-    display.style.left = "0px"; display.style.top = "0px";
+    display.style.width = `${fitWidth}px`;
+    display.style.height = `${fitHeight}px`;
+    display.style.left = "0px";
+    display.style.top = "0px";
     const fabricWrapper = (fabricCanvasRef as any).wrapper;
-    if (fabricWrapper) { fabricWrapper.style.left = "0px"; fabricWrapper.style.top = "0px"; }
+    if (fabricWrapper) {
+      fabricWrapper.style.left = "0px";
+      fabricWrapper.style.top = "0px";
+    }
     canvasOffsetRef.current = { x: 0, y: 0 };
     fc.requestRenderAll();
     setCanvasDisplaySize({ width: fitWidth, height: fitHeight });
@@ -2673,8 +2683,9 @@ export function CustomBatikPage() {
     const rect = containerEl.getBoundingClientRect();
     const vpt = fc.viewportTransform;
     const zoom = fc.getZoom() || 1;
-    const displayX = clientX - rect.left;
-    const displayY = clientY - rect.top;
+    const offset = canvasOffsetRef.current; // ← pakai offset canvas, bukan (0,0)
+    const displayX = clientX - rect.left - offset.x;
+    const displayY = clientY - rect.top - offset.y;
     if (!vpt) return { x: displayX, y: displayY };
     const logicalX = (displayX - vpt[4]) / zoom;
     const logicalY = (displayY - vpt[5]) / zoom;
@@ -2984,34 +2995,50 @@ export function CustomBatikPage() {
     const ctx = final.getContext("2d")!;
     ctx.fillStyle = canvasBackground || "#ffffff";
     ctx.fillRect(0, 0, 800, 600);
+
+    // Simpan state canvas saat ini
+    const savedVpt = fc.viewportTransform ? [...fc.viewportTransform] as number[] : null;
+    const savedW   = fc.getWidth();
+    const savedH   = fc.getHeight();
+
+    // Reset sementara ke 800×600 neutral viewport untuk ekspor yang konsisten
+    fc.setWidth(800);
+    fc.setHeight(600);
+    fc.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    fc.renderAll();
     const fabricDataUrl = fc.toDataURL({ format: "png", multiplier: 1 });
+
+    // Restore state
+    fc.setWidth(savedW);
+    fc.setHeight(savedH);
+    if (savedVpt) fc.setViewportTransform(savedVpt as any);
+    fc.requestRenderAll();
+
     await new Promise<void>((res, rej) => {
       const img = new Image();
       img.onload = () => { ctx.drawImage(img, 0, 0, 800, 600); res(); };
       img.onerror = rej;
       img.src = fabricDataUrl;
     });
-    // Draw the center 800x600 region of the 4000x3000 offscreen canvas
     ctx.drawImage(offscreen, 1600, 1200, 800, 600, 0, 0, 800, 600);
-    // [#28b] Watermark besar diagonal di tengah
+
+    // Watermark besar
     ctx.save();
     ctx.globalAlpha = 0.12;
     ctx.font = "bold 80px 'Playfair Display', serif";
     ctx.fillStyle = "#4A2F1A";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.translate(400, 300);
-    ctx.rotate(-25 * Math.PI / 180);
-    ctx.shadowColor = "rgba(0,0,0,0.15)";
-    ctx.shadowBlur = 8;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.translate(400, 300); ctx.rotate(-25 * Math.PI / 180);
+    ctx.shadowColor = "rgba(0,0,0,0.15)"; ctx.shadowBlur = 8;
     ctx.fillText("RekaBatik", 0, 0);
     ctx.restore();
-    // [#28b] Watermark kecil di pojok kanan bawah
+    // Watermark pojok
     ctx.save();
     ctx.globalAlpha = 0.7;
     ctx.font = "bold 20px 'Playfair Display', serif";
     ctx.fillStyle = "#ffffff";
-    ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 5; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
+    ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 5;
+    ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
     ctx.textAlign = "right"; ctx.textBaseline = "bottom";
     ctx.fillText("RekaBatik", 780, 580);
     ctx.restore();
@@ -3475,6 +3502,23 @@ export function CustomBatikPage() {
                         <span className="hidden sm:inline text-[10px] text-[#A89B8F] italic">Klik area kosong di kanvas untuk menambah teks</span>
                       </div>
                     )}
+
+                    {activeTool === "select" && (
+                      <div className="ml-auto flex-shrink-0">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setShowAIModal(true)}
+                          className="flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl font-bold text-white shadow-sm transition-all hover:shadow-md group overflow-hidden relative cursor-pointer"
+                          style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}
+                        >
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.2)_0%,_transparent_70%)]" />
+                          <Sparkles className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+                          <span className="text-[10px] uppercase tracking-wider hidden sm:inline">AI Enhance</span>
+                          <div className="absolute -right-0.5 -top-0.5 w-2 h-2 bg-[#D4B88B] rounded-full animate-ping opacity-75" />
+                        </motion.button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -3505,28 +3549,19 @@ export function CustomBatikPage() {
                     }}
                     onDrop={handleCanvasDrop}
                   >
-                    {/* Fullmode: dark overlay covering the area BELOW the canvas so users can see the canvas boundary */}
-                    {isFullMode && canvasDisplaySize.height > 0 && (
-                      <div
-                        className="absolute left-0 right-0 bottom-0 pointer-events-none"
-                        style={{
-                          top: `${canvasDisplaySize.height}px`,
-                          background: "linear-gradient(to bottom, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.18) 100%)",
-                          borderTop: "1.5px solid rgba(139,111,71,0.25)",
-                          zIndex: 4,
-                        }}
-                      />
-                    )}
                     {isFullMode && (
                       <div
-                        className="fixed top-0 left-0 right-0 z-[99] flex items-center justify-around py-3 pointer-events-none"
+                        className="fixed top-0 left-0 right-0 z-[99] flex items-center justify-between px-8 py-3 pointer-events-none"
                         style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 100%)" }}
                       >
-                        <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#8B6F47" }} />
-                          <span className="text-xs font-semibold tracking-wide" style={{ color: "#3D2B1F" }}>Kanvas Karya</span>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#8B6F47" }} />
+                            <span className="text-xs font-semibold tracking-wide" style={{ color: "#3D2B1F" }}>Kanvas Karya</span>
+                          </div>
                         </div>
-                        <div className="hidden lg:flex items-center gap-4 text-[11px] mr-[400px]" style={{ color: "rgba(61,43,31,0.45)" }}>
+
+                        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 text-[11px]" style={{ color: "rgba(61,43,31,0.45)" }}>
                           <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: "rgba(139,111,71,0.12)", color: "#8B6F47" }}>Scroll</kbd> geser kanvas</span>
                           <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: "rgba(139,111,71,0.12)", color: "#8B6F47" }}>Ctrl+Scroll</kbd> perbesar/perkecil</span>
                           <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: "rgba(139,111,71,0.12)", color: "#8B6F47" }}>Space+Drag</kbd> geser kanvas</span>
@@ -3558,11 +3593,12 @@ export function CustomBatikPage() {
                     {/* Horizontal scrollbar */}
                     <div
                       ref={horizontalScrollTrackRef}
-                      className="absolute bottom-2 left-2 right-6 h-2 rounded-full cursor-pointer bg-stone-500/5 hover:bg-stone-500/10 transition-colors z-[10]"
+                      className="hidden sm:block absolute bottom-2 left-2 right-10 h-2.5 rounded-full cursor-pointer bg-stone-500/10 hover:bg-stone-500/20 transition-all z-[110]"
+                      style={{ backdropFilter: "blur(4px)" }}
                     >
                       <div
                         ref={horizontalScrollThumbRef}
-                        className="absolute top-0 bottom-0 rounded-full bg-[#8B6F47]/40 hover:bg-[#8B6F47]/75 transition-colors"
+                        className="absolute top-0 bottom-0 rounded-full bg-[#8B6F47]/50 hover:bg-[#8B6F47]/80 transition-colors border border-white/20"
                         style={{ left: "0%", width: "100%" }}
                       />
                     </div>
@@ -3570,11 +3606,12 @@ export function CustomBatikPage() {
                     {/* Vertical scrollbar */}
                     <div
                       ref={verticalScrollTrackRef}
-                      className="absolute top-2 bottom-6 right-2 w-2 rounded-full cursor-pointer bg-stone-500/5 hover:bg-stone-500/10 transition-colors z-[10]"
+                      className="hidden sm:block absolute top-2 bottom-10 right-2 w-2.5 rounded-full cursor-pointer bg-stone-500/10 hover:bg-stone-500/20 transition-all z-[110]"
+                      style={{ backdropFilter: "blur(4px)" }}
                     >
                       <div
                         ref={verticalScrollThumbRef}
-                        className="absolute left-0 right-0 rounded-full bg-[#8B6F47]/40 hover:bg-[#8B6F47]/75 transition-colors"
+                        className="absolute left-0 right-0 rounded-full bg-[#8B6F47]/50 hover:bg-[#8B6F47]/80 transition-colors border border-white/20"
                         style={{ top: "0%", height: "100%" }}
                       />
                     </div>
@@ -3816,6 +3853,23 @@ export function CustomBatikPage() {
               <button onClick={undoAll} disabled={!canUndo} title="Undo (Ctrl+Z)" className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100 flex-shrink-0" style={{ color: "#8B6F47" }}><RotateCcw style={{ width: 14, height: 14 }} /></button>
               <button onClick={redoAll} disabled={!canRedo} title="Redo (Ctrl+Y)" className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100 flex-shrink-0" style={{ color: "#8B6F47" }}><RotateCw style={{ width: 14, height: 14 }} /></button>
               <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+              {activeTool === "select" && (
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowAIModal(true)}
+                    className="flex items-center justify-center w-8 h-8 rounded-full font-bold text-white shadow-lg transition-all hover:shadow-[0_0_15px_rgba(139,111,71,0.5)] group overflow-hidden relative cursor-pointer flex-shrink-0"
+                    style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}
+                  >
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.2)_0%,_transparent_70%)]" />
+                    <Sparkles className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+                  </motion.button>
+                  <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                </>
+              )}
+
               <button onClick={toggleFloatingSidebar} title={showFloatingSidebar ? "Sembunyikan Panel" : "Tampilkan Panel"}
                 className="flex items-center gap-1.5 px-3 h-8 rounded-full font-semibold text-xs cursor-pointer transition-all flex-shrink-0"
                 style={{ background: showFloatingSidebar ? "rgba(139,111,71,0.14)" : "transparent", color: "#8B6F47" }}>
@@ -3999,9 +4053,62 @@ export function CustomBatikPage() {
         )}
       </AnimatePresence>
 
+      {/* AI Premium Modal */}
+      <AnimatePresence>
+        {showAIModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAIModal(false)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-8 text-center shadow-2xl" style={{ border: "1px solid rgba(212,184,139,0.3)" }}>
+              <button onClick={() => setShowAIModal(false)} className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+              
+              <div className="relative w-24 h-24 mx-auto mb-6">
+                <div className="absolute inset-0 rounded-full animate-pulse blur-xl bg-[#8B6F47]/30" />
+                <div className="relative w-full h-full rounded-full flex items-center justify-center shadow-lg" style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}>
+                  <Sparkles className="w-10 h-10 text-white animate-bounce" />
+                </div>
+              </div>
+
+              <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+                AI Smart Enhance
+              </h3>
+              <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "rgba(139,111,71,0.1)", color: "#8B6F47", border: "1px solid rgba(139,111,71,0.2)" }}>
+                Premium Feature
+              </div>
+              
+              <p className="text-[#7A6B5E] mb-8 text-sm leading-relaxed">
+                Biarkan AI menganalisis desain batik Anda dan memberikan sentuhan artistik otomatis untuk hasil yang lebih memukau.
+              </p>
+
+              <div className="p-4 rounded-2xl mb-8 flex items-center gap-3 text-left" style={{ background: "rgba(139,111,71,0.05)", border: "1px solid rgba(139,111,71,0.1)" }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "white" }}>
+                  <Wand2 className="w-5 h-5 text-[#8B6F47]" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[#3D2B1F]">Tahap Pengembangan</p>
+                  <p className="text-[10px] text-[#8E7F72]">Fitur ini akan segera hadir eksklusif untuk member Premium RekaBatik.</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <button onClick={() => setShowAIModal(false)} className="w-full py-3.5 rounded-xl font-bold text-white transition-all hover:opacity-95 shadow-md active:scale-95" style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}>Berlangganan Premium</button>
+                <button onClick={() => setShowAIModal(false)} className="w-full py-3.5 rounded-xl font-bold transition-all hover:bg-stone-50" style={{ color: "#8B6F47" }}>Nanti Saja</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Navigation Blocker Confirmation Modal */}
       {blocker.state === "blocked" && (
-        <AlertDialog open={true} onOpenChange={() => blocker.reset?.()}>
+        <AlertDialog 
+          open={true} 
+          onOpenChange={(open) => {
+            if (!open && !isProceeding) {
+              blocker.reset?.();
+            }
+          }}
+        >
           <AlertDialogContent className="rounded-3xl">
             <AlertDialogHeader>
               <AlertDialogTitle style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
@@ -4016,7 +4123,11 @@ export function CustomBatikPage() {
                 Lanjutkan Mengedit
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => blocker.proceed?.()}
+                onClick={() => {
+                  setIsProceeding(true);
+                  // Immediate proceed now that isProceeding is true
+                  blocker.proceed?.();
+                }}
                 className="rounded-xl"
                 style={{ background: "#C0392B" }}
               >

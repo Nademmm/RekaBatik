@@ -186,9 +186,9 @@ export function CatalogPage() {
 
         {/* Grid Katalog */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-              <Skeleton key={i} className="h-[400px] w-full rounded-2xl" />
+              <Skeleton key={i} className="h-[320px] sm:h-[400px] w-full rounded-2xl" />
             ))}
           </div>
         ) : items.length === 0 ? (
@@ -198,7 +198,7 @@ export function CatalogPage() {
             <p style={{ color: "#7A6B5E" }} className="text-sm">Coba kata kunci pencarian lain.</p>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 md:gap-6">
             <AnimatePresence>
               {items.map((item, idx) => {
                 const pType = getPatternType(item.style_type);
@@ -219,7 +219,7 @@ export function CatalogPage() {
                     whileHover={{ y: -4, boxShadow: "0 10px 30px rgba(61,43,31,0.08)" }}
                   >
                     {/* Image Area */}
-                    <div className="h-56 sm:h-60 w-full relative overflow-hidden" style={{ background: item.bg_color }}>
+                    <div className="h-44 sm:h-60 w-full relative overflow-hidden" style={{ background: item.bg_color }}>
                       <motion.div 
                         className="w-full h-full"
                         whileHover={{ scale: 1.05 }}
@@ -245,23 +245,23 @@ export function CatalogPage() {
                           e.stopPropagation();
                           toggleFavoriteBatik(item.id);
                         }}
-                        className="absolute top-3 right-3 p-2 rounded-full bg-white/95 shadow hover:scale-110 transition-all z-10"
+                        className="absolute top-2 right-2 p-1.5 sm:top-3 sm:right-3 sm:p-2 rounded-full bg-white/95 shadow hover:scale-110 transition-all z-10"
                         title={favoriteBatikIds.includes(item.id) ? "Hapus dari favorit" : "Tambah ke favorit"}
                       >
                         <Heart
-                          className="w-4.5 h-4.5"
+                          className="w-3.5 h-3.5 sm:w-4.5 sm:h-4.5"
                           fill={favoriteBatikIds.includes(item.id) ? "#EF4444" : "none"}
                           style={{ color: favoriteBatikIds.includes(item.id) ? "#EF4444" : "#3D2B1F" }}
                         />
                       </button>
 
                       {/* Sold Badge */}
-                      <div className="absolute top-3 left-3 bg-[#8B6F47]/95 text-white px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm shadow">
+                      <div className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-[#8B6F47]/95 text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold backdrop-blur-sm shadow">
                         {item.sold} Terjual
                       </div>
 
-                      {/* Quick Action Overlay (Visible on Hover) */}
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                      {/* Quick Action Overlay (Visible on Hover - Desktop only) */}
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden sm:flex items-center justify-center pointer-events-none">
                         <span className="bg-white text-gray-900 px-5 py-2 rounded-xl font-semibold text-sm transform translate-y-3 group-hover:translate-y-0 transition-all duration-300 shadow-lg">
                           Lihat Detail
                         </span>
@@ -269,31 +269,31 @@ export function CatalogPage() {
                     </div>
 
                     {/* Content Area */}
-                    <div className="p-4 md:p-5 flex flex-col flex-1 relative bg-white">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-1 text-xs font-medium" style={{ color: "#5A4A3E" }}>
-                          <Star className="w-3.5 h-3.5 fill-[#D4B88B] text-[#D4B88B]" />
+                    <div className="p-3 sm:p-5 flex flex-col flex-1 relative bg-white">
+                      <div className="flex justify-between items-start mb-1 sm:mb-2">
+                        <div className="flex items-center gap-1 text-[10px] sm:text-xs font-medium" style={{ color: "#5A4A3E" }}>
+                          <Star className="w-3 sm:w-3.5 h-3 sm:h-3.5 fill-[#D4B88B] text-[#D4B88B]" />
                           <span>{item.rating}</span>
                         </div>
                       </div>
 
-                      <h3 className="font-semibold text-base mb-1 truncate" style={{ color: "#3D2B1F" }}>{item.name}</h3>
-                      <p className="text-xs text-gray-500 mb-3 flex items-center gap-1" style={{ color: "#7A6B5E" }}>
-                        <MapPin className="w-3 h-3" />{item.origin}
+                      <h3 className="font-semibold text-sm sm:text-base mb-0.5 sm:mb-1 truncate" style={{ color: "#3D2B1F" }}>{item.name}</h3>
+                      <p className="text-[10px] sm:text-xs text-gray-500 mb-2 sm:mb-3 flex items-center gap-1" style={{ color: "#7A6B5E" }}>
+                        <MapPin className="w-2.5 sm:w-3 h-2.5 sm:h-3" />{item.origin}
                       </p>
                       
-                      <div className="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
-                        <span className="font-bold text-lg" style={{ color: "#8B6F47" }}>Rp {item.price.toLocaleString("id-ID")}</span>
+                      <div className="mt-auto pt-2 sm:pt-3 border-t border-gray-50 flex items-center justify-between">
+                        <span className="font-bold text-sm sm:text-lg" style={{ color: "#8B6F47" }}>Rp {item.price.toLocaleString("id-ID")}</span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleAddToCart(item, 1);
                           }}
-                          className="p-2.5 rounded-xl hover:bg-[#8B6F47] hover:text-white transition-all"
+                          className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl hover:bg-[#8B6F47] hover:text-white transition-all"
                           style={{ background: "#FAF8F5", color: "#8B6F47" }}
                           title="Tambah ke Keranjang"
                         >
-                          <ShoppingBag className="w-4.5 h-4.5" />
+                          <ShoppingBag className="w-3.5 sm:w-4.5 h-3.5 sm:h-4.5" />
                         </button>
                       </div>
                     </div>
