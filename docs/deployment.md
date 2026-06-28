@@ -70,7 +70,15 @@ Sebelum upload build:
 
 ## Setup Database Production
 
-Untuk project Supabase baru, jalankan file SQL dengan urutan berikut:
+### Project Supabase baru (disarankan)
+
+Jalankan **1 file** di SQL Editor:
+
+- `supabase_full_schema.sql` — schema final, RLS, Realtime, dan seed data
+
+### Project yang sudah pernah di-setup (migrasi incremental)
+
+Jalankan file SQL yang **belum pernah** di-run, berurutan:
 
 1. `supabase_schema.sql`
 2. `supabase_migration.sql`
@@ -81,7 +89,9 @@ Untuk project Supabase baru, jalankan file SQL dengan urutan berikut:
 7. `add_notes_to_cart_items.sql`
 8. `fix_payment_status_constraint.sql` bila perlu
 
-Jangan jalankan file berikut di production tanpa pertimbangan matang:
+Jangan jalankan `supabase_full_schema.sql` jika database sudah berisi data.
+
+### File destruktif — jangan di production
 
 - `clean_and_update_batik_items.sql`
 - `update_batik_items_with_images.sql`
