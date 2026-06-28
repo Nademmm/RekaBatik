@@ -22,6 +22,7 @@ interface CartContextType {
   addToCart: (options: { batikId?: number; customDesignId?: number; quantity?: number }) => Promise<void>;
   updateQuantity: (itemId: string, newQuantity: number) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
+  clearCart: () => Promise<void>;
   fetchFullCart: () => Promise<CartItemWithRelations[]>;
 }
 
@@ -189,6 +190,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, fetchCart]);
 
+  const clearCart = useCallback(async () => {
+    if (!user) return;
+    
+    // Optimistic update
+    setCartItems([]);
+
+    try {
+      const { error } = await supabase
+        .from("cart_items")
+        .delete()
+        .eq("user_id", user.id);
+      
+      if (error) {
+        // Revert on error
+        fetchCart();
+        throw error;
+      }
+    } catch (err) {
+      console.error("Failed to clear cart:", err);
+      throw err;
+    }
+  }, [user, fetchCart]);
+
   // Initial fetch
   useEffect(() => {
     fetchCart();
@@ -229,6 +253,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         addToCart,
         updateQuantity,
         removeItem,
+        clearCart,
         fetchFullCart,
       }}
     >

@@ -9,6 +9,7 @@ export interface BatikItem {
   bg_color: string;
   rating: number;
   sold: number;
+  category?: string;
   style_type?: string;
   svg_url?: string;
   image_url?: string;

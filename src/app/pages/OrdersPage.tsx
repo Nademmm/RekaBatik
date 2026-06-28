@@ -224,7 +224,7 @@ function PaymentModal({ order, onClose, onPaid }: { order: Order; onClose: () =>
     >
       <motion.div
         initial={{ y: 40, scale: 0.96 }} animate={{ y: 0, scale: 1 }} exit={{ y: 40, scale: 0.96 }}
-        className="bg-white rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden"
+        className="bg-white rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         style={{ boxShadow: "0 -20px 60px rgba(61,43,31,0.2)" }}
         onClick={e => e.stopPropagation()}
       >

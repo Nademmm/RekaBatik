@@ -168,7 +168,7 @@ function Stepper({ current, steps = STEPS_NORMAL }: { current: CheckoutStep; ste
 // ─── Main Component ────────────────────────────────────────────────────────
 export function CartPage() {
   const { user } = useAuth();
-  const { fetchFullCart, updateQuantity: updateCartQuantity, removeItem: removeCartItem, refreshCart } = useCart();
+  const { fetchFullCart, updateQuantity: updateCartQuantity, removeItem: removeCartItem, refreshCart, clearCart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -319,6 +319,8 @@ export function CartPage() {
       sessionStorage.removeItem('checkoutNotes');
       sessionStorage.removeItem('checkoutPaymentMethod');
       sessionStorage.removeItem('checkoutSelectedStoreId');
+      sessionStorage.removeItem('checkoutRestoredItem');
+      sessionStorage.removeItem('forceCustomStep');
     }
   }, [successOrderId]);
 
@@ -505,12 +507,11 @@ export function CartPage() {
         }
       }
 
-      // Clear cart
+      // Clear cart from context and DB
       setFinalTotal(total);
       setFinalHasCustom(hasCustomItems);
-      await supabase.from("cart_items").delete().eq("user_id", user.id);
+      await clearCart();
       setCartItems([]);
-      refreshCart();
 
       if (hasCustomItems && store) {
         // Collect custom design thumbnails for the chat opening message
@@ -532,8 +533,15 @@ export function CartPage() {
           ...(forceCustomStep && restoredItem && cartItems.length === 0 && restoredItem.bg_color ? [restoredItem.bg_color] : []),
         ];
 
+        // Clear session storage and temporary state before navigating
+      sessionStorage.removeItem('checkoutRestoredItem');
+      sessionStorage.removeItem('forceCustomStep');
+      sessionStorage.removeItem('checkoutStep'); // Reset step to 1
+      setStep(1);
+
         // Redirect to chat with store info and custom design data
         navigate("/chat", {
+          replace: true, // Use replace to prevent going back to cart with old state
           state: {
             fromCheckout: true,
             storeId: store.id,
@@ -544,6 +552,8 @@ export function CartPage() {
         toast.success("Pesanan dibuat! Silakan diskusikan desain & harga dengan toko.");
       } else {
         setSuccessOrderId(ordersToInsert[0].id);
+        sessionStorage.removeItem('checkoutStep'); // Reset step to 1
+        setStep(1);
       }
     } catch (err) {
       console.error(err);

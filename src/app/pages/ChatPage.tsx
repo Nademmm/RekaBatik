@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import {
   MessageCircle, Send, ChevronLeft, Search,
   CheckCheck, Check, X,
-  CheckCircle, XCircle, Tag, AlertTriangle, Loader2,
+  CheckCircle, CheckCircle2, XCircle, Tag, AlertTriangle, Loader2,
   ShoppingCart, Store, Image as ImageIcon, Handshake,
 } from "lucide-react";
 import { BatikBackground } from "../components/BatikBackground";
@@ -171,6 +171,7 @@ export function ChatPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileShowChat, setMobileShowChat] = useState(false);
   const [loadingConvos, setLoadingConvos] = useState(true);
+  const [orderStatuses, setOrderStatuses] = useState<Record<string, string>>({});
 
   // Confirmation flows
   const [pendingRejectMsg, setPendingRejectMsg] = useState<{ id: string; orderId: string; priceOffer?: number; itemName?: string } | null>(null);
@@ -181,6 +182,10 @@ export function ChatPage() {
   // Negotiation question chip flow
   const [showNegotiationOptions, setShowNegotiationOptions] = useState<string | null>(null); // msgId
   const [sendingNegotiation, setSendingNegotiation] = useState(false);
+  
+  // Keep track of locally resolved messages to hide buttons instantly
+  const [locallyResolvedMsgIds, setLocallyResolvedMsgIds] = useState<Set<string>>(new Set());
+  const [locallyResolvedOrderIds, setLocallyResolvedOrderIds] = useState<Set<string>>(new Set());
 
   // Clear any old stale respondedOffers cache on mount
   useEffect(() => {
@@ -209,6 +214,11 @@ export function ChatPage() {
       .order("date", { ascending: false });
 
     if (orders && orders.length > 0) {
+      // Create a map of order statuses
+      const statuses: Record<string, string> = {};
+      orders.forEach(o => { statuses[o.id] = o.status; });
+      setOrderStatuses(statuses);
+
       // Group by artisan (store name)
       const storeMap = new Map<string, StoreConvo>();
       for (const o of orders) {
@@ -409,6 +419,17 @@ export function ChatPage() {
     const { id: msgId, orderId, price } = pendingAcceptMsg;
     setAcceptingMsgId(msgId);
     setPendingAcceptMsg(null);
+    setLocallyResolvedMsgIds(prev => {
+      const next = new Set(prev);
+      next.add(msgId);
+      next.add(msgId + "-accepted");
+      return next;
+    });
+    setLocallyResolvedOrderIds(prev => {
+      const next = new Set(prev);
+      next.add(orderId);
+      return next;
+    });
     await supabase.from("messages").update({ negotiation_status: "accepted" }).eq("id", msgId);
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, negotiation_status: "accepted" } : m));
     const buyerPrice = price;
@@ -466,6 +487,18 @@ export function ChatPage() {
     const { id: msgId, orderId, priceOffer, itemName } = pendingRejectMsg;
     setRejectLoading(true);
 
+    setLocallyResolvedMsgIds(prev => {
+      const next = new Set(prev);
+      next.add(msgId);
+      next.add(msgId + "-rejected");
+      return next;
+    });
+    setLocallyResolvedOrderIds(prev => {
+      const next = new Set(prev);
+      next.add(orderId);
+      return next;
+    });
+
     // Mark message as rejected
     await supabase.from("messages").update({ negotiation_status: "rejected" }).eq("id", msgId);
 
@@ -495,12 +528,45 @@ export function ChatPage() {
       message: rejectText, status: "sent",
     }]);
 
+    // Restore item to cart for negotiation with other stores
+    try {
+      const { data: orderData } = await supabase.from("orders").select("*").eq("id", orderId).single();
+      if (orderData) {
+        // Try to find if this custom design still exists
+        const { data: customDesign } = await supabase.from("custom_designs").select("id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).single();
+        
+        await supabase.from("cart_items").insert([{
+          user_id: user.id,
+          custom_design_id: customDesign?.id || null,
+          quantity: orderData.quantity || 1,
+          notes: JSON.stringify({
+            restored_from_order: true,
+            item: orderData.item,
+            bg_color: orderData.bg_color,
+            quantity: orderData.quantity
+          })
+        }]);
+      }
+    } catch (restoreErr) {
+      console.error("Gagal memulihkan item ke keranjang:", restoreErr);
+    }
+
     setRejectLoading(false);
     setPendingRejectMsg(null);
-    toast.success("Penawaran ditolak. Silakan pilih toko lain.");
+    toast.success("Penawaran ditolak. Silakan pilih toko lain di keranjang.");
     fetchConversations();
+    
     // Navigate directly to CartPage step 3 (Pilih Toko) with forceCustomStep
-    navigate("/cart", { state: { step: 3, forceCustomStep: true } });
+    navigate("/cart", { 
+      state: { 
+        step: 3, 
+        forceCustomStep: true,
+        restoredItem: {
+          item: itemName || "Desain Batik Kustom",
+          bg_color: priceOffer ? undefined : null // placeholder
+        }
+      } 
+    });
   };
 
   const filteredConvos = conversations.filter(
@@ -663,9 +729,41 @@ export function ChatPage() {
                         msg.negotiation_status === "accepted" ? "accepted"
                         : msg.negotiation_status === "rejected" ? "rejected"
                         : "pending";
-                      const isOfferPending = isPriceOffer && effectiveStatus === "pending";
-                      const isOfferAccepted = isPriceOffer && effectiveStatus === "accepted";
-                      const isOfferRejected = isPriceOffer && effectiveStatus === "rejected";
+                      
+                      // Check if ANY message for this specific order has been accepted or rejected
+                      // Also check if the order status itself is no longer 'negotiating'
+                      const orderMessages = messages.filter(m => m.order_id === msg.order_id);
+                      const orderStatus = orderStatuses[msg.order_id];
+                      const isOrderActuallyAccepted = ["processing", "shipping", "delivered"].includes(orderStatus);
+                      const isOrderActuallyRejected = orderStatus === "cancelled";
+                      
+                      // Check in conversations for actual order status
+                      const currentOrderInfo = conversations.flatMap(c => c.orderIds).includes(msg.order_id);
+                      const isOrderNegotiating = conversations.some(c => c.orderIds.includes(msg.order_id) && c.hasNegotiating);
+                      
+                      const isOrderResolved = 
+                        isOrderActuallyAccepted ||
+                        isOrderActuallyRejected ||
+                        orderMessages.some(m => m.negotiation_status === "accepted" || m.negotiation_status === "rejected") || 
+                        locallyResolvedMsgIds.has(msg.id) || 
+                        locallyResolvedOrderIds.has(msg.order_id) ||
+                        (!isOrderNegotiating && currentOrderInfo); // If order is no longer in negotiating state
+                      
+                      const isOfferPending = isPriceOffer && effectiveStatus === "pending" && !isOrderResolved;
+                      
+                      const isOfferAccepted = isPriceOffer && (
+                        effectiveStatus === "accepted" || 
+                        locallyResolvedMsgIds.has(msg.id + "-accepted") ||
+                        (effectiveStatus === "pending" && isOrderActuallyAccepted) ||
+                        (effectiveStatus === "pending" && orderMessages.some(m => m.negotiation_status === "accepted"))
+                      );
+                      
+                      const isOfferRejected = isPriceOffer && (
+                        effectiveStatus === "rejected" || 
+                        locallyResolvedMsgIds.has(msg.id + "-rejected") ||
+                        (effectiveStatus === "pending" && isOrderActuallyRejected) ||
+                        (effectiveStatus === "pending" && orderMessages.some(m => m.negotiation_status === "rejected"))
+                      );
                       const originalMsg = isPriceOffer ? messages.find(m => m.order_id === msg.order_id && m.sender_role === "user" && !!m.attachment) : null;
 
                       return (
@@ -683,35 +781,48 @@ export function ChatPage() {
                             </div>
                           )}
                           <div className={`max-w-[85%] sm:max-w-[70%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
-                            <div className="px-4 py-2.5 rounded-2xl text-sm sm:text-base leading-relaxed"
+                            <div className="px-4 py-2.5 rounded-2xl text-sm sm:text-base leading-relaxed relative overflow-hidden group"
                               style={{
-                                background: isUser ? "linear-gradient(135deg, #8B6F47, #6B4F2F)" : isPriceOffer ? "linear-gradient(135deg, #FFF7ED, #FFFFFF)" : "#FFFFFF",
+                                background: isUser ? "linear-gradient(135deg, #8B6F47, #6B4F2F)" : isPriceOffer ? (isOfferAccepted ? "linear-gradient(135deg, #F0FDF4, #FFFFFF)" : isOfferRejected ? "linear-gradient(135deg, #FEF2F2, #FFFFFF)" : "linear-gradient(135deg, #FFF7ED, #FFFFFF)") : "#FFFFFF",
                                 color: isUser ? "#FFFFFF" : "#3D2B1F",
                                 borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                                boxShadow: isPriceOffer ? "0 4px 16px rgba(245,158,11,0.2)" : isUser ? "0 2px 8px rgba(139,111,71,0.25)" : "0 2px 8px rgba(61,43,31,0.06)",
-                                border: isPriceOffer ? "2px solid rgba(245,158,11,0.3)" : "none",
+                                boxShadow: isPriceOffer ? (isOfferAccepted ? "0 4px 16px rgba(22,163,74,0.15)" : isOfferRejected ? "0 4px 16px rgba(239,68,68,0.15)" : "0 4px 16px rgba(245,158,11,0.2)") : isUser ? "0 2px 8px rgba(139,111,71,0.25)" : "0 2px 8px rgba(61,43,31,0.06)",
+                                border: isPriceOffer ? (isOfferAccepted ? "2px solid rgba(22,163,74,0.3)" : isOfferRejected ? "2px solid rgba(239,68,68,0.3)" : "2px solid rgba(245,158,11,0.3)") : "none",
                                 whiteSpace: "pre-line",
+                                opacity: (isOfferAccepted || isOfferRejected) && !isUser ? 0.9 : 1
                               }}
                             >
+                              {/* Confirmation Stamps/Watermarks */}
+                              {isOfferAccepted && (
+                                <div className="absolute -right-2 -bottom-2 opacity-10 rotate-[-12deg] pointer-events-none">
+                                  <CheckCircle className="w-16 h-16 text-green-600" />
+                                </div>
+                              )}
+                              {isOfferRejected && (
+                                <div className="absolute -right-2 -bottom-2 opacity-10 rotate-[-12deg] pointer-events-none">
+                                  <XCircle className="w-16 h-16 text-red-600" />
+                                </div>
+                              )}
+
                               {isPriceOffer && (
-                                <div className="flex flex-col gap-2 mb-2 pb-2" style={{ borderBottom: "1px dashed rgba(245,158,11,0.3)" }}>
+                                <div className="flex flex-col gap-2 mb-2 pb-2" style={{ borderBottom: isOfferAccepted ? "1px dashed rgba(22,163,74,0.3)" : isOfferRejected ? "1px dashed rgba(239,68,68,0.3)" : "1px dashed rgba(245,158,11,0.3)" }}>
                                   {originalMsg && (
-                                    <div className="flex bg-white/60 rounded-xl p-2 gap-2 w-full" style={{ borderLeft: "3px solid rgba(245,158,11,0.5)" }}>
+                                    <div className="flex bg-white/60 rounded-xl p-2 gap-2 w-full" style={{ borderLeft: isOfferAccepted ? "3px solid rgba(22,163,74,0.5)" : isOfferRejected ? "3px solid rgba(239,68,68,0.5)" : "3px solid rgba(245,158,11,0.5)" }}>
                                       {originalMsg.attachment && (
                                         <img src={originalMsg.attachment} alt="Desain" className="w-10 h-10 object-cover rounded bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)" }} />
                                       )}
                                       <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                        <p className="text-[10px] font-bold" style={{ color: "#D97706" }}>Membalas Pesanan</p>
+                                        <p className="text-[10px] font-bold" style={{ color: isOfferAccepted ? "#16A34A" : isOfferRejected ? "#DC2626" : "#D97706" }}>Membalas Pesanan</p>
                                         <p className="text-xs truncate" style={{ color: "#7A6B5E" }}>{originalMsg.message.split("\n").find(l => l.includes("Item:"))?.replace("- Item: ", "") || "Desain Kustom"}</p>
                                       </div>
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(245,158,11,0.15)" }}>
-                                      <Tag className="w-3.5 h-3.5" style={{ color: "#D97706" }} />
+                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: isOfferAccepted ? "rgba(22,163,74,0.15)" : isOfferRejected ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)" }}>
+                                      <Tag className="w-3.5 h-3.5" style={{ color: isOfferAccepted ? "#16A34A" : isOfferRejected ? "#DC2626" : "#D97706" }} />
                                     </div>
                                     <div className="flex-1">
-                                      <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "#D97706" }}>Penawaran Harga</p>
+                                      <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: isOfferAccepted ? "#16A34A" : isOfferRejected ? "#DC2626" : "#D97706" }}>Penawaran Harga</p>
                                       <p className="text-base font-bold" style={{ color: "#3D2B1F" }}>{formatCurrency(msg.price_offer!)}</p>
                                     </div>
                                   </div>
@@ -720,26 +831,26 @@ export function ChatPage() {
                               {msg.attachment && (
                                 <img src={msg.attachment} alt="Desain" className="w-full max-w-[200px] sm:max-w-[240px] rounded-xl mb-2 object-contain" style={{ border: "1px solid rgba(212,184,139,0.2)" }} />
                               )}
-                              {msg.message}
+                              <span className={isOfferRejected ? "line-through opacity-50" : ""}>{msg.message}</span>
                             </div>
 
                             {/* Status banner — below the bubble, only one at a time */}
                             {isOfferAccepted && (
-                              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                                className="flex items-center gap-2 px-3 py-2 rounded-xl mt-1"
-                                style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.25)", maxWidth: "100%" }}
+                              <motion.div initial={{ opacity: 0, y: -4, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                                className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl mt-1.5 shadow-sm"
+                                style={{ background: "linear-gradient(135deg, #16A34A, #15803D)", border: "1px solid rgba(22,163,74,0.2)", maxWidth: "100%" }}
                               >
-                                <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#16A34A" }} />
-                                <span className="text-xs font-bold" style={{ color: "#16A34A" }}>✅ Penawaran Diterima — Lanjut ke Pembayaran</span>
+                                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-white" />
+                                <span className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider">Penawaran Telah Disetujui</span>
                               </motion.div>
                             )}
                             {isOfferRejected && (
-                              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                                className="flex items-center gap-2 px-3 py-2 rounded-xl mt-1"
-                                style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", maxWidth: "100%" }}
+                              <motion.div initial={{ opacity: 0, y: -4, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                                className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl mt-1.5 shadow-sm"
+                                style={{ background: "linear-gradient(135deg, #DC2626, #991B1B)", border: "1px solid rgba(239,68,68,0.2)", maxWidth: "100%" }}
                               >
-                                <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#EF4444" }} />
-                                <span className="text-xs font-bold" style={{ color: "#EF4444" }}>❌ Penawaran Ditolak — Pesanan Dibatalkan</span>
+                                <XCircle className="w-4 h-4 flex-shrink-0 text-white" />
+                                <span className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider">Penawaran Telah Ditolak</span>
                               </motion.div>
                             )}
 
@@ -753,11 +864,11 @@ export function ChatPage() {
                                 >
                                   {/* Setuju */}
                                   <motion.button
-                                    whileHover={{ scale: acceptingMsgId ? 1 : 1.03 }}
-                                    whileTap={{ scale: acceptingMsgId ? 1 : 0.97 }}
+                                    whileHover={{ scale: (acceptingMsgId || isOrderResolved) ? 1 : 1.03 }}
+                                    whileTap={{ scale: (acceptingMsgId || isOrderResolved) ? 1 : 0.97 }}
                                     onClick={() => acceptOffer(msg.id, msg.price_offer!, msg.order_id)}
-                                    disabled={!!acceptingMsgId}
-                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-60"
+                                    disabled={!!acceptingMsgId || isOrderResolved}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-40"
                                     style={{ background: "linear-gradient(135deg, #16A34A, #15803D)", boxShadow: "0 2px 8px rgba(22,163,74,0.3)" }}
                                   >
                                     {acceptingMsgId === msg.id
@@ -768,10 +879,10 @@ export function ChatPage() {
 
                                   {/* Tanya Pengrajin toggle */}
                                   <motion.button
-                                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                    whileHover={{ scale: isOrderResolved ? 1 : 1.03 }} whileTap={{ scale: isOrderResolved ? 1 : 0.97 }}
                                     onClick={() => setShowNegotiationOptions(showNegotiationOptions === msg.id ? null : msg.id)}
-                                    disabled={!!acceptingMsgId || sendingNegotiation}
-                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold disabled:opacity-60"
+                                    disabled={!!acceptingMsgId || sendingNegotiation || isOrderResolved}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold disabled:opacity-40"
                                     style={{
                                       background: showNegotiationOptions === msg.id ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.1)",
                                       color: "#D97706",
@@ -785,7 +896,7 @@ export function ChatPage() {
 
                                   {/* Tidak Setuju */}
                                   <motion.button
-                                    whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                                    whileHover={{ scale: isOrderResolved ? 1 : 1.03 }} whileTap={{ scale: isOrderResolved ? 1 : 0.97 }}
                                     onClick={async () => {
                                       let itemName: string | undefined;
                                       try {
@@ -795,8 +906,8 @@ export function ChatPage() {
                                       } catch {}
                                       setPendingRejectMsg({ id: msg.id, orderId: msg.order_id, priceOffer: msg.price_offer, itemName });
                                     }}
-                                    disabled={!!acceptingMsgId}
-                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold disabled:opacity-60"
+                                    disabled={!!acceptingMsgId || isOrderResolved}
+                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold disabled:opacity-40"
                                     style={{
                                       background: "rgba(239,68,68,0.07)",
                                       color: "#DC2626",
