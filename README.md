@@ -5,7 +5,7 @@ RekaBatik adalah aplikasi web e-commerce dan kustomisasi batik berbasis React + 
 Dokumen ini ditulis berdasarkan kondisi kode saat ini di repository, sehingga fokusnya adalah dokumentasi implementasi yang benar-benar ada, bukan sekadar gambaran konsep produk.
 
 ## Daftar Isi
-
+ 
 - [Ringkasan Proyek](#ringkasan-proyek)
 - [Fitur Utama](#fitur-utama)
 - [Role dan Hak Akses](#role-dan-hak-akses)
