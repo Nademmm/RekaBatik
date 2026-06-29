@@ -121,6 +121,30 @@ export function RootLayout() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Handle OAuth / authentication errors from URL query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    const errorDescription = params.get("error_description");
+    
+    if (error) {
+      let displayMessage = errorDescription || "Terjadi kesalahan saat masuk.";
+      
+      // Translate common authentication error messages
+      if (displayMessage.includes("Unable to exchange external code")) {
+        displayMessage = "Gagal memproses autentikasi Google. Pastikan Google Client Secret & Redirect URI di Supabase sudah dikonfigurasi dengan benar.";
+      } else if (displayMessage.includes("Signups are not allowed") || error === "signup_disabled") {
+        displayMessage = "Akun Google Anda belum terdaftar. Silakan lakukan pendaftaran akun terlebih dahulu.";
+      }
+      
+      toast.error(displayMessage, { duration: 6000 });
+      
+      // Clean up the URL query parameters to keep the URL clean
+      const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }, []);
+
   useEffect(() => {
     setMobileOpen(false);
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -900,15 +924,19 @@ export function RootLayout() {
             </p>
             
             <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-6 gap-y-2">
-              {["Kebijakan Privasi", "Syarat & Ketentuan", "FAQ"].map((item, i) => (
-                <button
+              {[
+                { label: "Kebijakan Privasi", to: "/privacy-policy" },
+                { label: "Syarat & Ketentuan", to: "/terms-of-service" },
+              ].map((item, i) => (
+                <Link
                   key={i}
+                  to={item.to}
                   style={{ color: "rgba(250,248,245,0.45)", fontSize: "0.9rem", transition: "color 0.2s" }}
                   onMouseEnter={(e) => e.currentTarget.style.color = "#D4B88B"}
                   onMouseLeave={(e) => e.currentTarget.style.color = "rgba(250,248,245,0.45)"}
                 >
-                  {item}
-                </button>
+                  {item.label}
+                </Link>
               ))}
             </div>
           </motion.div>

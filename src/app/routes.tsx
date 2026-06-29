@@ -16,6 +16,8 @@ import { SuperAdminPage } from "./pages/SuperAdminPage";
 import { RootLayout } from "./layouts/RootLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorPage } from "./components/ErrorPage";
+import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
+import { TermsOfServicePage } from "./pages/TermsOfServicePage";
 
 export const router = createBrowserRouter([
   {
@@ -34,6 +36,8 @@ export const router = createBrowserRouter([
       { path: "desa-jetis", Component: DesaJetisPage },
       { path: "desa-jetis/:storeId", Component: DesaJetisStoreDetailPage },
       { path: "belajar-batik", Component: BelajarBatikPage },
+      { path: "privacy-policy", Component: PrivacyPolicyPage },
+      { path: "terms-of-service", Component: TermsOfServicePage },
       // Protected routes — require login
       {
         Component: ProtectedRoute,
