@@ -485,7 +485,7 @@ export function HomePage() {
               return (
                 <motion.div
                   key={i}
-                  className="group relative overflow-hidden"
+                  className="group relative"
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: i * 0.1 }}
@@ -523,12 +523,8 @@ export function HomePage() {
                             {f.title}
                           </h3>
                         </div>
-                        <p className="hidden sm:block" style={{ color: "rgba(250,248,245,0.65)", fontSize: "clamp(0.82rem, 2.2vw, 0.95rem)", lineHeight: "1.65" }}>
+                        <p style={{ color: "rgba(250,248,245,0.65)", fontSize: "clamp(0.7rem, 2.2vw, 0.95rem)", lineHeight: "1.65" }}>
                           {f.description}
-                        </p>
-                        {/* Mobile: deskripsi singkat */}
-                        <p className="sm:hidden" style={{ color: "rgba(250,248,245,0.6)", fontSize: "0.7rem", lineHeight: "1.5" }}>
-                          {f.description.split(',')[0]}
                         </p>
                       </div>
                     </div>

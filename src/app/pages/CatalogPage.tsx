@@ -255,11 +255,6 @@ export function CatalogPage() {
                         />
                       </button>
 
-                      {/* Sold Badge */}
-                      <div className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-[#8B6F47]/95 text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold backdrop-blur-sm shadow">
-                        {item.sold} Terjual
-                      </div>
-
                       {/* Quick Action Overlay (Visible on Hover - Desktop only) */}
                       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden sm:flex items-center justify-center pointer-events-none">
                         <span className="bg-white text-gray-900 px-5 py-2 rounded-xl font-semibold text-sm transform translate-y-3 group-hover:translate-y-0 transition-all duration-300 shadow-lg">

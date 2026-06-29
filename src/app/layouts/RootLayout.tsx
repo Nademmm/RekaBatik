@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck, Home, Grid, Palette, Info } from "lucide-react";
+import { Analytics } from "@vercel/analytics/react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BatikBackground } from "../components/BatikBackground";
 import logoImg from "../../imports/rekabatik-logo.png";
@@ -32,6 +33,31 @@ function getInitials(user: { user_metadata?: { full_name?: string }; email?: str
   }
   return (user.email ?? "U").slice(0, 2).toUpperCase();
 }
+
+/** Get Icon for each navigation label */
+const getNavItemIcon = (label: string, isActive: boolean) => {
+  const iconClass = `w-4.5 h-4.5 transition-transform duration-300 ${isActive ? "text-[#8B6F47] scale-110" : "text-[#7A6B5E] opacity-80"}`;
+  switch (label) {
+    case "Beranda":
+      return <Home className={iconClass} />;
+    case "Katalog":
+      return <Grid className={iconClass} />;
+    case "Kustom":
+      return <Palette className={iconClass} />;
+    case "Desainku":
+      return <BookOpen className={iconClass} />;
+    case "Pesanan":
+      return <Package className={iconClass} />;
+    case "Tentang Kami":
+      return <Info className={iconClass} />;
+    case "Chat":
+      return <MessageCircle className={iconClass} />;
+    case "Profil":
+      return <User className={iconClass} />;
+    default:
+      return null;
+  }
+};
 
 export function RootLayout() {
   const location = useLocation();
@@ -146,16 +172,20 @@ export function RootLayout() {
       }}
     >
       <Toaster position="top-right" richColors closeButton />
+      <Analytics />
       {/* Header */}
       {!isFullMode && (
         <header
-          className="sticky top-0 z-50"
+          className="sticky top-0 z-50 transition-all duration-300"
           style={{
-            background: "#ffffffff",
+            background: scrolled ? "rgba(255, 255, 255, 0.85)" : "#FAF8F5",
+            backdropFilter: scrolled ? "blur(12px)" : "none",
+            borderBottom: scrolled ? "1px solid rgba(139, 111, 71, 0.08)" : "1px solid transparent",
+            boxShadow: scrolled ? "0 4px 20px rgba(61, 43, 31, 0.04)" : "none",
           }}
         >
-        <div className="container mx-auto px-4 md:px-8 relative z-10">
-          <div className="flex items-center justify-between md:justify-around h-20">
+        <div className="container mx-auto px-6 relative z-10 max-w-7xl">
+          <div className={`flex items-center justify-between transition-all duration-300 ${scrolled ? "h-16" : "h-20"}`}>
 
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3 group flex-shrink-0">
@@ -183,21 +213,25 @@ export function RootLayout() {
             </Link>
 
             {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center gap-2">
+            <nav className="hidden md:flex items-center gap-1">
               {desktopNavItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className="relative px-4 py-2 rounded-md transition-all duration-200"
+                    className="relative px-4 py-2 rounded-xl transition-all duration-300 text-[0.95rem] font-medium tracking-wide flex items-center justify-center overflow-hidden group hover:bg-[#8B6F47]/[0.03]"
                     style={{
                       color: isActive ? "#3D2B1F" : "#7A6B5E",
-                      fontWeight: isActive ? 600 : 400,
-                      fontSize: "1.03rem",
                     }}
                   >
-                    {item.label}
+                    <span className="relative z-10">{item.label}</span>
+                    {/* Sliding underline */}
+                    <span 
+                      className={`absolute bottom-1 left-4 right-4 h-0.5 rounded-full transition-all duration-300 ${
+                        isActive ? "bg-[#8B6F47] scale-x-100" : "bg-[#D4B88B]/60 scale-x-0 group-hover:scale-x-100"
+                      } origin-center`} 
+                    />
                   </Link>
                 );
               })}
@@ -208,18 +242,30 @@ export function RootLayout() {
               {/* Cart Icon */}
               <Link
                 to="/cart"
-                className="flex items-center justify-center w-10 h-10 rounded-md transition-all hover:bg-gray-100 relative"
-                style={{ color: "#3D2B1F" }}
+                className="flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300 relative group"
+                style={{ 
+                  color: "#3D2B1F",
+                  background: "rgba(139,111,71,0.04)",
+                  border: "1px solid rgba(139,111,71,0.1)"
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "rgba(139,111,71,0.08)";
+                  e.currentTarget.style.borderColor = "rgba(139,111,71,0.3)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "rgba(139,111,71,0.04)";
+                  e.currentTarget.style.borderColor = "rgba(139,111,71,0.1)";
+                }}
               >
-                <ShoppingBag className="w-5 h-5" />
+                <ShoppingBag className="w-5 h-5 transition-transform duration-300 group-hover:scale-110" />
                 <AnimatePresence>
                   {cartCount > 0 && (
                     <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       exit={{ scale: 0 }}
-                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-                      style={{ background: "#D97706" }}
+                      className="absolute -top-1.5 -right-1.5 h-5 px-1.5 min-w-[20px] rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-md"
+                      style={{ background: "linear-gradient(135deg, #D4B88B, #8B6F47)" }}
                     >
                       {cartCount > 9 ? "9+" : cartCount}
                     </motion.div>
@@ -231,7 +277,7 @@ export function RootLayout() {
               {loading ? (
                 /* skeleton while loading auth */
                 <div
-                  className="hidden md:block w-24 h-9 rounded-md animate-pulse"
+                  className="hidden md:block w-24 h-9 rounded-xl animate-pulse"
                   style={{ background: "rgba(139,111,71,0.1)" }}
                 />
               ) : user ? (
@@ -239,12 +285,16 @@ export function RootLayout() {
                 <div className="hidden md:block relative" ref={userMenuRef}>
                   <motion.button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+                    className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl transition-all duration-300"
                     style={{
-                      border: "1.5px solid rgba(139,111,71,0.2)",
-                      background: userMenuOpen ? "rgba(139,111,71,0.06)" : "transparent",
+                      border: "1px solid rgba(139,111,71,0.15)",
+                      background: userMenuOpen ? "rgba(139,111,71,0.08)" : "rgba(139,111,71,0.03)",
                     }}
-                    whileHover={{ background: "rgba(139,111,71,0.06)" }}
+                    whileHover={{ 
+                      background: "rgba(139,111,71,0.08)",
+                      borderColor: "rgba(139,111,71,0.35)",
+                      boxShadow: "0 4px 12px rgba(61,43,31,0.05)"
+                    }}
                     whileTap={{ scale: 0.97 }}
                   >
                     {/* Avatar */}
@@ -289,7 +339,7 @@ export function RootLayout() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.96 }}
                         transition={{ duration: 0.18 }}
-                        className="absolute right-0 top-full mt-2 w-56 rounded-2xl overflow-hidden"
+                        className="absolute right-0 top-full mt-2 w-56 rounded-2xl overflow-hidden text-left"
                         style={{
                           background: "#FFFFFF",
                           border: "1px solid rgba(139,111,71,0.12)",
@@ -317,10 +367,8 @@ export function RootLayout() {
                             <Link
                               to="/super-admin"
                               onClick={() => setUserMenuOpen(false)}
-                              className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-blue-50/80"
                               style={{ color: "#1D4ED8" }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(29,78,216,0.07)")}
-                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                             >
                               <ShieldCheck className="w-4 h-4" style={{ color: "#1D4ED8" }} />
                               Portal Super Admin
@@ -337,10 +385,8 @@ export function RootLayout() {
                                 }
                                 setUserMenuOpen(false);
                               }}
-                              className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors"
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-[#8B6F47]/[0.06]"
                               style={{ color: "#8B6F47" }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.07)")}
-                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                             >
                               <LayoutDashboard className="w-4 h-4" style={{ color: "#8B6F47" }} />
                               <span className="flex-1">Dashboard Admin</span>
@@ -354,10 +400,8 @@ export function RootLayout() {
                           <Link
                             to="/profile"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-[#8B6F47]/[0.04]"
                             style={{ color: "#5A4A3E" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             <User className="w-4 h-4" style={{ color: "#8B6F47" }} />
                             Profil Saya
@@ -365,10 +409,8 @@ export function RootLayout() {
                           <Link
                             to="/orders"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-[#8B6F47]/[0.04]"
                             style={{ color: "#5A4A3E" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             <Package className="w-4 h-4" style={{ color: "#8B6F47" }} />
                             <span className="flex-1">Pesanan Saya</span>
@@ -386,10 +428,8 @@ export function RootLayout() {
                           <Link
                             to="/desain-histori"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-[#8B6F47]/[0.04]"
                             style={{ color: "#5A4A3E" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             <BookOpen className="w-4 h-4" style={{ color: "#8B6F47" }} />
                             Desain Saya
@@ -397,10 +437,8 @@ export function RootLayout() {
                           <Link
                             to="/chat"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-[#8B6F47]/[0.04]"
                             style={{ color: "#5A4A3E" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             <MessageCircle className="w-4 h-4" style={{ color: "#8B6F47" }} />
                             <span className="flex-1">Chat Toko</span>
@@ -413,10 +451,8 @@ export function RootLayout() {
                           <Link
                             to="/custom"
                             onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-[#8B6F47]/[0.04]"
                             style={{ color: "#5A4A3E" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(139,111,71,0.05)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             <Settings className="w-4 h-4" style={{ color: "#8B6F47" }} />
                             Studio Kustom
@@ -433,10 +469,8 @@ export function RootLayout() {
                               setUserMenuOpen(false);
                               setIsLogoutDialogOpen(true);
                             }}
-                            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm transition-colors"
+                            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm transition-colors hover:bg-red-50/80"
                             style={{ color: "#ef4444" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.05)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             <LogOut className="w-4 h-4" />
                             Keluar
@@ -450,12 +484,16 @@ export function RootLayout() {
                 /* Not logged in → Login button */
                 <Link
                   to="/auth"
-                  className="hidden md:flex items-center gap-2 px-5 py-2 rounded-md transition-all"
+                  className="hidden md:flex items-center gap-2 px-5.5 py-2 rounded-xl transition-all duration-300 hover:shadow-md hover:shadow-[#3D2B1F]/10 text-[0.9rem] font-medium"
                   style={{
-                    background: "#3D2B1F",
+                    background: "linear-gradient(135deg, #3D2B1F 0%, #5A3E2B 100%)",
                     color: "#FFFFFF",
-                    fontSize: "0.9rem",
-                    fontWeight: 500,
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = "translateY(0px)";
                   }}
                 >
                   <User className="w-4 h-4" />
@@ -465,11 +503,14 @@ export function RootLayout() {
 
               {/* Mobile hamburger */}
               <motion.button
-                className="md:hidden w-10 h-10 rounded-md flex items-center justify-center"
+                className="md:hidden w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
                 style={{
                   color: "#3D2B1F",
+                  background: "rgba(139,111,71,0.05)",
+                  border: "1px solid rgba(139,111,71,0.12)"
                 }}
                 onClick={() => setMobileOpen(!mobileOpen)}
+                whileHover={{ background: "rgba(139,111,71,0.08)" }}
                 whileTap={{ scale: 0.95 }}
               >
                 <AnimatePresence mode="wait" initial={false}>
@@ -513,20 +554,21 @@ export function RootLayout() {
               className="overflow-hidden md:hidden border-t"
               style={{ background: "#FFFFFF", borderColor: "#E8E1DA" }}
             >
-              <div className="px-8 py-4 space-y-2">
+              <div className="px-8 py-5 space-y-2 text-left">
                 {/* Super Admin Dashboard link */}
                 {userRole === "super_admin" && (
                   <Link
                     to="/super-admin"
-                    className="flex items-center justify-between px-4 py-3 rounded-md transition-all"
+                    className="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 hover:bg-blue-50/80"
                     style={{
                       color: location.pathname === "/super-admin" ? "#1E3A8A" : "#1D4ED8",
                       fontWeight: 600,
                       background: "rgba(29,78,216,0.06)",
                     }}
                   >
-                    <span className="text-sm flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4" />Portal Super Admin
+                    <span className="text-sm flex items-center gap-3">
+                      <ShieldCheck className="w-4.5 h-4.5" />
+                      <span>Portal Super Admin</span>
                     </span>
                     <ChevronRight className="w-4 h-4 opacity-50" />
                   </Link>
@@ -540,16 +582,18 @@ export function RootLayout() {
                         e.preventDefault();
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }
+                      setMobileOpen(false);
                     }}
-                    className="flex items-center justify-between px-4 py-3 rounded-md transition-all"
+                    className="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 hover:bg-[#8B6F47]/[0.06]"
                     style={{
                       color: location.pathname === "/admin" ? "#3D2B1F" : "#8B6F47",
                       fontWeight: 600,
                       background: "rgba(139,111,71,0.06)",
                     }}
                   >
-                    <span className="text-sm flex items-center gap-2 flex-1">
-                      <LayoutDashboard className="w-4 h-4" />Dashboard Admin
+                    <span className="text-sm flex items-center gap-3 flex-1">
+                      <LayoutDashboard className="w-4.5 h-4.5" />
+                      <span>Dashboard Admin</span>
                     </span>
                     {(notifications.awaitingVerificationCount + notifications.negotiatingCount) > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-bold text-white bg-red-500 mr-2">
@@ -578,13 +622,18 @@ export function RootLayout() {
                     <Link
                       key={item.path}
                       to={item.path}
-                      className="flex items-center justify-between px-4 py-3 rounded-md transition-all"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 hover:bg-[#8B6F47]/[0.04]"
                       style={{
-                        color: isActive ? "#3D2B1F" : "#7A6B5E",
-                        fontWeight: isActive ? 600 : 400,
+                        color: isActive ? "#8B6F47" : "#5A4A3E",
+                        fontWeight: isActive ? 600 : 500,
+                        background: isActive ? "rgba(139,111,71,0.06)" : "transparent",
                       }}
                     >
-                      <span className="text-sm flex-1">{item.label}</span>
+                      <span className="text-sm flex items-center gap-3 flex-1">
+                        {getNavItemIcon(item.label, isActive)}
+                        <span>{item.label}</span>
+                      </span>
                       {badgeCount > 0 && (
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold text-white ${badgeColor} mr-2`}>
                           {badgeCount}
@@ -599,14 +648,14 @@ export function RootLayout() {
                 <div className="pt-3 space-y-2">
                   {loading ? (
                     /* Skeleton while loading auth */
-                    <div className="px-4 py-3 rounded-md animate-pulse" style={{ background: "rgba(139,111,71,0.1)" }} />
+                    <div className="px-4 py-3 rounded-xl animate-pulse" style={{ background: "rgba(139,111,71,0.1)" }} />
                   ) : user ? (
                     /* Logged in */
                     <div className="space-y-2">
                       {/* User info */}
-                      <div className="flex items-center gap-3 px-4 py-3 rounded-md" style={{ background: "rgba(139,111,71,0.06)" }}>
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: "rgba(139,111,71,0.06)" }}>
                         <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
+                          className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
                           style={{
                             background: "linear-gradient(135deg, #3D2B1F, #8B6F47)",
                             color: "#FAF8F5",
@@ -615,7 +664,7 @@ export function RootLayout() {
                         >
                           {initials}
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 text-left">
                           <p className="text-sm font-semibold truncate" style={{ color: "#3D2B1F" }}>{displayName}</p>
                           <p className="text-xs truncate" style={{ color: "#9E8E82" }}>{user.email}</p>
                         </div>
@@ -624,7 +673,7 @@ export function RootLayout() {
                             setMobileOpen(false);
                             setIsLogoutDialogOpen(true);
                           }}
-                          className="w-10 h-10 rounded-md flex items-center justify-center"
+                          className="w-10 h-10 rounded-xl flex items-center justify-center transition-colors hover:bg-red-50"
                           style={{ color: "#ef4444" }}
                         >
                           <LogOut className="w-5 h-5" />
@@ -636,11 +685,10 @@ export function RootLayout() {
                     <Link
                       to="/auth"
                       onClick={() => setMobileOpen(false)}
-                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-md"
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[0.95rem] font-medium"
                       style={{
-                        background: "#3D2B1F",
+                        background: "linear-gradient(135deg, #3D2B1F 0%, #5A3E2B 100%)",
                         color: "#FFFFFF",
-                        fontWeight: 500,
                       }}
                     >
                       <User className="w-4 h-4" />
@@ -664,18 +712,18 @@ export function RootLayout() {
         
         {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-full h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(212,184,139,0.5), transparent)" }} />
-        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full opacity-8" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)" }} />
-        <div className="absolute -bottom-36 -left-36 w-[28rem] h-[28rem] rounded-full opacity-4" style={{ background: "radial-gradient(circle, #8B6F47 0%, transparent 70%)" }} />
+        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)", opacity: 0.08, pointerEvents: "none" }} />
+        <div className="absolute -bottom-36 -left-36 w-[28rem] h-[28rem] rounded-full" style={{ background: "radial-gradient(circle, #8B6F47 0%, transparent 70%)", opacity: 0.04, pointerEvents: "none" }} />
 
         <div className="container mx-auto px-6 py-16 relative z-10 max-w-7xl">
-          <div className="grid lg:grid-cols-12 gap-10 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 md:gap-8 lg:gap-10 mb-12 text-left">
             {/* Brand Column */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
               viewport={{ once: true }}
-              className="lg:col-span-5"
+              className="col-span-1 md:col-span-2 lg:col-span-5"
             >
               <div className="flex items-center gap-4 mb-5">
                 <div className="relative">
@@ -698,13 +746,18 @@ export function RootLayout() {
               </p>
 
               {/* Social Media */}
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 {[Instagram, Facebook, Twitter].map((Icon, i) => (
                   <motion.button
                     key={i}
-                    whileHover={{ scale: 1.05, backgroundColor: "rgba(212,184,139,0.25)" }}
+                    whileHover={{ 
+                      scale: 1.08, 
+                      backgroundColor: "rgba(212,184,139,0.2)",
+                      borderColor: "rgba(212,184,139,0.5)",
+                      boxShadow: "0 0 15px rgba(212,184,139,0.3)"
+                    }}
                     whileTap={{ scale: 0.95 }}
-                    className="w-11 h-11 rounded-xl flex items-center justify-center transition-all"
+                    className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300"
                     style={{ 
                       background: "rgba(255,255,255,0.03)", 
                       color: "#D4B88B",
@@ -723,7 +776,7 @@ export function RootLayout() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
               viewport={{ once: true }}
-              className="lg:col-span-2"
+              className="col-span-1 md:col-span-1 lg:col-span-2"
             >
               <h4 className="mb-5 font-semibold" style={{ color: "#FAF8F5", fontSize: "1.05rem", fontFamily: "'Playfair Display', serif" }}>
                 Navigasi
@@ -733,12 +786,13 @@ export function RootLayout() {
                   <li key={item.path}>
                     <Link
                       to={item.path}
-                      className="block transition-colors"
+                      className="group flex items-center transition-all duration-300"
                       style={{ color: "rgba(250,248,245,0.65)", fontSize: "0.95rem" }}
                       onMouseEnter={(e) => e.currentTarget.style.color = "#D4B88B"}
                       onMouseLeave={(e) => e.currentTarget.style.color = "rgba(250,248,245,0.65)"}
                     >
-                      {item.label}
+                      <ChevronRight className="w-0 h-3.5 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 transition-all duration-300 text-[#D4B88B] flex-shrink-0" />
+                      <span>{item.label}</span>
                     </Link>
                   </li>
                 ))}
@@ -751,7 +805,7 @@ export function RootLayout() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
               viewport={{ once: true }}
-              className="lg:col-span-2"
+              className="col-span-1 md:col-span-1 lg:col-span-2"
             >
               <h4 className="mb-5 font-semibold" style={{ color: "#FAF8F5", fontSize: "1.05rem", fontFamily: "'Playfair Display', serif" }}>
                 Layanan Kami
@@ -766,12 +820,13 @@ export function RootLayout() {
                 ].map((item, i) => (
                   <li key={i}>
                     <button
-                      className="block transition-colors text-left"
+                      className="group flex items-center transition-all duration-300 text-left w-full cursor-pointer"
                       style={{ color: "rgba(250,248,245,0.65)", fontSize: "0.95rem" }}
                       onMouseEnter={(e) => e.currentTarget.style.color = "#D4B88B"}
                       onMouseLeave={(e) => e.currentTarget.style.color = "rgba(250,248,245,0.65)"}
                     >
-                      {item}
+                      <ChevronRight className="w-0 h-3.5 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 transition-all duration-300 text-[#D4B88B] flex-shrink-0" />
+                      <span>{item}</span>
                     </button>
                   </li>
                 ))}
@@ -784,44 +839,44 @@ export function RootLayout() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
               viewport={{ once: true }}
-              className="lg:col-span-3"
+              className="col-span-1 md:col-span-2 lg:col-span-3"
             >
               <h4 className="mb-5 font-semibold" style={{ color: "#FAF8F5", fontSize: "1.05rem", fontFamily: "'Playfair Display', serif" }}>
                 Hubungi Kami
               </h4>
               
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(212,184,139,0.12)" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4B88B" strokeWidth="1.8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-6 lg:gap-4">
+                <div className="flex items-start gap-3 group/item">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300 group-hover/item:bg-[#D4B88B] group-hover/item:text-[#3D2B1F]" style={{ background: "rgba(212,184,139,0.12)", color: "#D4B88B" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                       <circle cx="12" cy="10" r="3" />
                     </svg>
                   </div>
-                  <p style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem", lineHeight: "1.5" }}>
+                  <p className="transition-colors duration-300 group-hover/item:text-[#FAF8F5]" style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem", lineHeight: "1.5" }}>
                     Desa Jetis, Sidoarjo<br/>Jawa Timur, Indonesia
                   </p>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(212,184,139,0.12)" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4B88B" strokeWidth="1.8">
+                <div className="flex items-center gap-3 group/item">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300 group-hover/item:bg-[#D4B88B] group-hover/item:text-[#3D2B1F]" style={{ background: "rgba(212,184,139,0.12)", color: "#D4B88B" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                       <path d="M22 6l-10 7L2 6" />
                     </svg>
                   </div>
-                  <p style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem" }}>
+                  <p className="transition-colors duration-300 group-hover/item:text-[#FAF8F5]" style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem" }}>
                     info@rekabatik.id
                   </p>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(212,184,139,0.12)" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4B88B" strokeWidth="1.8">
+                <div className="flex items-center gap-3 group/item">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300 group-hover/item:bg-[#D4B88B] group-hover/item:text-[#3D2B1F]" style={{ background: "rgba(212,184,139,0.12)", color: "#D4B88B" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                     </svg>
                   </div>
-                  <p style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem" }}>
+                  <p className="transition-colors duration-300 group-hover/item:text-[#FAF8F5]" style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem" }}>
                     +62 812-3456-7890
                   </p>
                 </div>
@@ -830,7 +885,7 @@ export function RootLayout() {
           </div>
 
           {/* Divider */}
-          <div className="h-px mb-6" style={{ background: "rgba(212,184,139,0.18)" }} />
+          <div className="h-px mb-6" style={{ background: "linear-gradient(90deg, rgba(212,184,139,0.05), rgba(212,184,139,0.25) 50%, rgba(212,184,139,0.05))" }} />
 
           {/* Bottom Footer */}
           <motion.div
@@ -840,11 +895,11 @@ export function RootLayout() {
             viewport={{ once: true }}
             className="flex flex-col md:flex-row items-center justify-between gap-4"
           >
-            <p style={{ color: "rgba(250,248,245,0.45)", fontSize: "0.9rem" }}>
+            <p className="text-center md:text-left" style={{ color: "rgba(250,248,245,0.45)", fontSize: "0.9rem" }}>
               © 2026 RekaBatik. Warisan Budaya, Karya Makna.
             </p>
             
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-6 gap-y-2">
               {["Kebijakan Privasi", "Syarat & Ketentuan", "FAQ"].map((item, i) => (
                 <button
                   key={i}

@@ -1574,12 +1574,15 @@ export function CustomBatikPage() {
     if (tool === "eraser") {
       ctx.globalCompositeOperation = "destination-out";
       ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.fillStyle = "rgba(0,0,0,1)";
     } else {
       ctx.globalCompositeOperation = "source-over";
       const r = parseInt(brushColorRef.current.slice(1, 3), 16);
       const g = parseInt(brushColorRef.current.slice(3, 5), 16);
       const b = parseInt(brushColorRef.current.slice(5, 7), 16);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${brushOpacityRef.current / 100})`;
+      const colorStr = `rgba(${r},${g},${b},${brushOpacityRef.current / 100})`;
+      ctx.strokeStyle = colorStr;
+      ctx.fillStyle = colorStr;
     }
 
     // Map logical coordinate (xf, yf) to virtual canvas (4000x3000 centered at (2000, 1500))
@@ -1866,6 +1869,10 @@ export function CustomBatikPage() {
       preserveObjectStacking: true,
       targetFindTolerance: 10,
     });
+    const isTouchPrimary = window.matchMedia("(pointer: coarse)").matches;
+    if (isTouchPrimary) {
+      canvas.selection = false;
+    }
     fabricCanvasRef.current = canvas;
     canvas.on("after:render", () => {
       syncDisplayTransformRef.current?.();
@@ -2440,6 +2447,73 @@ export function CustomBatikPage() {
     fc.on("mouse:move", onPanMouseMove);
     fc.on("mouse:up", onPanMouseUp);
 
+    // [MOBILE-PAN] Touch pan untuk mobile — Fabric intercept touch events
+    // tapi tidak handle pan, jadi kita pasang listener langsung di canvas wrapper
+    const fabricEl = fc.getElement();
+    const fabricWrapper = fabricEl?.parentElement;
+    const panTarget = fabricWrapper ?? fabricEl;
+
+    let touchPanActive = false;
+    let touchPanStart = { x: 0, y: 0 };
+    let touchMoved = false;
+    let touchOnObject = false;
+    const PAN_THRESHOLD = 8;
+
+    const onTouchPanStart = (e: TouchEvent) => {
+      if (activeToolRef.current !== "select") return;
+      if (e.touches.length !== 1) return;
+
+      const touch = e.touches[0];
+      touchPanStart = { x: touch.clientX, y: touch.clientY };
+      touchMoved = false;
+
+      const target = fc.findTarget(e as any, false);
+      touchOnObject = !!target;
+
+      if (touchOnObject) {
+        touchPanActive = false;
+        return;
+      }
+
+      touchPanActive = true;
+    };
+
+    const onTouchPanMove = (e: TouchEvent) => {
+      if (!touchPanActive || e.touches.length !== 1) return;
+      if (activeToolRef.current !== "select") return;
+      if (touchOnObject) return;
+
+      const dx = e.touches[0].clientX - touchPanStart.x;
+      const dy = e.touches[0].clientY - touchPanStart.y;
+
+      if (!touchMoved) {
+        if (Math.abs(dx) < PAN_THRESHOLD && Math.abs(dy) < PAN_THRESHOLD) return;
+        touchMoved = true;
+      }
+
+      touchPanStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+      const vpt = fc.viewportTransform;
+      if (!vpt) return;
+      vpt[4] += dx;
+      vpt[5] += dy;
+      fc.setViewportTransform(clampViewport(vpt));
+      fc.requestRenderAll();
+      e.preventDefault();
+    };
+
+    const onTouchPanEnd = () => {
+      touchPanActive = false;
+      touchMoved = false;
+      touchOnObject = false;
+    };
+
+    if (panTarget) {
+      panTarget.addEventListener("touchstart", onTouchPanStart, { passive: true });
+      panTarget.addEventListener("touchmove", onTouchPanMove, { passive: false });
+      panTarget.addEventListener("touchend", onTouchPanEnd);
+    }
+
     return () => {
       fc.off("mouse:down", onMouseDown);
       fc.off("mouse:move", onMouseMove);
@@ -2450,6 +2524,11 @@ export function CustomBatikPage() {
       fc.off("mouse:up", onPanMouseUp);
       window.removeEventListener("keydown", onKeyDownPan);
       window.removeEventListener("keyup", onKeyUpPan);
+      if (panTarget) {
+        panTarget.removeEventListener("touchstart", onTouchPanStart);
+        panTarget.removeEventListener("touchmove", onTouchPanMove);
+        panTarget.removeEventListener("touchend", onTouchPanEnd);
+      }
     };
   }, [saveSnapshot, applyZoom, clampViewport]);
 
@@ -2487,7 +2566,10 @@ export function CustomBatikPage() {
 
     const sizeStyle = { width: `${canvas.getWidth()}px`, height: `${canvas.getHeight()}px` };
     if (activeTool === "select") {
-      canvas.isDrawingMode = false; canvas.selection = true; canvas.defaultCursor = "default"; canvas.hoverCursor = "move";
+      canvas.isDrawingMode = false;
+      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+      canvas.selection = !isTouchDevice;
+      canvas.defaultCursor = "default"; canvas.hoverCursor = "move";
       canvas.forEachObject((obj) => { const layerId = (obj as any).data?.layerId; if (!layerId) return; obj.evented = true; obj.selectable = true; });
       canvas.renderAll();
       display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
