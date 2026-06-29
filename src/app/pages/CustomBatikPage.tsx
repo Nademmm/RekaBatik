@@ -403,6 +403,20 @@ function makeStarPoints(cx: number, cy: number, numPoints: number, outerR: numbe
 // [OPT-2] detectObjectType — centralized helper, defined once outside the component
 function detectObjectType(target: fabric.Object): "pattern" | "shape" | "text" | null {
   if (!target) return null;
+  
+  // Handle ActiveSelection (multiple objects)
+  if (target.type === "activeSelection" && (target as fabric.ActiveSelection).getObjects) {
+    const objects = (target as fabric.ActiveSelection).getObjects();
+    if (objects.length === 0) return null;
+    
+    // Check if all objects have the same type
+    const firstType = detectObjectType(objects[0]);
+    if (firstType && objects.every(obj => detectObjectType(obj) === firstType)) {
+      return firstType;
+    }
+    return null;
+  }
+
   const ctorName = target.constructor?.name?.toLowerCase() ?? "";
   if (ctorName.includes("text") || target.type === "i-text" || target.type === "text") return "text";
   if (ctorName.includes("image") || target.type === "image") return "pattern";
@@ -470,6 +484,12 @@ interface SidebarTabsProps {
   layerItemRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
   addUploadedImageToCanvas: (dataUrl: string, fileName: string) => void;
   flipLayer: (id: string, axis: "x" | "y") => void;
+  // ↓ tambahan baru 
+  isMultiSelectMode: boolean;
+  toggleMultiSelectMode: () => void;
+  selectedPatternIds: Set<number>;
+  togglePatternSelection: (patternId: number) => void;
+  onAddSelectedPatterns: () => void;
 }
 
 const SidebarTabs = memo(({
@@ -486,6 +506,11 @@ const SidebarTabs = memo(({
   layerItemRefs,
   addUploadedImageToCanvas,
   flipLayer,
+  isMultiSelectMode,
+  toggleMultiSelectMode,
+  selectedPatternIds,
+  togglePatternSelection,
+  onAddSelectedPatterns,
 }: SidebarTabsProps) => {
   // [OPT-1b] Local refs for the custom color input — uncontrolled, so dragging
   // the picker never triggers a SidebarTabs (or parent) re-render. Only the
@@ -519,9 +544,25 @@ const SidebarTabs = memo(({
       </div>
 
       <TabsContent value="pattern" className="p-5 m-0 max-h-[420px] sm:max-h-[520px] lg:max-h-[650px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: "#FFFFFF" }}>
-        <div className="flex items-center gap-2 mb-4 px-1">
-          <Palette className="w-4 h-4 text-[#8B6F47]" />
-          <p style={{ color: "#7A6B5E", fontSize: "0.8rem", fontWeight: 500 }}>Pilih motif untuk diletakkan di kanvas:</p>
+        <div className="flex items-center justify-between gap-2 mb-4 px-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <Palette className="w-4 h-4 text-[#8B6F47] flex-shrink-0" />
+            <p style={{ color: "#7A6B5E", fontSize: "0.8rem", fontWeight: 500 }}>
+              {isMultiSelectMode ? "Klik motif yang ingin ditambahkan:" : "Pilih motif untuk diletakkan di kanvas:"}
+            </p>
+          </div>
+          <button
+            onClick={toggleMultiSelectMode}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all flex-shrink-0 cursor-pointer"
+            style={{
+              background: isMultiSelectMode ? "linear-gradient(135deg, #8B6F47 0%, #A0845E 100%)" : "rgba(139,111,71,0.08)",
+              color: isMultiSelectMode ? "#FFFFFF" : "#8B6F47",
+              border: "1px solid rgba(139,111,71,0.2)",
+            }}
+          >
+            <CheckCircle2 style={{ width: 12, height: 12 }} />
+            {isMultiSelectMode ? "Batal" : "Pilih Banyak"}
+          </button>
         </div>
 
         {/* Upload Gambar Card */}
@@ -563,37 +604,77 @@ const SidebarTabs = memo(({
           {loading ? (
             [...Array(4)].map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)
           ) : (
-            patterns.map((pattern) => (
-              <button
-                key={pattern.id + "-" + selectedPreset.name}
-                onClick={() => addItemToCanvas(pattern)}
-                draggable
-                onDragStart={(e) => {
-                  // [DRAG] Store the pattern id so the canvas drop handler can
-                  // look it up and spawn it exactly where the user dropped it.
-                  e.dataTransfer.setData("application/x-batik-pattern-id", String(pattern.id));
-                  e.dataTransfer.effectAllowed = "copy";
-                }}
-                className="p-2.5 sm:p-3.5 rounded-2xl border transition-all duration-200 text-left flex flex-col items-stretch cursor-grab active:cursor-grabbing bg-[#FAF8F5] hover:bg-[#FFFFFF] hover:border-[#8B6F47]/40 hover:shadow-sm group"
-                style={{ borderColor: "rgba(139,111,71,0.12)" }}
-              >
-                <div className="w-full aspect-square rounded-xl mb-3 overflow-hidden flex items-center justify-center p-2 transition-all bg-[#FAF8F5] group-hover:bg-[#FFFFFF] border"
-                  style={{ borderColor: "rgba(139,111,71,0.06)", boxShadow: "inset 0 1px 3px rgba(139,111,71,0.02)" }}>
-                  {renderMiniPattern(pattern)}
-                </div>
-                <div style={{ color: "#3D2B1F", fontSize: "0.85rem", fontWeight: 700, marginBottom: "2px" }} className="group-hover:text-[#8B6F47] transition-colors">
-                  {pattern.name}
-                </div>
-                <div style={{ color: "#8E7F72", fontSize: "0.725rem", lineHeight: 1.4, flex: 1 }} className="line-clamp-2">
-                  {pattern.description}
-                </div>
-                <div className="mt-2 text-[10px] font-bold tracking-wider uppercase flex items-center gap-1 text-[#8B6F47]">
-                  <Plus className="w-3 h-3" /> Tambah atau seret ke kanvas
-                </div>
-              </button>
-            ))
+            patterns.map((pattern) => {
+              const isSelected = selectedPatternIds.has(pattern.id);
+              return (
+                <button
+                  key={pattern.id + "-" + selectedPreset.name}
+                  onClick={() => {
+                    if (isMultiSelectMode) togglePatternSelection(pattern.id);
+                    else addItemToCanvas(pattern);
+                  }}
+                  draggable={!isMultiSelectMode}
+                  onDragStart={(e) => {
+                    if (isMultiSelectMode) { e.preventDefault(); return; }
+                    // [DRAG] Store the pattern id so the canvas drop handler can
+                    // look it up and spawn it exactly where the user dropped it.
+                    e.dataTransfer.setData("application/x-batik-pattern-id", String(pattern.id));
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
+                  className={`relative p-2.5 sm:p-3.5 rounded-2xl border-2 transition-all duration-200 text-left flex flex-col items-stretch group ${
+                    isMultiSelectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+                  } ${isSelected ? "bg-[rgba(139,111,71,0.08)]" : "bg-[#FAF8F5] hover:bg-[#FFFFFF]"}`}
+                  style={{ borderColor: isSelected ? "#8B6F47" : "rgba(139,111,71,0.12)" }}
+                >
+                  {isMultiSelectMode && (
+                    <div
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center z-10 transition-all"
+                      style={{
+                        background: isSelected ? "#8B6F47" : "rgba(255,255,255,0.9)",
+                        border: `2px solid ${isSelected ? "#8B6F47" : "rgba(139,111,71,0.3)"}`,
+                      }}
+                    >
+                      {isSelected && <CheckCircle2 style={{ width: 14, height: 14, color: "white" }} />}
+                    </div>
+                  )}
+                  <div className="w-full aspect-square rounded-xl mb-3 overflow-hidden flex items-center justify-center p-2 transition-all bg-[#FAF8F5] group-hover:bg-[#FFFFFF] border"
+                    style={{ borderColor: "rgba(139,111,71,0.06)", boxShadow: "inset 0 1px 3px rgba(139,111,71,0.02)" }}>
+                    {renderMiniPattern(pattern)}
+                  </div>
+                  <div style={{ color: "#3D2B1F", fontSize: "0.85rem", fontWeight: 700, marginBottom: "2px" }} className="group-hover:text-[#8B6F47] transition-colors">
+                    {pattern.name}
+                  </div>
+                  <div style={{ color: "#8E7F72", fontSize: "0.725rem", lineHeight: 1.4, flex: 1 }} className="line-clamp-2">
+                    {pattern.description}
+                  </div>
+                  <div className="mt-2 text-[10px] font-bold tracking-wider uppercase flex items-center gap-1 text-[#8B6F47]">
+                    {isMultiSelectMode ? (
+                      isSelected ? (<><CheckCircle2 className="w-3 h-3" /> Terpilih</>) : (<><Plus className="w-3 h-3" /> Pilih motif ini</>)
+                    ) : (
+                      <><Plus className="w-3 h-3" /> Tambah atau seret ke kanvas</>
+                    )}
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
+
+        {isMultiSelectMode && selectedPatternIds.size > 0 && (
+          <div
+            className="sticky bottom-0 left-0 right-0 mt-4 -mx-5 px-5 py-3 flex items-center justify-between gap-3"
+            style={{ background: "linear-gradient(to top, #FFFFFF 75%, rgba(255,255,255,0.85))", borderTop: "1px solid rgba(139,111,71,0.15)" }}
+          >
+            <span className="text-xs font-bold text-[#3D2B1F]">{selectedPatternIds.size} motif terpilih</span>
+            <button
+              onClick={onAddSelectedPatterns}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs text-white cursor-pointer hover:opacity-95"
+              style={{ background: "linear-gradient(135deg, #8B6F47 0%, #6B4F2F 100%)" }}
+            >
+              <Plus className="w-3.5 h-3.5" /> Tambah ke Kanvas
+            </button>
+          </div>
+        )}
       </TabsContent>
 
       <TabsContent value="color" className="p-5 m-0 max-h-[420px] sm:max-h-[520px] lg:max-h-[650px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: "#FFFFFF" }}>
@@ -858,6 +939,72 @@ export function CustomBatikPage() {
   const [customColor, setCustomColor] = useState(colorPresets[0].colors.primary);
   const [activeTab, setActiveTab] = useState("pattern");
 
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedPatternIds, setSelectedPatternIds] = useState<Set<number>>(new Set());
+
+  const toggleMultiSelectMode = useCallback(() => {
+    setIsMultiSelectMode((prev) => {
+      const next = !prev;
+      if (!next) setSelectedPatternIds(new Set());
+      return next;
+    });
+  }, []);
+
+  const togglePatternSelection = useCallback((patternId: number) => {
+    setSelectedPatternIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(patternId)) next.delete(patternId);
+      else next.add(patternId);
+      return next;
+    });
+  }, []);
+
+  const [isCanvasMultiSelectMode, setIsCanvasMultiSelectMode] = useState(false);
+  const [canvasSelectedIds, setCanvasSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleCanvasMultiSelectMode = useCallback(() => {
+    setIsCanvasMultiSelectMode((prev) => {
+      const next = !prev;
+      const fc = fabricCanvasRef.current;
+      if (!fc) return next;
+
+      if (next) {
+        // Masuk mode pilih banyak: matikan selection Fabric biasa 
+        fc.discardActiveObject();
+        fc.selection = false;
+        fc.defaultCursor = "pointer";
+        fc.hoverCursor = "pointer";
+        fc.forEachObject((obj) => {
+          obj.selectable = false;
+          obj.evented = true; // tetap bisa di-detect klik 
+        });
+        fc.requestRenderAll();
+        setCanvasSelectedIds(new Set());
+      } else {
+        // Keluar mode pilih banyak: kembalikan ke select normal 
+        fc.selection = true;
+        fc.defaultCursor = "default";
+        fc.hoverCursor = "move";
+        fc.forEachObject((obj) => {
+          // Restore opacity jika ada 
+          if ((obj as any)._savedOpacity !== undefined) {
+            obj.set({ opacity: (obj as any)._savedOpacity });
+            delete (obj as any)._savedOpacity;
+          }
+
+          const layerId = (obj as any).data?.layerId;
+          if (!layerId) return;
+          obj.selectable = true;
+          obj.evented = true;
+        });
+        fc.discardActiveObject();
+        fc.requestRenderAll();
+        setCanvasSelectedIds(new Set());
+      }
+      return next;
+    });
+  }, []);
+
   const [canvasBackground, setCanvasBackground] = useState("#ffffff");
   const [committedBg, setCommittedBg] = useState("#ffffff");
   const [shapeType, setShapeType] = useState<ShapeType>("rect");
@@ -874,8 +1021,11 @@ export function CustomBatikPage() {
   const [showFloatingSidebar, setShowFloatingSidebar] = useState(true);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
+  const [showObjectMenu, setShowObjectMenu] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [canvasDisplaySize, setCanvasDisplaySize] = useState({ width: 0, height: 0 });
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [toolbarUpdate, setToolbarUpdate] = useState(0);
 
   useEffect(() => {
     if (isFullMode) setShowFloatingSidebar(true);
@@ -981,6 +1131,7 @@ export function CustomBatikPage() {
   // [DRAG] Ref to addItemToCanvas so handleCanvasDrop (defined earlier in source
   // order) can call the latest version without a temporal-dead-zone issue.
   const addItemToCanvasRef = useRef<((pattern: BatikItem, dropCoords?: { x: number; y: number }) => void) | null>(null);
+  const isDraggingObjectRef = useRef(false);
 
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
   useEffect(() => { shapeTypeRef.current = shapeType; }, [shapeType]);
@@ -1109,6 +1260,42 @@ export function CustomBatikPage() {
     }, 80);
     return () => clearTimeout(timer);
   }, [selectedLayerId, activeTab]);
+
+  useEffect(() => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    if (!isCanvasMultiSelectMode) return;
+
+    const handleMultiClick = (e: any) => {
+      if (!e.target) return;
+      const layerId = (e.target as any).data?.layerId;
+      if (!layerId) return;
+
+      setCanvasSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(layerId)) {
+          next.delete(layerId);
+          // Hilangkan highlight visual 
+          (e.target as fabric.Object).set({ opacity: (e.target as any)._savedOpacity ?? 1 });
+        } else {
+          next.add(layerId);
+          // Simpan opacity asli & redupkan sebagai tanda terpilih 
+          if ((e.target as any)._savedOpacity === undefined) {
+            (e.target as any)._savedOpacity = e.target.opacity ?? 1;
+          }
+          (e.target as fabric.Object).set({ opacity: 0.55 });
+        }
+        fc.requestRenderAll();
+        return next;
+      });
+    };
+
+    fc.on("mouse:down", handleMultiClick);
+    return () => {
+      fc.off("mouse:down", handleMultiClick);
+    };
+  }, [isCanvasMultiSelectMode]);
 
   const isImageDataEqual = (img1: ImageData, img2: ImageData) => {
     if (img1.width !== img2.width || img1.height !== img2.height) return false;
@@ -1647,10 +1834,16 @@ export function CustomBatikPage() {
       try {
         const { data, error } = await supabase.from("batik_items").select("*").order("id", { ascending: true });
         if (error) throw error;
-        setPatterns(mergePatternsWithAssets(data || []));
+        const mergedPatterns = mergePatternsWithAssets(data || []);
+        setPatterns(mergedPatterns);
+
+        // Pre-load all SVGs to ensure they are available for the sidebar preview
+        await Promise.all(mergedPatterns.map(p => loadBatikSvg(p.style_type)));
       } catch (err: any) {
         handleSupabaseError(err, "CustomBatikPage.fetchPatterns");
         setPatterns(batikAssetPatterns);
+        // Pre-load fallback assets too
+        await Promise.all(batikAssetPatterns.map(p => loadBatikSvg(p.style_type)));
       } finally {
         setLoading(false);
       }
@@ -1913,29 +2106,6 @@ export function CustomBatikPage() {
       syncDisplayTransformRef.current?.();
     });
 
-    // Custom delete control
-    fabric.Object.prototype.controls.deleteControl = new fabric.Control({
-      x: 0.5, y: -0.5, offsetY: -16, cursorStyle: "pointer",
-      mouseUpHandler: () => {
-        const active = canvas.getActiveObjects();
-        if (active.length > 0) {
-          active.forEach((obj) => {
-            if ((obj as any).data?.layerId) { canvas.remove(obj); setLayers((prev) => prev.filter((l) => l.id !== (obj as any).data.layerId)); }
-          });
-          canvas.discardActiveObject();
-          setSelectedLayerId(null);
-        }
-        return true;
-      },
-      render: (ctx, left, top, _style, fabricObject) => {
-        ctx.save(); ctx.translate(left, top); ctx.rotate(fabric.util.degreesToRadians(fabricObject.angle || 0));
-        ctx.beginPath(); ctx.arc(0, 0, 12, 0, 2 * Math.PI); ctx.fillStyle = "#ef4444"; ctx.fill();
-        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-5, -5); ctx.lineTo(5, 5); ctx.moveTo(5, -5); ctx.lineTo(-5, 5);
-        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.stroke(); ctx.restore();
-      },
-    });
-
     canvas.on("object:selected", (e) => {
       const target = (e as any).target;
       if (!target) { setSelectedObject(null); setSelectedObjectType(null); return; }
@@ -1981,6 +2151,7 @@ export function CustomBatikPage() {
     // no redefinition of detection logic like the old version had.
     canvas.on("mouse:down", (e) => {
       if (e.target) {
+        // isDraggingObjectRef.current = true; // start tracking for potential follow
         setSelectedObject(e.target);
         setSelectedObjectType(detectObjectType(e.target));
         if (e.target.data?.layerId) {
@@ -2008,6 +2179,14 @@ export function CustomBatikPage() {
 
     canvas.on("object:modified", () => saveSnapshot());
     canvas.on("object:removed", () => saveSnapshot());
+
+    // Update toolbar position while dragging/scaling/rotating
+    const updateToolbar = () => setToolbarUpdate(v => v + 1);
+    canvas.on("object:moving", updateToolbar);
+    canvas.on("object:scaling", updateToolbar);
+    canvas.on("object:rotating", updateToolbar);
+    canvas.on("selection:updated", updateToolbar);
+    canvas.on("selection:cleared", updateToolbar);
 
     // ── Text editing undo checkpoint ─────────────────────────────────────────
     // Strategy: maintain a SEPARATE string-level history for the active text 
@@ -2278,6 +2457,7 @@ export function CustomBatikPage() {
 
     // Restrict object movement to virtual canvas bounds: [-1600, 2400] on X and [-1200, 1800] on Y
     canvas.on("object:moving", (e) => {
+      // isDraggingObjectRef.current = true; // REMOVED: so toolbar follows during drag
       const obj = e.target;
       if (!obj) return;
       
@@ -2315,6 +2495,14 @@ export function CustomBatikPage() {
       }
       if (obj.top !== undefined) {
         obj.top = Math.max(topBoundMin, Math.min(topBoundMax, obj.top));
+      }
+    });
+
+    // canvas.on("object:scaling", () => { isDraggingObjectRef.current = true; });
+    // canvas.on("object:rotating", () => { isDraggingObjectRef.current = true; });
+    canvas.on("mouse:up", () => {
+      if (isDraggingObjectRef.current) {
+        isDraggingObjectRef.current = false;
       }
     });
 
@@ -2534,6 +2722,8 @@ export function CustomBatikPage() {
       fc.add(finalShape); fc.setActiveObject(finalShape); fc.requestRenderAll();
       setLayers((prev) => [...prev, { id: newLayerId, type: "drawing" as const, name: shapeLabel, visible: true, locked: false, fabricObject: finalShape }]);
       setSelectedLayerId(newLayerId);
+      setSelectedObject(finalShape);
+      setSelectedObjectType("shape");
       setActiveTab("layer");
       saveSnapshot();
     };
@@ -2840,7 +3030,9 @@ export function CustomBatikPage() {
     return `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="${id}" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">${patternContent}</pattern></defs><rect width="200" height="200" fill="url(#${id})" /></svg>`;
   }, [selectedPreset]);
 
-  const renderMiniPattern = useCallback((pattern: BatikItem, presetName?: string) => {
+  const renderMiniPattern = useCallback((pattern: BatikItem | undefined, presetName?: string) => {
+    if (!pattern) return <div className="w-full h-full bg-[#FAF8F5] rounded-xl animate-pulse" />;
+
     const preset = presetName ? colorPresets.find(p => p.name === presetName) || selectedPreset : selectedPreset;
     const svgSource = getBatikSvg(pattern.style_type);
     if (svgSource) {
@@ -2851,9 +3043,9 @@ export function CustomBatikPage() {
       );
     }
     return (
-      <div className="w-full h-full">
+      <div className="w-full h-full flex items-center justify-center relative">
         <svg width="100%" height="100%" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-          <rect fill="#FAF8F5" width="20" height="20" />
+          <rect fill="transparent" width="20" height="20" />
           {(pattern.style_type === "parang" || pattern.style_type === "parang-new" || pattern.style_type === "traditional" || pattern.style_type === "diagonal-lines") && (
             <path d="M0,10 Q5,5 10,10 Q15,15 20,10" stroke={preset.colors.primary} strokeWidth="1.5" fill="none" />
           )}
@@ -2876,6 +3068,7 @@ export function CustomBatikPage() {
             </g>
           )}
         </svg>
+        <Loader2 className="absolute w-4 h-4 animate-spin text-[#8B6F47] opacity-20" />
       </div>
     );
   }, [selectedPreset]);
@@ -2964,6 +3157,8 @@ export function CustomBatikPage() {
           fc.add(img); img.setCoords(); fc.setActiveObject(img); fc.requestRenderAll();
           setLayers((prev) => [...prev, { id: newLayerId, type: 'pattern', name: pattern.name || 'Motif', visible: true, locked: false, fabricObject: img }]);
           setSelectedLayerId(newLayerId);
+          setSelectedObject(img);
+          setSelectedObjectType("pattern");
           setActiveTab("layer");
           saveSnapshot();
         });
@@ -2972,6 +3167,75 @@ export function CustomBatikPage() {
   }, [saveSnapshot, renderPatternSVGString, selectedPreset, customColor, getSpawnPoint]);
 
   useEffect(() => { addItemToCanvasRef.current = addItemToCanvas; }, [addItemToCanvas]);
+
+  const addSelectedPatternsToCanvas = useCallback(() => {
+    const selected = patterns.filter((p) => selectedPatternIds.has(p.id));
+    if (selected.length === 0) return;
+
+    selected.forEach((pattern, idx) => {
+      const base = getSpawnPoint();
+      // geser sedikit tiap motif biar gak numpuk persis di titik yang sama 
+      const offset = idx * 28;
+      addItemToCanvas(pattern, { x: base.x + offset, y: base.y + offset });
+    });
+
+    toast.success(`${selected.length} motif berhasil ditambahkan ke kanvas`);
+    setSelectedPatternIds(new Set());
+    setIsMultiSelectMode(false);
+  }, [patterns, selectedPatternIds, addItemToCanvas, getSpawnPoint]);
+
+  const applyCanvasMultiSelect = useCallback(() => {
+    const fc = fabricCanvasRef.current;
+    if (!fc || canvasSelectedIds.size === 0) return;
+
+    // Keluar dari mode multi-select dulu (kembalikan evented/selectable & restore opacity) 
+    fc.selection = true;
+    fc.defaultCursor = "default";
+    fc.hoverCursor = "move";
+    fc.forEachObject((obj) => {
+      // Restore opacity jika ada 
+      if ((obj as any)._savedOpacity !== undefined) {
+        obj.set({ opacity: (obj as any)._savedOpacity });
+        delete (obj as any)._savedOpacity;
+      }
+
+      const layerId = (obj as any).data?.layerId;
+      if (!layerId) return;
+      obj.selectable = true;
+      obj.evented = true;
+    });
+
+    // Ambil objek-objek yang dipilih 
+    const selected = fc.getObjects().filter((obj) => {
+      const layerId = (obj as any).data?.layerId;
+      return layerId && canvasSelectedIds.has(layerId);
+    });
+
+    if (selected.length === 0) {
+      fc.requestRenderAll();
+      setIsCanvasMultiSelectMode(false);
+      setCanvasSelectedIds(new Set());
+      return;
+    }
+
+    // Buat ActiveSelection 
+    if (selected.length === 1) {
+      fc.setActiveObject(selected[0]);
+      setSelectedLayerId((selected[0] as any).data?.layerId ?? null);
+      setSelectedObject(selected[0]);
+      setSelectedObjectType(detectObjectType(selected[0]));
+    } else {
+      const sel = new fabric.ActiveSelection(selected, { canvas: fc });
+      fc.setActiveObject(sel);
+      setSelectedObject(sel);
+      setSelectedObjectType(null);
+      setSelectedLayerId(null);
+    }
+
+    fc.requestRenderAll();
+    setIsCanvasMultiSelectMode(false);
+    setCanvasSelectedIds(new Set());
+  }, [canvasSelectedIds]);
   const handleCustomColorCommit = useCallback((newColor: string, skipPresetRegen?: boolean) => {
     setCustomColor(newColor);
     if (!skipPresetRegen) {
@@ -2980,171 +3244,296 @@ export function CustomBatikPage() {
   }, []);
 
   const recolorActiveObject = useCallback(() => {
-    if (!fabricCanvasRef.current) return;
-    const activeObj = fabricCanvasRef.current.getActiveObject();
-    if (!activeObj) return;
-    const data = (activeObj as any).data;
-    if (data.colorPresetName === selectedPreset.name && selectedPreset.name !== "Custom") return;
-    if (selectedPreset.name === "Custom" && data.customColor === customColor) return;
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+    const activeObjects = fc.getActiveObjects();
+    if (activeObjects.length === 0) return;
 
-    let recoloredSvg = "";
-    if (data.originalSvg) {
-      recoloredSvg = recolorSVG(data.originalSvg, selectedPreset);
-    } else {
-      const pattern = patterns.find(p => p.id === data.patternId);
-      if (!pattern) return;
-      recoloredSvg = renderPatternSVGString(pattern);
-    }
+    activeObjects.forEach((activeObj) => {
+      const data = (activeObj as any).data;
+      if (!data || !data.patternId) return;
+      if (data.colorPresetName === selectedPreset.name && selectedPreset.name !== "Custom") return;
+      if (selectedPreset.name === "Custom" && data.customColor === customColor) return;
 
-    // Save current crop and transform properties to prevent setSrc from resetting them
-    const activeObjAny = activeObj as any;
-    const currentWidth = activeObj.width;
-    const currentHeight = activeObj.height;
-    const currentCropX = activeObjAny.cropX;
-    const currentCropY = activeObjAny.cropY;
-    const currentScaleX = activeObj.scaleX;
-    const currentScaleY = activeObj.scaleY;
-    const currentLeft = activeObj.left;
-    const currentTop = activeObj.top;
+      let recoloredSvg = "";
+      if (data.originalSvg) {
+        recoloredSvg = recolorSVG(data.originalSvg, selectedPreset);
+      } else {
+        const pattern = patterns.find(p => p.id === data.patternId);
+        if (!pattern) return;
+        recoloredSvg = renderPatternSVGString(pattern);
+      }
 
-    svgStringToPngDataUrl(recoloredSvg).then((pngUrl) => {
-      (activeObj as fabric.Image).setSrc(pngUrl, () => {
-        activeObj.set({
-          width: currentWidth,
-          height: currentHeight,
-          scaleX: currentScaleX,
-          scaleY: currentScaleY,
-          left: currentLeft,
-          top: currentTop,
-        } as any);
-        activeObjAny.cropX = currentCropX;
-        activeObjAny.cropY = currentCropY;
-        data.colorPresetName = selectedPreset.name;
-        data.customColor = customColor;
-        activeObj.setCoords();
-        fabricCanvasRef.current?.requestRenderAll();
-        setLayers((prev) => [...prev]);
-        saveSnapshot();
-      });
-    }).catch(() => { /* silent */ });
+      // Save current crop and transform properties to prevent setSrc from resetting them
+      const activeObjAny = activeObj as any;
+      const currentWidth = activeObj.width;
+      const currentHeight = activeObj.height;
+      const currentCropX = activeObjAny.cropX;
+      const currentCropY = activeObjAny.cropY;
+      const currentScaleX = activeObj.scaleX;
+      const currentScaleY = activeObj.scaleY;
+      const currentLeft = activeObj.left;
+      const currentTop = activeObj.top;
+
+      svgStringToPngDataUrl(recoloredSvg).then((pngUrl) => {
+        (activeObj as fabric.Image).setSrc(pngUrl, () => {
+          activeObj.set({
+            width: currentWidth,
+            height: currentHeight,
+            scaleX: currentScaleX,
+            scaleY: currentScaleY,
+            left: currentLeft,
+            top: currentTop,
+          } as any);
+          activeObjAny.cropX = currentCropX;
+          activeObjAny.cropY = currentCropY;
+          data.colorPresetName = selectedPreset.name;
+          data.customColor = customColor;
+          activeObj.setCoords();
+          fc.requestRenderAll();
+          setLayers((prev) => [...prev]);
+          saveSnapshot();
+        });
+      }).catch(() => { /* silent */ });
+    });
   }, [selectedPreset, customColor, saveSnapshot, renderPatternSVGString, patterns]);
 
   useEffect(() => {
     recolorActiveObject();
   }, [selectedPreset, recolorActiveObject]);
-  const deleteSelectedLayer = useCallback(() => {
-    if (!selectedLayerId || !fabricCanvasRef.current) return;
-    const layer = layers.find((l) => l.id === selectedLayerId);
-    if (layer?.fabricObject) fabricCanvasRef.current.remove(layer.fabricObject);
-    setLayers((prev) => prev.filter((l) => l.id !== selectedLayerId));
-    setSelectedLayerId(null);
-  }, [selectedLayerId, layers]);
 
-  const toggleLayerVisibility = useCallback((layerId: string) => {
-    setLayers((prev) => prev.map((layer) => {
-      if (layer.id === layerId && layer.fabricObject) {
-        layer.fabricObject.set("visible", !layer.visible);
-        fabricCanvasRef.current?.renderAll();
-        return { ...layer, visible: !layer.visible };
-      }
-      return layer;
-    }));
-  }, []);
-
-  const toggleLayerLock = useCallback((layerId: string) => {
-    setLayers((prev) => prev.map((layer) => {
-      if (layer.id === layerId && layer.fabricObject) {
-        layer.fabricObject.set("selectable", layer.locked);
-        layer.fabricObject.set("evented", layer.locked);
-        fabricCanvasRef.current?.renderAll();
-        return { ...layer, locked: !layer.locked };
-      }
-      return layer;
-    }));
-  }, []);
-
-  const moveLayer = useCallback((layerId: string, direction: "up" | "down") => {
+  // Toolbar position sync on after:render
+  useEffect(() => {
     const fc = fabricCanvasRef.current;
     if (!fc) return;
-    const index = layers.findIndex((l) => l.id === layerId);
-    if (index === -1) return;
-    const layer = layers[index];
-    if (!layer.fabricObject) return;
-    if (direction === "up" && index === layers.length - 1) return;
-    if (direction === "down" && index === 0) return;
-    if (direction === "up") { fc.bringForward(layer.fabricObject, false); }
-    else { fc.sendBackwards(layer.fabricObject, false); }
-    fc.requestRenderAll();
+    // nothing — position is computed at render time via getObjectToolbarPosition()
+    // We force a re-render on after:render by listening to canvas events and
+    // updating a lightweight counter state.
+  }, [selectedObject]);
+
+  // Dismiss context menu and object menu on outside click
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      setContextMenu(null);
+      // Only close the secondary dropdown; the primary toolbar stays open while object is selected
+      const target = e.target as Element;
+      if (!target.closest("[data-object-toolbar]")) {
+        setShowObjectMenu(false);
+      }
+    };
+    window.addEventListener("mousedown", onDown, true);
+    return () => window.removeEventListener("mousedown", onDown, true);
+  }, []);
+
+  const deleteSelectedLayer = useCallback(() => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    const activeObjects = fc.getActiveObjects();
+    if (activeObjects.length > 0) {
+      const layerIdsToRemove = activeObjects.map((obj) => (obj as any).data?.layerId).filter(Boolean);
+      setLayers((prev) => prev.filter((l) => !layerIdsToRemove.includes(l.id)));
+      activeObjects.forEach((obj) => fc.remove(obj));
+      fc.discardActiveObject();
+      setSelectedLayerId(null);
+      setSelectedObject(null);
+      setSelectedObjectType(null);
+      saveSnapshot();
+    } else if (selectedLayerId) {
+      const layer = layers.find((l) => l.id === selectedLayerId);
+      if (layer?.fabricObject) fc.remove(layer.fabricObject);
+      setLayers((prev) => prev.filter((l) => l.id !== selectedLayerId));
+      setSelectedLayerId(null);
+      setSelectedObject(null);
+      setSelectedObjectType(null);
+      saveSnapshot();
+    }
+  }, [selectedLayerId, layers, saveSnapshot]);
+
+  const toggleLayerVisibility = useCallback((layerId: string | null) => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    const targetLayerIds = layerId 
+      ? [layerId] 
+      : fc.getActiveObjects().map(obj => (obj as any).data?.layerId).filter(Boolean);
+
+    if (targetLayerIds.length === 0) return;
+
+    setLayers((prev) => prev.map((layer) => {
+      if (targetLayerIds.includes(layer.id) && layer.fabricObject) {
+        const newVisible = !layer.visible;
+        layer.fabricObject.set("visible", newVisible);
+        return { ...layer, visible: newVisible };
+      }
+      return layer;
+    }));
+    fc.renderAll();
+  }, []);
+
+  const toggleLayerLock = useCallback((layerId: string | null) => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    const targetLayerIds = layerId 
+      ? [layerId] 
+      : fc.getActiveObjects().map(obj => (obj as any).data?.layerId).filter(Boolean);
+
+    if (targetLayerIds.length === 0) return;
+
+    setLayers((prev) => prev.map((layer) => {
+      if (targetLayerIds.includes(layer.id) && layer.fabricObject) {
+        const newLocked = !layer.locked;
+        layer.fabricObject.set("selectable", !newLocked);
+        layer.fabricObject.set("evented", !newLocked);
+        return { ...layer, locked: newLocked };
+      }
+      return layer;
+    }));
+    fc.renderAll();
+  }, []);
+
+  const moveLayer = useCallback((layerId: string | null, direction: "up" | "down") => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    const targetObjects = layerId
+      ? layers.filter(l => l.id === layerId).map(l => l.fabricObject).filter(Boolean) as fabric.Object[]
+      : fc.getActiveObjects();
+
+    if (targetObjects.length === 0) return;
+
+    // Sort target objects by their current index in the layers array to maintain relative order during movement
+    const targetLayerIds = targetObjects.map(obj => (obj as any).data?.layerId).filter(Boolean);
+    const targetIndices = targetLayerIds.map(id => layers.findIndex(l => l.id === id)).filter(idx => idx !== -1);
+    targetIndices.sort((a, b) => a - b);
+
+    if (direction === "up" && targetIndices[targetIndices.length - 1] === layers.length - 1) return;
+    if (direction === "down" && targetIndices[0] === 0) return;
+
     setLayers((prev) => {
       const next = [...prev];
-      const swapIndex = direction === "up" ? index + 1 : index - 1;
-      [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      if (direction === "up") {
+        // Move from top to bottom to avoid index shifting issues
+        for (let i = targetIndices.length - 1; i >= 0; i--) {
+          const idx = targetIndices[i];
+          const obj = next[idx].fabricObject;
+          if (obj) fc.bringForward(obj, false);
+          [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+        }
+      } else {
+        // Move from bottom to top
+        for (let i = 0; i < targetIndices.length; i++) {
+          const idx = targetIndices[i];
+          const obj = next[idx].fabricObject;
+          if (obj) fc.sendBackwards(obj, false);
+          [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
+        }
+      }
       return next;
     });
+
+    fc.requestRenderAll();
     saveSnapshot();
   }, [layers, saveSnapshot]);
 
-  const duplicateLayer = useCallback((layerId: string) => {
-    const layer = layers.find((l) => l.id === layerId);
-    if (!layer?.fabricObject || !fabricCanvasRef.current) return;
-    layer.fabricObject.clone((clonedObj: fabric.Object) => {
-      const fc = fabricCanvasRef.current;
-      if (!fc) return;
+  const duplicateLayer = useCallback((layerId?: string) => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
 
-      clonedObj.set({
-        left: (clonedObj.left || 0) + 20,
-        top: (clonedObj.top || 0) + 20,
-        selectable: true,
-        evented: true,
-        hasControls: true,
-        hasBorders: true,
-      });
+    let objectsToClone: fabric.Object[] = [];
 
-      const newLayerId = Date.now().toString();
-      const layerName = `${layer.name} (Salinan)`;
-      (clonedObj as any).data = {
-        ...(layer.fabricObject as any).data,
-        layerId: newLayerId,
-        layerName: layerName,
-      };
+    if (layerId) {
+      const layer = layers.find((l) => l.id === layerId);
+      if (layer?.fabricObject) objectsToClone = [layer.fabricObject];
+    } else {
+      objectsToClone = fc.getActiveObjects();
+    }
 
-      fc.add(clonedObj);
-      clonedObj.setCoords();
-      fc.setActiveObject(clonedObj);
-      fc.requestRenderAll();
+    if (objectsToClone.length === 0) return;
 
-      setLayers((prev) => [
-        ...prev,
-        {
+    const newLayers: CustomLayer[] = [];
+    let processedCount = 0;
+
+    objectsToClone.forEach((obj) => {
+      obj.clone((clonedObj: fabric.Object) => {
+        const newLayerId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        const originalData = (obj as any).data || {};
+        const layerName = `${originalData.layerName || 'Objek'} (Salinan)`;
+
+        clonedObj.set({
+          left: (clonedObj.left || 0) + 20,
+          top: (clonedObj.top || 0) + 20,
+          selectable: true,
+          evented: true,
+          hasControls: true,
+          hasBorders: true,
+        });
+
+        (clonedObj as any).data = {
+          ...originalData,
+          layerId: newLayerId,
+          layerName: layerName,
+        };
+
+        fc.add(clonedObj);
+        clonedObj.setCoords();
+
+        newLayers.push({
           id: newLayerId,
-          type: layer.type,
+          type: (clonedObj as any).data?.patternId ? "pattern" : "drawing",
           name: layerName,
           visible: true,
           locked: false,
           fabricObject: clonedObj,
-        },
-      ]);
-      setSelectedLayerId(newLayerId);
-      setActiveTab("layer");
-      saveSnapshot();
+        });
+
+        processedCount++;
+        if (processedCount === objectsToClone.length) {
+          setLayers((prev) => [...prev, ...newLayers]);
+          fc.discardActiveObject();
+
+          if (newLayers.length > 1) {
+            const sel = new fabric.ActiveSelection(newLayers.map(l => l.fabricObject!), { canvas: fc });
+            fc.setActiveObject(sel);
+            setSelectedLayerId(null);
+            setSelectedObject(sel);
+            setSelectedObjectType(null);
+          } else {
+            fc.setActiveObject(newLayers[0].fabricObject!);
+            setSelectedLayerId(newLayers[0].id);
+            setSelectedObject(newLayers[0].fabricObject!);
+            setSelectedObjectType(detectObjectType(newLayers[0].fabricObject!));
+          }
+
+          fc.requestRenderAll();
+          saveSnapshot();
+        }
+      }, ["data"]);
     });
   }, [layers, saveSnapshot]);
 
-  const flipLayer = useCallback((layerId: string, axis: "x" | "y") => {
-    setLayers((prev) => prev.map((layer) => {
-      if (layer.id === layerId && layer.fabricObject) {
-        if (axis === "x") {
-          layer.fabricObject.set("flipX", !layer.fabricObject.flipX);
-        } else {
-          layer.fabricObject.set("flipY", !layer.fabricObject.flipY);
-        }
-        fabricCanvasRef.current?.requestRenderAll();
-        return { ...layer };
+  const flipLayer = useCallback((layerId: string | null, axis: "x" | "y") => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    const targetObjects = layerId
+      ? layers.filter(l => l.id === layerId).map(l => l.fabricObject).filter(Boolean)
+      : fc.getActiveObjects();
+
+    if (targetObjects.length === 0) return;
+
+    targetObjects.forEach((obj) => {
+      if (axis === "x") {
+        obj!.set("flipX", !obj!.flipX);
+      } else {
+        obj!.set("flipY", !obj!.flipY);
       }
-      return layer;
-    }));
+    });
+
+    fc.requestRenderAll();
     saveSnapshot();
-  }, [saveSnapshot]);
+  }, [layers, saveSnapshot]);
 
   const addUploadedImageToCanvas = useCallback((dataUrl: string, fileName: string) => {
     if (!fabricCanvasRef.current) return;
@@ -3208,6 +3597,8 @@ export function CustomBatikPage() {
         },
       ]);
       setSelectedLayerId(newLayerId);
+      setSelectedObject(img);
+      setSelectedObjectType("pattern");
       setActiveTab("layer");
       saveSnapshot();
     });
@@ -3242,6 +3633,8 @@ export function CustomBatikPage() {
 
     setLayers((prev) => [...prev, { id: newLayerId, type: "drawing" as const, name: "Teks", visible: true, locked: false, fabricObject: text }]);
     setSelectedLayerId(newLayerId);
+    setSelectedObject(text);
+    setSelectedObjectType("text");
     setActiveTab("layer");
     setActiveTool("select"); // auto-switch to select like Canva
 
@@ -3436,6 +3829,26 @@ export function CustomBatikPage() {
     const actionType = showProjectModal;
     setShowProjectModal(null);
     await executeAction(actionType);
+  };
+
+  const getObjectToolbarPosition = () => {
+    const fc = fabricCanvasRef.current;
+    const container = containerRef.current;
+    if (!fc || !container || !selectedObject) return null;
+    const vpt = fc.viewportTransform;
+    if (!vpt) return null;
+    const br = selectedObject.getBoundingRect(true, true);
+    const zoom = fc.getZoom();
+    const offset = canvasOffsetRef.current;
+    const displayLeft = br.left * zoom + vpt[4] + offset.x;
+    const displayTop = br.top * zoom + vpt[5] + offset.y;
+    const displayWidth = br.width * zoom;
+    const containerWidth = container.getBoundingClientRect().width;
+    const rawLeft = displayLeft + displayWidth / 2;
+    return {
+      left: Math.max(60, Math.min(containerWidth - 60, rawLeft)),
+      top: Math.max(8, displayTop - 52),
+    };
   };
 
   return (
@@ -3841,7 +4254,20 @@ export function CustomBatikPage() {
                       </div>
                     )}
 
-                    <canvas ref={displayCanvasRef} width={800} height={600} style={{ position: 'absolute', top: 0, left: 0, zIndex: 2, pointerEvents: 'auto', touchAction: 'manipulation' }} />
+                    <canvas
+                      ref={displayCanvasRef}
+                      width={800}
+                      height={600}
+                      style={{ position: 'absolute', top: 0, left: 0, zIndex: 2, pointerEvents: 'auto', touchAction: 'manipulation' }}
+                      onContextMenu={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        if (!selectedObject || activeTool !== "select") return;
+                        const container = containerRef.current;
+                        if (!container) return;
+                        const rect = container.getBoundingClientRect();
+                        setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+                      }}
+                    />
                     <div
                       ref={(el) => {
                         (fabricCanvasRef as any).wrapper = el;
@@ -3860,6 +4286,343 @@ export function CustomBatikPage() {
                         <p className="text-xs opacity-75 mt-0.5">Pilih & klik motif di sidebar kanan, atau seret langsung ke kanvas</p>
                       </div>
                     )}
+
+                    {isCanvasMultiSelectMode && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          bottom: isFullMode ? 90 : 20,
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          zIndex: 110,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "6px 14px",
+                          borderRadius: 20,
+                          background: "rgba(30,20,10,0.88)",
+                          backdropFilter: "blur(8px)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                          whiteSpace: "nowrap",
+                          pointerEvents: "auto",
+                        }}
+                      >
+                        <CheckCircle2 style={{ width: 13, height: 13, color: "#D4B88B" }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, color: "#E8E1DA" }}>
+                          {canvasSelectedIds.size > 0
+                            ? `${canvasSelectedIds.size} objek dipilih`
+                            : "Klik objek di kanvas untuk memilih"}
+                        </span>
+                        {canvasSelectedIds.size > 0 && (
+                          <>
+                            <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.15)" }} />
+                            <button
+                              onClick={applyCanvasMultiSelect}
+                              style={{
+                                padding: "3px 10px", borderRadius: 12, border: "none",
+                                background: "rgba(212,184,139,0.25)", color: "#D4B88B",
+                                fontSize: 11, fontWeight: 700, cursor: "pointer",
+                              }}
+                            >
+                              Terapkan
+                            </button>
+                          </>
+                        )}
+                        <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.15)" }} />
+                        <button
+                          onClick={toggleCanvasMultiSelectMode}
+                          style={{
+                            width: 22, height: 22, borderRadius: 6, border: "none",
+                            background: "transparent", cursor: "pointer", color: "#A89B8F",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          <X style={{ width: 12, height: 12 }} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Floating context toolbar — Canva-style, appears above selected object */}
+                    {selectedObject && activeTool === "select" && !isDraggingObjectRef.current && (() => {
+                      // Trigger re-render when toolbarUpdate changes
+                      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+                      toolbarUpdate;
+                      const pos = getObjectToolbarPosition();
+                      if (!pos) return null;
+                      return (
+                        <div
+                          data-object-toolbar
+                          style={{
+                            position: "absolute",
+                            left: pos.left,
+                            top: pos.top,
+                            transform: "translateX(-50%)",
+                            zIndex: 50,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: 4,
+                            pointerEvents: "auto",
+                          }}
+                        >
+                          {/* Primary bar */}
+                          <motion.div
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            transition={{ duration: 0.15 }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 2,
+                              padding: "4px 6px",
+                              borderRadius: 12,
+                              background: "rgba(30,20,10,0.88)",
+                              backdropFilter: "blur(8px)",
+                              border: "1px solid rgba(255,255,255,0.10)",
+                              boxShadow: "0 4px 16px rgba(0,0,0,0.35)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {/* Duplicate */}
+                            <button
+                              title="Duplikat"
+                              onClick={(e) => { e.stopPropagation(); duplicateLayer(); }}
+                              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
+                              <Copy style={{ width: 14, height: 14 }} />
+                            </button>
+                            {/* Delete */}
+                            <button
+                              title="Hapus"
+                              onClick={(e) => { e.stopPropagation(); deleteSelectedLayer(); }}
+                              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#F87171" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
+                              <Trash2 style={{ width: 14, height: 14 }} />
+                            </button>
+                            {/* Divider */}
+                            <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)", margin: "0 2px" }} />
+                            {/* Flip H */}
+                            <button
+                              title="Balik Horizontal"
+                              onClick={(e) => { e.stopPropagation(); flipLayer(null, "x"); }}
+                              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
+                              <FlipHorizontal style={{ width: 14, height: 14 }} />
+                            </button>
+                            {/* Flip V */}
+                            <button
+                              title="Balik Vertikal"
+                              onClick={(e) => { e.stopPropagation(); flipLayer(null, "y"); }}
+                              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
+                              <FlipVertical style={{ width: 14, height: 14 }} />
+                            </button>
+                            {/* Divider */}
+                            <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.15)", margin: "0 2px" }} />
+                            {/* Canvas multi-select toggle */}
+                            <button
+                              title="Pilih Banyak Objek"
+                              onClick={(e) => { e.stopPropagation(); toggleCanvasMultiSelectMode(); }}
+                              style={{
+                                width: 28, height: 28,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                borderRadius: 7, border: "none",
+                                background: isCanvasMultiSelectMode ? "rgba(212,184,139,0.3)" : "transparent",
+                                cursor: "pointer", color: isCanvasMultiSelectMode ? "#D4B88B" : "#E8E1DA",
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = isCanvasMultiSelectMode ? "rgba(212,184,139,0.3)" : "transparent")}
+                            >
+                              <CheckCircle2 style={{ width: 14, height: 14 }} />
+                            </button>
+                            {/* More options toggle */}
+                            <button
+                              title="Lainnya"
+                              onClick={(e) => { e.stopPropagation(); setShowObjectMenu(v => !v); }}
+                              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: showObjectMenu ? "rgba(255,255,255,0.18)" : "transparent", cursor: "pointer", color: "#D4B88B" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+                              onMouseLeave={e => (e.currentTarget.style.background = showObjectMenu ? "rgba(255,255,255,0.18)" : "transparent")}
+                            >
+                              {/* MoreHorizontal — three dots */}
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+                              </svg>
+                            </button>
+                          </motion.div>
+
+                          {/* Secondary dropdown */}
+                          <AnimatePresence>
+                            {showObjectMenu && (
+                              <motion.div
+                                data-object-toolbar
+                                initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                                transition={{ duration: 0.12 }}
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 2,
+                                  padding: "6px",
+                                  borderRadius: 10,
+                                  background: "rgba(30,20,10,0.92)",
+                                  backdropFilter: "blur(8px)",
+                                  border: "1px solid rgba(255,255,255,0.10)",
+                                  boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
+                                  minWidth: 160,
+                                }}
+                              >
+                                {/* Move up */}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveLayer(null, "up"); setShowObjectMenu(false); }}
+                                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA", width: "100%", textAlign: "left" }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
+                                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                >
+                                  <ArrowUp style={{ width: 13, height: 13, flexShrink: 0 }} />
+                                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#D4B88B" }}>Pindah ke depan</span>
+                                </button>
+                                {/* Move down */}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); moveLayer(null, "down"); setShowObjectMenu(false); }}
+                                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA", width: "100%", textAlign: "left" }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
+                                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                >
+                                  <ArrowDown style={{ width: 13, height: 13, flexShrink: 0 }} />
+                                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#D4B88B" }}>Pindah ke belakang</span>
+                                </button>
+                                {/* Divider */}
+                                <div style={{ height: 1, background: "rgba(255,255,255,0.10)", margin: "2px 0" }} />
+                                {/* Toggle visibility */}
+                                {(() => {
+                                  const fc = fabricCanvasRef.current;
+                                  if (!fc) return null;
+                                  const activeObjects = fc.getActiveObjects();
+                                  if (activeObjects.length === 0) return null;
+                                  
+                                  const allVisible = activeObjects.every(obj => obj.visible !== false);
+                                  
+                                  return (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(null); setShowObjectMenu(false); }}
+                                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA", width: "100%", textAlign: "left" }}
+                                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
+                                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                    >
+                                      {allVisible ? <EyeOff style={{ width: 13, height: 13, flexShrink: 0 }} /> : <Eye style={{ width: 13, height: 13, flexShrink: 0 }} />}
+                                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#D4B88B" }}>{allVisible ? "Sembunyikan" : "Tampilkan"}</span>
+                                    </button>
+                                  );
+                                })()}
+                                {/* Toggle lock */}
+                                {(() => {
+                                  const fc = fabricCanvasRef.current;
+                                  if (!fc) return null;
+                                  const activeObjects = fc.getActiveObjects();
+                                  if (activeObjects.length === 0) return null;
+                                  
+                                  const anyLocked = activeObjects.some(obj => !obj.selectable);
+                                  
+                                  return (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); toggleLayerLock(null); setShowObjectMenu(false); }}
+                                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA", width: "100%", textAlign: "left" }}
+                                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
+                                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                    >
+                                      {anyLocked ? <Unlock style={{ width: 13, height: 13, flexShrink: 0 }} /> : <Lock style={{ width: 13, height: 13, flexShrink: 0 }} />}
+                                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#D4B88B" }}>{anyLocked ? "Buka kunci" : "Kunci layer"}</span>
+                                    </button>
+                                  );
+                                })()}
+                                {/* Pattern color shortcut */}
+                                {selectedObjectType === "pattern" && (
+                                  <>
+                                    <div style={{ height: 1, background: "rgba(255,255,255,0.10)", margin: "2px 0" }} />
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setActiveTab("color"); setShowObjectMenu(false); }}
+                                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA", width: "100%", textAlign: "left" }}
+                                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
+                                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                    >
+                                      <Palette style={{ width: 13, height: 13, flexShrink: 0 }} />
+                                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#D4B88B" }}>Ganti warna →</span>
+                                    </button>
+                                  </>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Right-click context menu */}
+                    <AnimatePresence>
+                      {contextMenu && selectedObject && (
+                        <motion.div
+                          data-object-toolbar
+                          initial={{ opacity: 0, scale: 0.96 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.96 }}
+                          transition={{ duration: 0.12 }}
+                          style={{
+                            position: "absolute",
+                            left: contextMenu.x,
+                            top: contextMenu.y,
+                            zIndex: 60,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                            padding: "6px",
+                            borderRadius: 10,
+                            background: "rgba(30,20,10,0.92)",
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255,255,255,0.10)",
+                            boxShadow: "0 8px 32px rgba(0,0,0,0.35)",
+                            minWidth: 168,
+                            pointerEvents: "auto",
+                          }}
+                        >
+                          {[
+                            { icon: Copy, label: "Duplikat", action: () => { duplicateLayer(); } },
+                            { icon: Trash2, label: "Hapus", action: () => { deleteSelectedLayer(); }, danger: true },
+                            null,
+                            { icon: FlipHorizontal, label: "Balik Horizontal", action: () => { flipLayer(null, "x"); } },
+                            { icon: FlipVertical, label: "Balik Vertikal", action: () => { flipLayer(null, "y"); } },
+                            null,
+                            { icon: ArrowUp, label: "Pindah ke Depan", action: () => { moveLayer(null, "up"); } },
+                            { icon: ArrowDown, label: "Pindah ke Belakang", action: () => { moveLayer(null, "down"); } },
+                          ].map((item, i) => {
+                            if (item === null) return <div key={i} style={{ height: 1, background: "rgba(255,255,255,0.10)", margin: "2px 0" }} />;
+                            const Icon = item.icon;
+                            return (
+                              <button
+                                key={i}
+                                onClick={(e) => { e.stopPropagation(); item.action(); setContextMenu(null); }}
+                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: item.danger ? "#F87171" : "#E8E1DA", width: "100%", textAlign: "left" }}
+                                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
+                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                              >
+                                <Icon style={{ width: 13, height: 13, flexShrink: 0 }} />
+                                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: item.danger ? "#F87171" : "#D4B88B" }}>{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Horizontal scrollbar */}
                     <div
@@ -3946,6 +4709,11 @@ export function CustomBatikPage() {
                   layerItemRefs={layerItemRefs}
                   addUploadedImageToCanvas={addUploadedImageToCanvas}
                   flipLayer={flipLayer}
+                  isMultiSelectMode={isMultiSelectMode}
+                  toggleMultiSelectMode={toggleMultiSelectMode}
+                  selectedPatternIds={selectedPatternIds}
+                  togglePatternSelection={togglePatternSelection}
+                  onAddSelectedPatterns={addSelectedPatternsToCanvas}
                 />
               </div>
             </div>
@@ -3960,7 +4728,7 @@ export function CustomBatikPage() {
             {activeTool !== "select" && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                className="fixed bottom-20 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 transform-none sm:transform z-[101] flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full shadow-2xl backdrop-blur-md overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                className="fixed bottom-23 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 transform-none sm:transform z-[101] flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full shadow-2xl backdrop-blur-md overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                 style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(212,184,139,0.25)" }}
               >
                 {activeTool === "brush" && (
@@ -4221,6 +4989,11 @@ export function CustomBatikPage() {
                     layerItemRefs={layerItemRefs}
                     addUploadedImageToCanvas={addUploadedImageToCanvas}
                     flipLayer={flipLayer}
+                    isMultiSelectMode={isMultiSelectMode}
+                    toggleMultiSelectMode={toggleMultiSelectMode}
+                    selectedPatternIds={selectedPatternIds}
+                    togglePatternSelection={togglePatternSelection}
+                    onAddSelectedPatterns={addSelectedPatternsToCanvas}
                   />
                 </div>
               </motion.div>
