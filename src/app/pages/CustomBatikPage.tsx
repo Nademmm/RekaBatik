@@ -1974,6 +1974,129 @@ export function CustomBatikPage() {
     canvas.on("object:modified", () => saveSnapshot());
     canvas.on("object:removed", () => saveSnapshot());
 
+    // ── Text editing undo checkpoint ─────────────────────────────────────────
+    // Strategy: maintain a SEPARATE string-level history for the active text 
+    // object. Ctrl+Z inside editing restores previous text WITHOUT exiting. 
+    // Only when text history is exhausted does Ctrl+Z fall through to the 
+    // canvas-level undo (which removes the text box). 
+    // canvas.toJSON() is NOT used during editing — Fabric doesn't serialize 
+    // the live editing buffer, so we store raw strings instead. 
+
+    let textHistory: string[] = [];
+    let textHistoryCursor = -1;
+    let activeTextObj: fabric.IText | null = null;
+    let textDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let textUndoKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+    const pushTextSnapshot = (value: string) => {
+      textHistory = textHistory.slice(0, textHistoryCursor + 1);
+      if (textHistory[textHistoryCursor] === value) return; // dedupe 
+      textHistory.push(value);
+      textHistoryCursor = textHistory.length - 1;
+    };
+
+    const clearTextHistory = () => {
+      textHistory = [];
+      textHistoryCursor = -1;
+      if (textDebounceTimer) { clearTimeout(textDebounceTimer); textDebounceTimer = null; }
+      if (textUndoKeyHandler && activeTextObj) {
+        canvas.getElement().removeEventListener("keydown", textUndoKeyHandler, true);
+        textUndoKeyHandler = null;
+      }
+      activeTextObj = null;
+    };
+
+    const startTextEditing = (textObj: fabric.IText) => {
+      clearTextHistory();
+      activeTextObj = textObj;
+      // Seed with current text 
+      textHistory = [textObj.text ?? ""];
+      textHistoryCursor = 0;
+
+      const scheduleSnapshot = () => {
+        if (textDebounceTimer) clearTimeout(textDebounceTimer);
+        textDebounceTimer = setTimeout(() => {
+          textDebounceTimer = null;
+          if (!activeTextObj) return;
+          // Read from internal _text array — this captures live editing buffer 
+          const live = (activeTextObj as any)._text
+            ? (activeTextObj as any)._text.join("")
+            : (activeTextObj.text ?? "");
+          pushTextSnapshot(live);
+        }, 300);
+      };
+
+      textObj.on("text:changed", scheduleSnapshot);
+
+      const onKey = (e: KeyboardEvent) => {
+        const isMac = navigator.platform.toUpperCase().includes("MAC");
+        const ctrl = isMac ? e.metaKey : e.ctrlKey;
+        if (!ctrl) return;
+
+        const isUndo = e.key === "z" && !e.shiftKey;
+        const isRedo = e.key === "y" || (e.key === "z" && e.shiftKey);
+        if (!isUndo && !isRedo) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        // Flush pending debounce first so current state is in history 
+        if (textDebounceTimer) {
+          clearTimeout(textDebounceTimer);
+          textDebounceTimer = null;
+          const live = (activeTextObj as any)._text
+            ? (activeTextObj as any)._text.join("")
+            : (activeTextObj?.text ?? "");
+          pushTextSnapshot(live);
+        }
+
+        if (isUndo) {
+          if (textHistoryCursor > 0) {
+            // Still have text history — restore previous text, stay in edit mode 
+            textHistoryCursor--;
+            const restored = textHistory[textHistoryCursor];
+            textObj.set("text", restored);
+            textObj.selectionStart = restored.length;
+            textObj.selectionEnd = restored.length;
+            canvas.requestRenderAll();
+          }
+          // If textHistoryCursor === 0, do nothing — let user press Ctrl+Z again 
+          // OUTSIDE editing mode to remove the box (they must exit first) 
+        } else if (isRedo) {
+          if (textHistoryCursor < textHistory.length - 1) {
+            textHistoryCursor++;
+            const restored = textHistory[textHistoryCursor];
+            textObj.set("text", restored);
+            textObj.selectionStart = restored.length;
+            textObj.selectionEnd = restored.length;
+            canvas.requestRenderAll();
+          }
+        }
+      };
+
+      textUndoKeyHandler = onKey;
+      canvas.getElement().addEventListener("keydown", onKey, true);
+    };
+
+    canvas.on("text:editing:entered", (e: any) => {
+      if (e.target) startTextEditing(e.target as fabric.IText);
+    });
+
+    canvas.on("text:editing:exited", (e: any) => {
+      const textObj = e.target as fabric.IText | undefined;
+      clearTextHistory();
+      if (!textObj) return;
+      if (!textObj.text?.trim()) {
+        canvas.remove(textObj);
+        const lid = (textObj as any).data?.layerId;
+        if (lid) setLayers(prev => prev.filter(l => l.id !== lid));
+        setSelectedLayerId(null);
+      }
+      // Commit final text state to main canvas history 
+      saveSnapshot();
+    });
+    // ─────────────────────────────────────────────────────────────────────────
+
     // [#27] Track start state of scaling/cropping
     canvas.on("before:transform", (e) => {
       const obj = e.transform?.target as any;
@@ -2532,28 +2655,10 @@ export function CustomBatikPage() {
     };
   }, [saveSnapshot, applyZoom, clampViewport]);
 
-  // Text tool event listener
+  // Text tool event listener — mouse:down spawn removed (Canva-style: spawn on toolbar button click)
   useEffect(() => {
-    const fc = fabricCanvasRef.current;
-    if (!fc) return;
-    const onMouseDown = (e: any) => {
-      if (activeToolRef.current !== "text") return;
-      if (e.target) return;
-      const pointer = fc.getPointer(e.e);
-      const text = new fabric.IText("Ketik teks di sini", { left: pointer.x, top: pointer.y, fontFamily: fontFamilyRef.current, fontSize: fontSizeRef.current, fill: textColorRef.current, selectable: true, evented: true, hasControls: true, editable: true, objectCaching: false });
-      const newLayerId = Date.now().toString();
-      (text as any).data = { layerId: newLayerId, layerName: "Teks" };
-      fc.add(text); fc.setActiveObject(text); text.enterEditing(); text.selectAll(); fc.requestRenderAll();
-      setLayers((prev) => [...prev, { id: newLayerId, type: "drawing" as const, name: "Teks", visible: true, locked: false, fabricObject: text }]);
-      setSelectedLayerId(newLayerId);
-      setActiveTab("layer");
-      text.on("editing:exited", () => {
-        if (!text.text?.trim()) { fc.remove(text); setLayers((prev) => prev.filter((l) => l.id !== newLayerId)); setSelectedLayerId(null); }
-        else { saveSnapshot(); }
-      });
-    };
-    fc.on("mouse:down", onMouseDown);
-    return () => { fc.off("mouse:down", onMouseDown); };
+    // No mouse:down listener needed; text is spawned directly via spawnTextObject()
+    return () => {};
   }, [saveSnapshot]);
 
   // Switch tool
@@ -3068,6 +3173,50 @@ export function CustomBatikPage() {
     });
   }, [saveSnapshot, getSpawnPoint]);
 
+  // Spawn text object — Canva-style: called directly from toolbar button click.
+  // Saves a snapshot BEFORE enterEditing so the "empty text box" state is in
+  // history, while direct listeners handle per-burst text checkpoints.
+  const spawnTextObject = useCallback(() => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+    const spawnPoint = getSpawnPoint();
+    const text = new fabric.IText("Ketik teks di sini", {
+      left: spawnPoint.x,
+      top: spawnPoint.y,
+      fontFamily: fontFamilyRef.current,
+      fontSize: fontSizeRef.current,
+      fill: textColorRef.current,
+      selectable: true,
+      evented: true,
+      hasControls: true,
+      editable: true,
+      objectCaching: false,
+      originX: "center",
+      originY: "center",
+    });
+    const newLayerId = Date.now().toString();
+    (text as any).data = { layerId: newLayerId, layerName: "Teks" };
+    fc.add(text);
+    fc.setActiveObject(text);
+    fc.requestRenderAll();
+
+    setLayers((prev) => [...prev, { id: newLayerId, type: "drawing" as const, name: "Teks", visible: true, locked: false, fabricObject: text }]);
+    setSelectedLayerId(newLayerId);
+    setActiveTab("layer");
+    setActiveTool("select"); // auto-switch to select like Canva
+
+    // Save spawn state to canvas history BEFORE entering edit mode 
+    saveSnapshot();
+
+    text.enterEditing();
+    text.selectAll();
+    fc.requestRenderAll();
+
+    // editing:exited: handled by canvas-level listener above 
+    text.on("editing:exited", () => {
+    });
+  }, [saveSnapshot, getSpawnPoint]);
+
   // Build final canvas for download/save
   const buildFinalCanvas = async (): Promise<HTMLCanvasElement> => {
     const fc = fabricCanvasRef.current!;
@@ -3294,7 +3443,7 @@ export function CustomBatikPage() {
                       ] as const).map(({ tool, icon: Icon, label }) => {
                         const isActive = activeTool === tool;
                         return (
-                          <button key={tool} onClick={() => setActiveTool(tool)} title={label}
+                          <button key={tool} onClick={() => tool === "text" ? spawnTextObject() : setActiveTool(tool)} title={label}
                             className="flex items-center justify-center gap-1.5 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 px-2.5 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-xs font-semibold select-none flex-shrink-0"
                             style={{ background: isActive ? "linear-gradient(135deg, #8B6F47 0%, #A0845E 100%)" : "transparent", color: isActive ? "#FFFFFF" : "#7A6B5E", boxShadow: isActive ? "0 2px 8px rgba(139,111,71,0.25), inset 0 1px 0 rgba(255,255,255,0.15)" : "none" }}>
                             <Icon style={{ width: "13px", height: "13px", flexShrink: 0 }} />
@@ -3581,7 +3730,7 @@ export function CustomBatikPage() {
                           </div>
                         </div>
                         <div className="h-6 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-                        <span className="hidden sm:inline text-[10px] text-[#A89B8F] italic">Klik area kosong di kanvas untuk menambah teks</span>
+                        <span className="hidden sm:inline text-[10px] text-[#A89B8F] italic">Teks baru langsung muncul saat tombol Teks diklik</span>
                       </div>
                     )}
 
@@ -3868,7 +4017,7 @@ export function CustomBatikPage() {
                 ] as const).map(({ tool, icon: Icon, label }) => {
                   const isActive = activeTool === tool;
                   return (
-                    <button key={tool} onClick={() => setActiveTool(tool)} title={label}
+                    <button key={tool} onClick={() => tool === "text" ? spawnTextObject() : setActiveTool(tool)} title={label}
                       className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-full transition-all cursor-pointer"
                       style={{ background: isActive ? "linear-gradient(135deg, #8B6F47 0%, #A0845E 100%)" : "transparent", color: isActive ? "#FFFFFF" : "#7A6B5E" }}>
                       <Icon style={{ width: 14, height: 14 }} />

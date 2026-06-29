@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { ShoppingBag, Menu, X, Instagram, Facebook, Twitter, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck, Home, Grid, Palette, Info } from "lucide-react";
+import { ShoppingBag, Menu, X, Instagram, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck, Home, Grid, Palette, Info } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BatikBackground } from "../components/BatikBackground";
@@ -178,6 +178,14 @@ export function RootLayout() {
     { path: "/desa-jetis", label: "Tentang Kami" },
     { path: "/chat", label: "Chat" },
     { path: "/profile", label: "Profil" },
+  ];
+
+  const serviceItems = [
+    { path: "/custom", label: "Kustomisasi Batik" },
+    { path: "/catalog", label: "Katalog Motif Premium" },
+    { path: "/chat", label: "Pesanan Bulk" },
+    { path: "/chat", label: "Kolaborasi Desain" },
+    { path: "/belajar-batik", label: "Workshop Batik" },
   ];
 
   const desktopNavItems = navItems.filter(item => 
@@ -768,30 +776,6 @@ export function RootLayout() {
                 Platform kustomisasi batik digital yang menghubungkan Anda dengan warisan budaya batik Indonesia.
                 Ciptakan motif unik dan personal dari pengrajin terbaik di Desa Jetis.
               </p>
-
-              {/* Social Media */}
-              <div className="flex gap-3">
-                {[Instagram, Facebook, Twitter].map((Icon, i) => (
-                  <motion.button
-                    key={i}
-                    whileHover={{ 
-                      scale: 1.08, 
-                      backgroundColor: "rgba(212,184,139,0.2)",
-                      borderColor: "rgba(212,184,139,0.5)",
-                      boxShadow: "0 0 15px rgba(212,184,139,0.3)"
-                    }}
-                    whileTap={{ scale: 0.95 }}
-                    className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300"
-                    style={{ 
-                      background: "rgba(255,255,255,0.03)", 
-                      color: "#D4B88B",
-                      border: "1px solid rgba(212,184,139,0.15)"
-                    }}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </motion.button>
-                ))}
-              </div>
             </motion.div>
 
             {/* Quick Links */}
@@ -835,23 +819,18 @@ export function RootLayout() {
                 Layanan Kami
               </h4>
               <ul className="space-y-2.5">
-                {[
-                  "Kustomisasi Batik",
-                  "Katalog Motif Premium",
-                  "Pesanan Bulk",
-                  "Kolaborasi Desain",
-                  "Workshop Batik"
-                ].map((item, i) => (
-                  <li key={i}>
-                    <button
-                      className="group flex items-center transition-all duration-300 text-left w-full cursor-pointer"
+                {serviceItems.map((item) => (
+                  <li key={item.label}>
+                    <Link
+                      to={item.path}
+                      className="group flex items-center transition-all duration-300"
                       style={{ color: "rgba(250,248,245,0.65)", fontSize: "0.95rem" }}
                       onMouseEnter={(e) => e.currentTarget.style.color = "#D4B88B"}
                       onMouseLeave={(e) => e.currentTarget.style.color = "rgba(250,248,245,0.65)"}
                     >
                       <ChevronRight className="w-0 h-3.5 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 transition-all duration-300 text-[#D4B88B] flex-shrink-0" />
-                      <span>{item}</span>
-                    </button>
+                      <span>{item.label}</span>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -869,8 +848,13 @@ export function RootLayout() {
                 Hubungi Kami
               </h4>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-6 lg:gap-4">
-                <div className="flex items-start gap-3 group/item">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-6 lg:gap-4">
+                <a 
+                  href="https://www.google.com/maps/search/Desa+Jetis,+Sidoarjo" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-3 group/item w-fit"
+                >
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300 group-hover/item:bg-[#D4B88B] group-hover/item:text-[#3D2B1F]" style={{ background: "rgba(212,184,139,0.12)", color: "#D4B88B" }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -880,9 +864,12 @@ export function RootLayout() {
                   <p className="transition-colors duration-300 group-hover/item:text-[#FAF8F5]" style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem", lineHeight: "1.5" }}>
                     Desa Jetis, Sidoarjo<br/>Jawa Timur, Indonesia
                   </p>
-                </div>
+                </a>
                 
-                <div className="flex items-center gap-3 group/item">
+                <a 
+                  href="mailto:rekabatik@gmail.com" 
+                  className="flex items-center gap-3 group/item w-fit"
+                >
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300 group-hover/item:bg-[#D4B88B] group-hover/item:text-[#3D2B1F]" style={{ background: "rgba(212,184,139,0.12)", color: "#D4B88B" }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -890,20 +877,37 @@ export function RootLayout() {
                     </svg>
                   </div>
                   <p className="transition-colors duration-300 group-hover/item:text-[#FAF8F5]" style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem" }}>
-                    info@rekabatik.id
+                    rekabatik@gmail.com
                   </p>
-                </div>
+                </a>
                 
-                <div className="flex items-center gap-3 group/item">
+                <a 
+                  href="tel:+6285143898545" 
+                  className="flex items-center gap-3 group/item w-fit"
+                >
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300 group-hover/item:bg-[#D4B88B] group-hover/item:text-[#3D2B1F]" style={{ background: "rgba(212,184,139,0.12)", color: "#D4B88B" }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                     </svg>
                   </div>
                   <p className="transition-colors duration-300 group-hover/item:text-[#FAF8F5]" style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem" }}>
-                    +62 812-3456-7890
+                    +62 851-4389-8545
                   </p>
-                </div>
+                </a>
+
+                <a 
+                  href="https://www.instagram.com/rekabatik.id" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 group/item w-fit"
+                >
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300 group-hover/item:bg-[#D4B88B] group-hover/item:text-[#3D2B1F]" style={{ background: "rgba(212,184,139,0.12)", color: "#D4B88B" }}>
+                    <Instagram className="w-4.5 h-4.5" />
+                  </div>
+                  <p className="transition-colors duration-300 group-hover/item:text-[#FAF8F5]" style={{ color: "rgba(250,248,245,0.68)", fontSize: "0.95rem" }}>
+                    @rekabatik.id
+                  </p>
+                </a>
               </div>
             </motion.div>
           </div>

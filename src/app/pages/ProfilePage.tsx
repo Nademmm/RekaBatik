@@ -248,6 +248,10 @@ export function ProfilePage() {
   const [favoriteBatik, setFavoriteBatik] = useState<BatikItem[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
 
+  // Orders
+  const [userOrders, setUserOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+
   // Address Book state
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
@@ -543,6 +547,24 @@ export function ProfilePage() {
     }
   };
 
+  const fetchOrders = async () => {
+    if (!user) return;
+    try {
+      setLoadingOrders(true);
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date", { ascending: false });
+      if (error) throw error;
+      setUserOrders(data || []);
+    } catch {
+      toast.error("Gagal memuat data pesanan");
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
   const fetchStore = async () => {
     if (!user) return;
     try {
@@ -687,6 +709,7 @@ export function ProfilePage() {
       setEmail(user.email || "");
       fetchFavorites();
       fetchAddresses();
+      fetchOrders();
       if (userRole === "artisan") {
         fetchStore();
       } else {
@@ -893,7 +916,7 @@ export function ProfilePage() {
           className="grid grid-cols-3 gap-3 mb-5"
         >
           {[
-            { num: "12", label: "Pesanan" },
+            { num: String(userOrders.length), label: "Pesanan" },
             { num: String(favoriteStores.length), label: "Toko Favorit" },
             { num: String(favoriteBatik.length), label: "Batik Favorit" },
           ].map((s) => (
@@ -1479,56 +1502,95 @@ export function ProfilePage() {
               description="Semua transaksi Anda"
             >
               <div className="space-y-2 mb-4">
-                {/* Example order rows — replace with real data */}
-                {[
-                  { id: "#ORD-20240601", items: "2 item", date: "1 Jun 2024", price: "Rp 450.000", status: "Selesai" },
-                  { id: "#ORD-20240518", items: "1 item", date: "18 Mei 2024", price: "Rp 280.000", status: "Dikirim" },
-                ].map((o) => (
-                  <div
-                    key={o.id}
-                    className="flex items-center gap-3 p-3 rounded-2xl hover:bg-[#FAF8F5] transition-colors cursor-pointer"
-                  >
+                {loadingOrders ? (
+                  <div className="space-y-3">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-16 rounded-2xl w-full" />
+                    ))}
+                  </div>
+                ) : userOrders.length === 0 ? (
+                  <div className="text-center py-10">
                     <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
                       style={{ background: "rgba(139,111,71,0.08)" }}
                     >
-                      <Package className="w-5 h-5" style={{ color: "#8B6F47" }} />
+                      <Package className="w-7 h-7" style={{ color: "#8B6F47" }} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold" style={{ color: "#3D2B1F" }}>
-                        {o.id}
-                      </p>
-                      <p className="text-xs" style={{ color: "#9B8C80" }}>
-                        {o.items} · {o.date} · {o.price}
-                      </p>
-                    </div>
-                    <span
-                      className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
-                      style={
-                        o.status === "Selesai"
-                          ? { background: "#EAF3DE", color: "#3B6D11" }
-                          : { background: "#E6F1FB", color: "#185FA5" }
-                      }
-                    >
-                      {o.status}
-                    </span>
+                    <p className="text-sm font-semibold mb-1" style={{ color: "#3D2B1F" }}>
+                      Belum Ada Pesanan
+                    </p>
+                    <p className="text-xs mb-4" style={{ color: "#9B8C80" }}>
+                      Mulailah membuat desain atau beli batik dari katalog
+                    </p>
+                    <Link to="/catalog">
+                      <Button
+                        size="sm"
+                        className="rounded-xl font-semibold"
+                        style={{
+                          background: "linear-gradient(135deg, #8B6F47, #A88967)",
+                          color: "#fff",
+                        }}
+                      >
+                        Belanja Sekarang
+                      </Button>
+                    </Link>
                   </div>
-                ))}
+                ) : (
+                  userOrders.slice(0, 3).map((o) => (
+                    <div
+                      key={o.id}
+                      onClick={() => navigate("/orders")}
+                      className="flex items-center gap-3 p-3 rounded-2xl hover:bg-[#FAF8F5] transition-colors cursor-pointer"
+                    >
+                      <div
+                        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: "rgba(139,111,71,0.08)" }}
+                      >
+                        <Package className="w-5 h-5" style={{ color: "#8B6F47" }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: "#3D2B1F" }}>
+                          #{o.id}
+                        </p>
+                        <p className="text-xs" style={{ color: "#9B8C80" }}>
+                          {o.item} · {new Date(o.date).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' })} · Rp {Number(o.total).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                      <span
+                        className="text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 uppercase tracking-wider"
+                        style={
+                          o.status === "delivered"
+                            ? { background: "#EAF3DE", color: "#3B6D11" }
+                            : o.status === "cancelled"
+                            ? { background: "#FEE2E2", color: "#B91C1C" }
+                            : { background: "#E6F1FB", color: "#185FA5" }
+                        }
+                      >
+                        {o.status === "negotiating" ? "Negosiasi" : 
+                         o.status === "processing" ? "Proses" :
+                         o.status === "shipping" ? "Dikirim" :
+                         o.status === "delivered" ? "Selesai" : "Batal"}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
 
-              <Link to="/orders">
-                <Button
-                  className="w-full rounded-xl font-semibold"
-                  style={{
-                    background: "linear-gradient(135deg, #8B6F47, #A88967)",
-                    color: "#fff",
-                    height: 44,
-                  }}
-                >
-                  Lihat Semua Pesanan
-                  <ChevronRight className="w-4 h-4 ml-1.5" />
-                </Button>
-              </Link>
+              {userOrders.length > 0 && (
+                <Link to="/orders">
+                  <Button
+                    className="w-full rounded-xl font-semibold"
+                    style={{
+                      background: "linear-gradient(135deg, #8B6F47, #A88967)",
+                      color: "#fff",
+                      height: 44,
+                    }}
+                  >
+                    Lihat Semua Pesanan
+                    <ChevronRight className="w-4 h-4 ml-1.5" />
+                  </Button>
+                </Link>
+              )}
             </SectionCard>
           </motion.div>
         )}

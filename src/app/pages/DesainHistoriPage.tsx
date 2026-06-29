@@ -97,18 +97,6 @@ function DesignCard({
           </div>
         )}
 
-        {/* Design badge */}
-        <div className="absolute top-2 left-2 sm:top-3 sm:left-3">
-          <span
-            className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-[9px] sm:text-xs font-bold"
-            style={{ background: "rgba(139,111,71,0.2)", color: "#8B6F47", backdropFilter: "blur(8px)", border: "1px solid rgba(139,111,71,0.4)" }}
-          >
-            <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-            <span className="hidden sm:inline">Desain Kustom</span>
-            <span className="sm:hidden">Kustom</span>
-          </span>
-        </div>
-
         {/* Delete button */}
         <button
           onClick={(e) => {
@@ -565,17 +553,6 @@ export function DesainHistoriPage() {
                     </div>
 
                     <div className="p-6">
-                      {/* Status */}
-                      <div className="mb-4">
-                        <span
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-                          style={{ background: "rgba(139,111,71,0.15)", color: "#8B6F47", border: "1px solid rgba(139,111,71,0.3)" }}
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Desain Kustom
-                        </span>
-                      </div>
-
                       <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
                         {projectName}
                       </h2>
