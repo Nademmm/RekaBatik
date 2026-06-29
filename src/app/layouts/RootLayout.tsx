@@ -70,16 +70,35 @@ export function RootLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const notificationTimerRef = useRef<number | null>(null);
+  const artisanStoreNameRef = useRef<string | null>(null);
 
   const [notifications, setNotifications] = useState({ unpaidCount: 0, negotiatingCount: 0, awaitingVerificationCount: 0 });
 
   const fetchNotifications = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setNotifications({ unpaidCount: 0, negotiatingCount: 0, awaitingVerificationCount: 0 });
+      return;
+    }
+
     try {
       if (userRole === "artisan") {
-        const { data: storeData } = await supabase.from("stores").select("name").eq("owner_id", user.id).single();
-        if (storeData?.name) {
-          const { data: orders } = await supabase.from("orders").select("status, payment_status").eq("artisan", storeData.name);
+        let storeName = artisanStoreNameRef.current;
+        if (!storeName) {
+          const { data: storeData } = await supabase
+            .from("stores")
+            .select("name")
+            .eq("owner_id", user.id)
+            .single();
+          storeName = storeData?.name ?? null;
+          artisanStoreNameRef.current = storeName;
+        }
+
+        if (storeName) {
+          const { data: orders } = await supabase
+            .from("orders")
+            .select("status, payment_status")
+            .eq("artisan", storeName);
           if (orders) {
             const awaiting = orders.filter(o => o.payment_status === "awaiting_verification").length;
             const nego = orders.filter(o => o.status === "negotiating").length;
@@ -87,7 +106,10 @@ export function RootLayout() {
           }
         }
       } else {
-        const { data: orders } = await supabase.from("orders").select("status, payment_status, total, date").eq("user_id", user.id);
+        const { data: orders } = await supabase
+          .from("orders")
+          .select("status, payment_status, total, date")
+          .eq("user_id", user.id);
         if (orders) {
           const unpaid = orders.filter(o => o.payment_status === "pending" && o.total > 0 && o.status !== "negotiating" && (new Date(o.date).getTime() + 86400000 > Date.now())).length;
           const nego = orders.filter(o => o.status === "negotiating").length;
@@ -105,10 +127,20 @@ export function RootLayout() {
     const channel = supabase
       .channel("navbar-orders-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        fetchNotifications();
+        if (notificationTimerRef.current) {
+          window.clearTimeout(notificationTimerRef.current);
+        }
+
+        notificationTimerRef.current = window.setTimeout(() => {
+          fetchNotifications();
+        }, 250);
       })
       .subscribe();
     return () => {
+      if (notificationTimerRef.current) {
+        window.clearTimeout(notificationTimerRef.current);
+        notificationTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
   }, [user, fetchNotifications]);

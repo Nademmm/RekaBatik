@@ -9,6 +9,31 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+
+          if (id.includes("fabric")) {
+            return "vendor-fabric";
+          }
+
+          if (id.includes("motion")) {
+            return "vendor-motion";
+          }
+
+          if (id.includes("@supabase")) {
+            return "vendor-supabase";
+          }
+
+          if (id.includes("@radix-ui")) {
+            return "vendor-radix";
+          }
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       // Alias @ to the src directory

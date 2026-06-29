@@ -10,6 +10,7 @@ import { useAuth } from "../../lib/AuthContext";
 import { useCart } from "../../lib/CartContext";
 import { useNavigate } from "react-router";
 import { fallbackCatalogItems, resolveCatalogItems } from "../constants/batikCatalog";
+import { ImageWithFallback } from "../components/ImageWithFallback";
 
 
 
@@ -26,6 +27,7 @@ export function CatalogPage() {
   const [items, setItems] = useState<BatikItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   
   const [selectedBatik, setSelectedBatik] = useState<BatikItem | null>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -97,11 +99,23 @@ export function CatalogPage() {
   };
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    fetchFavorites();
+  }, [user]);
+
+  useEffect(() => {
     async function fetchItems() {
       setLoading(true);
       try {
         let query = supabase.from("batik_items").select("*");
-        if (search) query = query.ilike("name", `%${search}%`);
+        if (debouncedSearch) query = query.ilike("name", `%${debouncedSearch}%`);
 
         const { data, error } = await query;
         
@@ -117,9 +131,9 @@ export function CatalogPage() {
         
         // Filter by search untuk fallback juga
         let filteredItems = [...itemsToShow];
-        if (search) {
+        if (debouncedSearch) {
           filteredItems = filteredItems.filter(item => 
-            item.name.toLowerCase().includes(search.toLowerCase())
+            item.name.toLowerCase().includes(debouncedSearch.toLowerCase())
           );
         }
         
@@ -131,8 +145,7 @@ export function CatalogPage() {
       }
     }
     fetchItems();
-    fetchFavorites();
-  }, [search, user]);
+  }, [debouncedSearch]);
 
   const handleAddToCart = async (batik: BatikItem, quantity: number) => {
     if (!user) {
@@ -226,7 +239,7 @@ export function CatalogPage() {
                         transition={{ duration: 0.6, ease: "easeOut" }}
                       >
                         {item.image_url ? (
-                          <img 
+                          <ImageWithFallback
                             src={item.image_url} 
                             alt={item.name} 
                             className="w-full h-full object-cover"

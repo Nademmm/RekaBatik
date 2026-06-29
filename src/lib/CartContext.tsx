@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "./supabase";
 import { useAuth } from "./AuthContext";
 
@@ -32,6 +32,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const realtimeRefreshTimerRef = useRef<number | null>(null);
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -233,30 +234,43 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           filter: `user_id=eq.${user.id}`,
         },
         () => {
-          fetchCart();
+          if (realtimeRefreshTimerRef.current) {
+            window.clearTimeout(realtimeRefreshTimerRef.current);
+          }
+
+          realtimeRefreshTimerRef.current = window.setTimeout(() => {
+            fetchCart();
+          }, 150);
         }
       )
       .subscribe();
 
     return () => {
+      if (realtimeRefreshTimerRef.current) {
+        window.clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
   }, [user, fetchCart]);
 
+  const contextValue = useMemo(
+    () => ({
+      cartCount,
+      cartItems,
+      isLoading,
+      refreshCart: fetchCart,
+      addToCart,
+      updateQuantity,
+      removeItem,
+      clearCart,
+      fetchFullCart,
+    }),
+    [cartCount, cartItems, isLoading, fetchCart, addToCart, updateQuantity, removeItem, clearCart, fetchFullCart]
+  );
+
   return (
-    <CartContext.Provider
-      value={{
-        cartCount,
-        cartItems,
-        isLoading,
-        refreshCart: fetchCart,
-        addToCart,
-        updateQuantity,
-        removeItem,
-        clearCart,
-        fetchFullCart,
-      }}
-    >
+    <CartContext.Provider value={contextValue}>
       {children}
     </CartContext.Provider>
   );

@@ -79,29 +79,64 @@ const formatPatternName = (value: string) =>
 const batikSvgModules = import.meta.glob("../../assets/batik-svgs/*.svg", {
   query: "?raw",
   import: "default",
-  eager: true,
-}) as Record<string, string>;
+}) as Record<string, () => Promise<string>>;
 
-const batikAssetSvgMap = Object.fromEntries(
-  Object.entries(batikSvgModules).map(([path, svg]) => {
+const batikSvgCache: Record<string, string> = {};
+const batikSvgLoadPromises = new Map<string, Promise<string | undefined>>();
+
+const batikSvgPathMap: Record<string, string> = Object.fromEntries(
+  Object.keys(batikSvgModules).map((path) => {
     const fileName = path.split("/").pop() ?? "";
-    return [normalizeStyleType(fileName), svg];
+    return [normalizeStyleType(fileName), path];
   }),
 );
 
-const batikSvgMap: Record<string, string> = Object.fromEntries(
+const batikSvgAliasPathMap: Record<string, string> = Object.fromEntries(
   Object.entries({
-    ...batikAssetSvgMap,
-    parang: batikAssetSvgMap["parang-batik"],
-    "parang-new": batikAssetSvgMap.parang,
-    mega: batikAssetSvgMap["mega-mendung"],
-    "sido-mukti": batikAssetSvgMap.sidomukti,
-  }).filter(([, svg]) => Boolean(svg)),
-) as Record<string, string>;
+    ...batikSvgPathMap,
+    parang: batikSvgPathMap["parang-batik"],
+    "parang-new": batikSvgPathMap.parang,
+    mega: batikSvgPathMap["mega-mendung"],
+    "sido-mukti": batikSvgPathMap.sidomukti,
+  }).filter(([, path]) => Boolean(path)),
+);
+
+const batikKnownStyleTypes = new Set(Object.keys(batikSvgAliasPathMap));
+
+const loadBatikSvg = async (styleType?: string) => {
+  if (!styleType) return undefined;
+
+  const normalizedStyleType = normalizeStyleType(styleType);
+  if (batikSvgCache[normalizedStyleType]) {
+    return batikSvgCache[normalizedStyleType];
+  }
+
+  const existingPromise = batikSvgLoadPromises.get(normalizedStyleType);
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  const modulePath = batikSvgAliasPathMap[normalizedStyleType];
+  const loader = modulePath ? batikSvgModules[modulePath] : undefined;
+
+  if (!loader) return undefined;
+
+  const loadPromise = loader()
+    .then((svg) => {
+      batikSvgCache[normalizedStyleType] = svg;
+      return svg;
+    })
+    .finally(() => {
+      batikSvgLoadPromises.delete(normalizedStyleType);
+    });
+
+  batikSvgLoadPromises.set(normalizedStyleType, loadPromise);
+  return loadPromise;
+};
 
 const getBatikSvg = (styleType?: string) => {
   if (!styleType) return undefined;
-  return batikSvgMap[normalizeStyleType(styleType)];
+  return batikSvgCache[normalizeStyleType(styleType)];
 };
 
 const batikAssetStyleTypeMap: Record<string, string> = {
@@ -179,7 +214,7 @@ const batikAssetMeta: Record<string, Partial<BatikItem>> = {
   },
 };
 
-const batikAssetPatterns: BatikItem[] = Object.keys(batikAssetSvgMap)
+const batikAssetPatterns: BatikItem[] = Object.keys(batikSvgPathMap)
   .sort((a, b) => a.localeCompare(b))
   .map((assetKey, index) => {
     const styleType = batikAssetStyleTypeMap[assetKey] ?? assetKey;
@@ -210,7 +245,7 @@ const mergePatternsWithAssets = (items: BatikItem[] = []) => {
 
   items.forEach((item) => {
     const styleType = normalizeStyleType(item.style_type ?? "");
-    if (!styleType || !getBatikSvg(styleType)) return;
+    if (!styleType || !batikKnownStyleTypes.has(styleType)) return;
 
     merged.set(styleType, {
       ...item,
@@ -2896,39 +2931,44 @@ export function CustomBatikPage() {
   }, [patterns, screenPointToCanvasCoords]);
   const addItemToCanvas = useCallback((pattern: BatikItem, dropCoords?: { x: number; y: number }) => {
     if (!fabricCanvasRef.current) return;
-    const svg = renderPatternSVGString(pattern);
     const fc = fabricCanvasRef.current;
     const spawnPoint = getSpawnPoint(dropCoords);
 
-    svgStringToPngDataUrl(svg).then((pngUrl) => {
-      fabric.Image.fromURL(pngUrl, (img) => {
-        const rawW = img.width ?? 554;
-        const rawH = img.height ?? 554;
-        const maxSize = 280;
-        const scale = rawW > 0 && rawH > 0 ? Math.min(maxSize / rawW, maxSize / rawH, 1) : 1;
-        const displayW = rawW * scale;
-        const displayH = rawH * scale;
-        img.set({
-          left: spawnPoint.x - displayW / 2,
-          top: spawnPoint.y - displayH / 2,
-          scaleX: scale, scaleY: scale,
-          selectable: true, evented: true, hasControls: true, hasBorders: true,
-          perPixelTargetFind: false,
-          lockMovementX: false, lockMovementY: false, lockRotation: false,
-          lockScalingX: false, lockScalingY: false, lockUniScaling: false,
-          lockScalingFlip: true,
-          objectCaching: false,
+    loadBatikSvg(pattern.style_type)
+      .then(() => {
+        const svg = renderPatternSVGString(pattern);
+        return svgStringToPngDataUrl(svg);
+      })
+      .then((pngUrl) => {
+        fabric.Image.fromURL(pngUrl, (img) => {
+          const rawW = img.width ?? 554;
+          const rawH = img.height ?? 554;
+          const maxSize = 280;
+          const scale = rawW > 0 && rawH > 0 ? Math.min(maxSize / rawW, maxSize / rawH, 1) : 1;
+          const displayW = rawW * scale;
+          const displayH = rawH * scale;
+          img.set({
+            left: spawnPoint.x - displayW / 2,
+            top: spawnPoint.y - displayH / 2,
+            scaleX: scale, scaleY: scale,
+            selectable: true, evented: true, hasControls: true, hasBorders: true,
+            perPixelTargetFind: false,
+            lockMovementX: false, lockMovementY: false, lockRotation: false,
+            lockScalingX: false, lockScalingY: false, lockUniScaling: false,
+            lockScalingFlip: true,
+            objectCaching: false,
+          });
+          img.setCoords();
+          const newLayerId = Date.now().toString();
+          (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: selectedPreset.name, customColor: customColor, originalSvg: getBatikSvg(pattern.style_type) || null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
+          fc.add(img); img.setCoords(); fc.setActiveObject(img); fc.requestRenderAll();
+          setLayers((prev) => [...prev, { id: newLayerId, type: 'pattern', name: pattern.name || 'Motif', visible: true, locked: false, fabricObject: img }]);
+          setSelectedLayerId(newLayerId);
+          setActiveTab("layer");
+          saveSnapshot();
         });
-        img.setCoords();
-        const newLayerId = Date.now().toString();
-        (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: selectedPreset.name, customColor: customColor, originalSvg: getBatikSvg(pattern.style_type) || null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
-        fc.add(img); img.setCoords(); fc.setActiveObject(img); fc.requestRenderAll();
-        setLayers((prev) => [...prev, { id: newLayerId, type: 'pattern', name: pattern.name || 'Motif', visible: true, locked: false, fabricObject: img }]);
-        setSelectedLayerId(newLayerId);
-        setActiveTab("layer");
-        saveSnapshot();
-      });
-    }).catch(() => { toast.error('Gagal memuat motif SVG'); });
+      })
+      .catch(() => { toast.error('Gagal memuat motif SVG'); });
   }, [saveSnapshot, renderPatternSVGString, selectedPreset, customColor, getSpawnPoint]);
 
   useEffect(() => { addItemToCanvasRef.current = addItemToCanvas; }, [addItemToCanvas]);

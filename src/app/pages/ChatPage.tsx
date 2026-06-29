@@ -221,8 +221,10 @@ export function ChatPage() {
 
       // Group by artisan (store name)
       const storeMap = new Map<string, StoreConvo>();
+      const orderStoreMap = new Map<string, string>();
       for (const o of orders) {
         const storeName = o.artisan || "Toko Batik";
+        orderStoreMap.set(o.id, storeName);
         if (!storeMap.has(storeName)) {
           storeMap.set(storeName, {
             storeName,
@@ -238,20 +240,32 @@ export function ChatPage() {
         if (o.status === "negotiating") conv.hasNegotiating = true;
       }
 
-      // Fetch last message per store
-      const convos = await Promise.all(
-        Array.from(storeMap.values()).map(async (conv) => {
-          const { data: lastMsgs } = await supabase
-            .from("messages")
-            .select("message, created_at")
-            .in("order_id", conv.orderIds)
-            .order("created_at", { ascending: false })
-            .limit(1);
-          const last = lastMsgs?.[0];
-          const latestOrder = orders.find(o => o.id === conv.latestOrderId);
-          return { ...conv, lastMessage: last?.message, lastTime: last?.created_at || latestOrder?.date } as StoreConvo;
-        })
-      );
+      const { data: messages } = await supabase
+        .from("messages")
+        .select("order_id, message, created_at")
+        .in("order_id", orders.map((order) => order.id))
+        .order("created_at", { ascending: false });
+
+      const latestMessageByStore = new Map<string, { message?: string; created_at?: string }>();
+      messages?.forEach((message) => {
+        const storeName = orderStoreMap.get(message.order_id);
+        if (!storeName || latestMessageByStore.has(storeName)) return;
+
+        latestMessageByStore.set(storeName, {
+          message: message.message,
+          created_at: message.created_at,
+        });
+      });
+
+      const convos = Array.from(storeMap.values()).map((conv) => {
+        const last = latestMessageByStore.get(conv.storeName);
+        const latestOrder = orders.find(o => o.id === conv.latestOrderId);
+        return {
+          ...conv,
+          lastMessage: last?.message,
+          lastTime: last?.created_at || latestOrder?.date,
+        } as StoreConvo;
+      });
       setConversations(convos);
     } else {
       setConversations([]);

@@ -187,13 +187,29 @@ export function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      setLikedPatterns([]);
+      setLoadingFavorites(false);
+      return;
+    }
+
+    fetchFavorites();
+  }, [user]);
+
+  useEffect(() => {
     async function fetchData() {
       try {
-        const { data: patternsData, error: pError } = await supabase
-          .from("batik_items")
-          .select("*")
-          .order("sold", { ascending: false })
-          .limit(6);
+        const [{ data: patternsData, error: pError }, { data: reviewsData, error: rError }] = await Promise.all([
+          supabase
+            .from("batik_items")
+            .select("*")
+            .order("sold", { ascending: false })
+            .limit(6),
+          supabase
+            .from("reviews")
+            .select("*")
+            .limit(4),
+        ]);
         
         let safePatterns: BatikItem[] = [];
         if (pError || !patternsData || patternsData.length === 0) {
@@ -203,11 +219,6 @@ export function HomePage() {
         }
 
         setPopularPatterns(safePatterns);
-
-        const { data: reviewsData, error: rError } = await supabase
-          .from("reviews")
-          .select("*")
-          .limit(4);
         
         if (rError) throw rError;
         const safeReviews = reviewsData || [];
@@ -230,8 +241,7 @@ export function HomePage() {
       }
     }
     fetchData();
-    fetchFavorites();
-  }, [user]);
+  }, []);
 
   const handleAddToCart = async (batik: BatikItem, quantity: number) => {
     if (!user) {

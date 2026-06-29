@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { X, Minus, Plus, Loader2, ShoppingBag } from "lucide-react";
 import { BatikItem } from "../../types/database";
+import { ImageWithFallback } from "./ImageWithFallback";
 
 // ── Pattern Renderer ────────────────────────────────────────────────────────
 export function PatternMini({ primary, secondary, bg, type }: { primary: string; secondary: string; bg: string; type: string }) {
@@ -85,10 +86,12 @@ export function BatikDetailModal({
           style={{ background: item.bg_color }}
         >
           {item.image_url ? (
-            <img 
+            <ImageWithFallback
               src={item.image_url} 
               alt={item.name} 
               className="w-full h-full object-cover md:absolute md:inset-0"
+              loading="eager"
+              fetchPriority="high"
             />
           ) : (
             <PatternMini primary={item.primary_color} secondary={item.secondary_color} bg={item.bg_color} type={patternType} />
