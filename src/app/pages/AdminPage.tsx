@@ -946,11 +946,19 @@ export function AdminPage() {
         </motion.div>
 
         {/* ── Tab Navigation ──────────────────────────────────────────── */}
-        <div className={`flex p-1 rounded-2xl w-fit transition-all duration-300 ${activeTab === "chat" ? "mb-4" : "mb-8"}`} style={{ background: "rgba(139,111,71,0.08)", border: "1px solid rgba(139,111,71,0.12)" }}>
+        <div 
+          className={`flex p-1 rounded-2xl w-fit overflow-x-auto flex-nowrap transition-all duration-300 ${activeTab === "chat" ? "mb-4" : "mb-8"}`} 
+          style={{ 
+            background: "rgba(139,111,71,0.08)", 
+            border: "1px solid rgba(139,111,71,0.12)",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none"
+          }}
+        >
           {([
             { key: "overview", label: "Ringkasan", icon: TrendingUp },
             { key: "orders", label: "Pesanan", icon: Package, count: stats.activeOrders },
-            { key: "chat", label: "Chat & Negosiasi", icon: MessageCircle, count: stats.negotiating },
+            { key: "chat", label: "Chat", icon: MessageCircle, count: stats.negotiating },
           ] as { key: AdminTab; label: string; icon: any; count?: number }[]).map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -958,7 +966,7 @@ export function AdminPage() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className="relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                className="relative flex items-center gap-1.5 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex-shrink-0"
                 style={{ color: isActive ? "#3D2B1F" : "#9E8E82" }}
               >
                 {isActive && (
@@ -990,7 +998,7 @@ export function AdminPage() {
           {activeTab === "overview" && (
             <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
               {/* Stats Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
                   { label: "Total Pendapatan", value: formatCurrency(stats.totalRevenue), icon: DollarSign, color: "#16A34A", sub: "Dari pesanan lunas" },
                   { label: "Pesanan Aktif", value: stats.activeOrders, icon: Package, color: "#3B82F6", sub: "Diproses + Dikirim" },
@@ -1079,7 +1087,10 @@ export function AdminPage() {
               </div>
 
               {/* Filter Tabs */}
-              <div className="flex gap-2 flex-wrap mb-5">
+              <div 
+                className="flex gap-2 overflow-x-auto pb-2 mb-5 flex-nowrap -mx-4 px-4 sm:mx-0 sm:px-0"
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
                 {([
                   { key: "all", label: "Semua", count: orders.length },
                   { key: "unpaid", label: "Belum Dibayar", count: stats.unpaid },
@@ -1094,7 +1105,7 @@ export function AdminPage() {
                   const isHighlighted = f.highlight && f.count > 0;
                   return (
                     <button key={f.key} onClick={() => setOrderFilter(f.key)}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${isHighlighted && !isActive ? "animate-pulse" : ""}`}
+                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex-shrink-0 ${isHighlighted && !isActive ? "animate-pulse" : ""}`}
                       style={{
                         background: isActive
                           ? "#3D2B1F"
@@ -1770,11 +1781,11 @@ export function AdminPage() {
               <AnimatePresence>
                 {activeConvo && showDetailPanel && (
                   <motion.div
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: "320px", opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 260, damping: 26 }}
-                    className="hidden lg:flex flex-col bg-white border-l border-[#D4B88B]/10 overflow-hidden flex-shrink-0 h-full"
+                    initial={{ x: "100%", opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: "100%", opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="flex flex-col bg-white border-l border-[#D4B88B]/10 overflow-hidden flex-shrink-0 h-full absolute lg:relative right-0 top-0 z-30 shadow-2xl lg:shadow-none w-[280px] sm:w-[320px]"
                   >
                     <div className="p-4 flex-shrink-0 bg-[#FAF8F5] border-b border-[#D4B88B]/10 flex items-center justify-between">
                       <h4 className="font-bold text-xs uppercase tracking-wider" style={{ color: "#3D2B1F" }}>

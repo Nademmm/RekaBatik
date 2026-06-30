@@ -298,7 +298,7 @@ export function CatalogPage() {
                             handleAddToCart(item, 1);
                           }}
                           className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl hover:bg-[#8B6F47] hover:text-white transition-all"
-                          style={{ background: "#FAF8F5", color: "#8B6F47" }}
+                          style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", color: "white" }}
                           title="Tambah ke Keranjang"
                         >
                           <ShoppingBag className="w-3.5 sm:w-4.5 h-3.5 sm:h-4.5" />

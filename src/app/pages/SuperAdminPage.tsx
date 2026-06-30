@@ -212,7 +212,7 @@ export function SuperAdminPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 border-t pt-4" style={{ borderColor: "rgba(212,184,139,0.15)" }}>
+                <div className="flex flex-col sm:flex-row gap-2 border-t pt-4" style={{ borderColor: "rgba(212,184,139,0.15)" }}>
                   {store.status !== "approved" && (
                     <motion.button
                       whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}

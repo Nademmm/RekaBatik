@@ -641,18 +641,8 @@ const SidebarTabs = memo(({
                     style={{ borderColor: "rgba(139,111,71,0.06)", boxShadow: "inset 0 1px 3px rgba(139,111,71,0.02)" }}>
                     {renderMiniPattern(pattern)}
                   </div>
-                  <div style={{ color: "#3D2B1F", fontSize: "0.85rem", fontWeight: 700, marginBottom: "2px" }} className="group-hover:text-[#8B6F47] transition-colors">
+                  <div style={{ color: "#3D2B1F", fontSize: "0.85rem", fontWeight: 700, marginBottom: "2px", textAlign: "center" }} className="group-hover:text-[#8B6F47] transition-colors text-center">
                     {pattern.name}
-                  </div>
-                  <div style={{ color: "#8E7F72", fontSize: "0.725rem", lineHeight: 1.4, flex: 1 }} className="line-clamp-2">
-                    {pattern.description}
-                  </div>
-                  <div className="mt-2 text-[10px] font-bold tracking-wider uppercase flex items-center gap-1 text-[#8B6F47]">
-                    {isMultiSelectMode ? (
-                      isSelected ? (<><CheckCircle2 className="w-3 h-3" /> Terpilih</>) : (<><Plus className="w-3 h-3" /> Pilih motif ini</>)
-                    ) : (
-                      <><Plus className="w-3 h-3" /> Tambah atau seret ke kanvas</>
-                    )}
                   </div>
                 </button>
               );
@@ -3992,6 +3982,13 @@ export function CustomBatikPage() {
 
                         <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
 
+                        <button onClick={() => setIsFullMode(true)} title="Mode Layar Penuh" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
+                          <Maximize2 style={{ width: "13px", height: "13px" }} />
+                        </button>
+
+                        <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+
                         {/* [OPT-1] Uncontrolled color picker — no setState on drag, only DOM updates */}
                         <div className="relative flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer hover:bg-white transition-all" title="Warna latar kanvas">
                           {/* Swatch updated directly via ref */}
@@ -4043,12 +4040,6 @@ export function CustomBatikPage() {
                         </button>
                         <button onClick={handleSaveAndShowModal} disabled={isSaving} title="Simpan desain" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
                           {isSaving ? <Loader2 style={{ width: "13px", height: "13px" }} className="animate-spin" /> : <Save style={{ width: "13px", height: "13px" }} />}
-                        </button>
-
-                        <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
-
-                        <button onClick={() => setIsFullMode(true)} title="Mode Layar Penuh" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
-                          <Maximize2 style={{ width: "13px", height: "13px" }} />
                         </button>
                       </div>
                     </div>
@@ -4639,21 +4630,6 @@ export function CustomBatikPage() {
                                     </button>
                                   );
                                 })()}
-                                {/* Pattern color shortcut */}
-                                {selectedObjectType === "pattern" && (
-                                  <>
-                                    <div style={{ height: 1, background: "rgba(255,255,255,0.10)", margin: "2px 0" }} />
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setActiveTab("color"); setShowObjectMenu(false); }}
-                                      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: "#E8E1DA", width: "100%", textAlign: "left" }}
-                                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
-                                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                                    >
-                                      <Palette style={{ width: 13, height: 13, flexShrink: 0 }} />
-                                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#D4B88B" }}>Ganti warna →</span>
-                                    </button>
-                                  </>
-                                )}
                               </motion.div>
                             )}
                           </AnimatePresence>
