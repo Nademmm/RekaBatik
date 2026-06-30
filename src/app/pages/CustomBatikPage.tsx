@@ -1010,7 +1010,7 @@ export function CustomBatikPage() {
   const [shapeType, setShapeType] = useState<ShapeType>("rect");
   const [shapeFill, setShapeFill] = useState("#8B6F47");
   const [shapeStroke, setShapeStroke] = useState("#3D2B1F");
-  const [shapeStrokeWidth, setShapeStrokeWidth] = useState(2);
+  const [shapeStrokeWidth, setShapeStrokeWidth] = useState(0);
   const [shapeOpacity, setShapeOpacity] = useState(100);
   const [textColor, setTextColor] = useState("#3D2B1F");
   const [fontSize, setFontSize] = useState(32);
@@ -1054,6 +1054,7 @@ export function CustomBatikPage() {
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef<number>(-1);
   const isRestoringRef = useRef(false);
+  const skipAutoTabSwitchRef = useRef(false);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
@@ -1095,7 +1096,7 @@ export function CustomBatikPage() {
   const shapeTypeRef = useRef<ShapeType>("rect");
   const shapeFillRef = useRef("#8B6F47");
   const shapeStrokeRef = useRef("#3D2B1F");
-  const shapeStrokeWidthRef = useRef(2);
+  const shapeStrokeWidthRef = useRef(0);
   const shapeOpacityRef = useRef(100);
   const textColorRef = useRef("#3D2B1F");
   const fontSizeRef = useRef(32);
@@ -2110,10 +2111,10 @@ export function CustomBatikPage() {
       const target = (e as any).target;
       if (!target) { setSelectedObject(null); setSelectedObjectType(null); return; }
       setSelectedObject(target);
-      setSelectedObjectType(detectObjectType(target)); // [OPT-2]
+      const objType = detectObjectType(target);
+      setSelectedObjectType(objType); // [OPT-2]
       if (target?.data?.layerId) {
         setSelectedLayerId(target.data.layerId);
-        setActiveTab("layer");
         if (target.data.colorPresetName) {
           const foundPreset = colorPresets.find((p) => p.name === target.data.colorPresetName);
           if (foundPreset) setSelectedPreset(foundPreset);
@@ -2125,10 +2126,10 @@ export function CustomBatikPage() {
       const target = (e as any).target;
       if (!target) { setSelectedObject(null); setSelectedObjectType(null); return; }
       setSelectedObject(target);
-      setSelectedObjectType(detectObjectType(target)); // [OPT-2]
+      const objType = detectObjectType(target);
+      setSelectedObjectType(objType); // [OPT-2]
       if (target?.data?.layerId) {
         setSelectedLayerId(target.data.layerId);
-        setActiveTab("layer");
         if (target.data.colorPresetName) {
           const foundPreset = colorPresets.find((p) => p.name === target.data.colorPresetName);
           if (foundPreset) setSelectedPreset(foundPreset);
@@ -2142,21 +2143,14 @@ export function CustomBatikPage() {
       if (lastMousedownInCanvasRef.current) setSelectedLayerId(null);
     });
 
-    // [OPT-5-FIX] mouse:down — still needed alongside object:selected/selection:updated.
-    // Fabric does NOT re-fire object:selected/selection:updated when clicking an object
-    // that is already the active object (e.g. switching tool back to "select" and
-    // clicking the same already-selected item). Without this, selectedObjectType can
-    // go stale/null and the edit panel (fill/stroke/text controls) stops appearing.
-    // Kept thin: just syncs state via the centralized detectObjectType helper (OPT-2),
-    // no redefinition of detection logic like the old version had.
     canvas.on("mouse:down", (e) => {
       if (e.target) {
         // isDraggingObjectRef.current = true; // start tracking for potential follow
         setSelectedObject(e.target);
-        setSelectedObjectType(detectObjectType(e.target));
+        const objType = detectObjectType(e.target);
+        setSelectedObjectType(objType);
         if (e.target.data?.layerId) {
           setSelectedLayerId(e.target.data.layerId);
-          setActiveTab("layer");
         }
       } else {
         setSelectedObject(null);
@@ -2724,7 +2718,6 @@ export function CustomBatikPage() {
       setSelectedLayerId(newLayerId);
       setSelectedObject(finalShape);
       setSelectedObjectType("shape");
-      setActiveTab("layer");
       saveSnapshot();
     };
 
@@ -2795,8 +2788,9 @@ export function CustomBatikPage() {
     fc.on("mouse:move", onPanMouseMove);
     fc.on("mouse:up", onPanMouseUp);
 
-    // [MOBILE-PAN] Touch pan untuk mobile — Fabric intercept touch events
-    // tapi tidak handle pan, jadi kita pasang listener langsung di canvas wrapper
+    // [MOBILE-PAN + PINCH-ZOOM] Touch pan untuk mobile & pinch-to-zoom dengan 2 jari
+    // Fabric intercept touch events tapi tidak handle pan/zoom,
+    // jadi kita pasang listener langsung di canvas wrapper
     const fabricEl = fc.getElement();
     const fabricWrapper = fabricEl?.parentElement;
     const panTarget = fabricWrapper ?? fabricEl;
@@ -2807,10 +2801,36 @@ export function CustomBatikPage() {
     let touchOnObject = false;
     const PAN_THRESHOLD = 8;
 
+    // Pinch-to-zoom state
+    let lastPinchDist = 0;
+    let isPinching = false;
+
+    const getTouchDist = (t: TouchList) => {
+      const dx = t[0].clientX - t[1].clientX;
+      const dy = t[0].clientY - t[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const getTouchMidpoint = (t: TouchList, rect: DOMRect) => {
+      return {
+        x: ((t[0].clientX + t[1].clientX) / 2) - rect.left,
+        y: ((t[0].clientY + t[1].clientY) / 2) - rect.top,
+      };
+    };
+
     const onTouchPanStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        // Start pinch
+        isPinching = true;
+        touchPanActive = false;
+        lastPinchDist = getTouchDist(e.touches);
+        return;
+      }
+
       if (activeToolRef.current !== "select") return;
       if (e.touches.length !== 1) return;
 
+      isPinching = false;
       const touch = e.touches[0];
       touchPanStart = { x: touch.clientX, y: touch.clientY };
       touchMoved = false;
@@ -2827,6 +2847,46 @@ export function CustomBatikPage() {
     };
 
     const onTouchPanMove = (e: TouchEvent) => {
+      // Pinch-to-zoom with 2 fingers
+      if (e.touches.length === 2 && isPinching) {
+        e.preventDefault();
+        const newDist = getTouchDist(e.touches);
+        if (lastPinchDist === 0) {
+          lastPinchDist = newDist;
+          return;
+        }
+        const distDelta = newDist - lastPinchDist;
+        lastPinchDist = newDist;
+
+        // Only zoom if meaningful movement
+        if (Math.abs(distDelta) < 1) return;
+
+        const rect = (panTarget as HTMLElement).getBoundingClientRect();
+        const mid = getTouchMidpoint(e.touches, rect);
+
+        // Convert screen midpoint to canvas coordinates
+        const vpt = fc.viewportTransform;
+        const zoom = fc.getZoom();
+        if (!vpt) return;
+
+        // Scale factor: distDelta per 200px = 1 zoom level step
+        const zoomDelta = (distDelta / 200) * 50;
+        const newZoom = Math.max(50, Math.min(300, zoomLevelRef.current + zoomDelta));
+
+        const snapped = Math.round(newZoom / 5) * 5;
+        zoomLevelRef.current = snapped;
+        setZoomLevel(snapped);
+
+        const scale = getEffectiveZoom(snapped);
+        fc.zoomToPoint(new fabric.Point(mid.x, mid.y), scale);
+        if (fc.viewportTransform) {
+          fc.setViewportTransform(clampViewport(fc.viewportTransform));
+        }
+        fc.requestRenderAll();
+        return;
+      }
+
+      // Single-finger pan
       if (!touchPanActive || e.touches.length !== 1) return;
       if (activeToolRef.current !== "select") return;
       if (touchOnObject) return;
@@ -2850,10 +2910,16 @@ export function CustomBatikPage() {
       e.preventDefault();
     };
 
-    const onTouchPanEnd = () => {
-      touchPanActive = false;
-      touchMoved = false;
-      touchOnObject = false;
+    const onTouchPanEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        isPinching = false;
+        lastPinchDist = 0;
+      }
+      if (e.touches.length === 0) {
+        touchPanActive = false;
+        touchMoved = false;
+        touchOnObject = false;
+      }
     };
 
     if (panTarget) {
@@ -3154,13 +3220,17 @@ export function CustomBatikPage() {
           img.setCoords();
           const newLayerId = Date.now().toString();
           (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: selectedPreset.name, customColor: customColor, originalSvg: getBatikSvg(pattern.style_type) || null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
+          
+          skipAutoTabSwitchRef.current = true;
           fc.add(img); img.setCoords(); fc.setActiveObject(img); fc.requestRenderAll();
           setLayers((prev) => [...prev, { id: newLayerId, type: 'pattern', name: pattern.name || 'Motif', visible: true, locked: false, fabricObject: img }]);
           setSelectedLayerId(newLayerId);
           setSelectedObject(img);
           setSelectedObjectType("pattern");
-          setActiveTab("layer");
           saveSnapshot();
+          setTimeout(() => {
+            skipAutoTabSwitchRef.current = false;
+          }, 50);
         });
       })
       .catch(() => { toast.error('Gagal memuat motif SVG'); });
@@ -3580,6 +3650,7 @@ export function CustomBatikPage() {
         originalHeight: rawH,
       };
 
+      skipAutoTabSwitchRef.current = true;
       fc.add(img);
       img.setCoords();
       fc.setActiveObject(img);
@@ -3599,8 +3670,10 @@ export function CustomBatikPage() {
       setSelectedLayerId(newLayerId);
       setSelectedObject(img);
       setSelectedObjectType("pattern");
-      setActiveTab("layer");
       saveSnapshot();
+      setTimeout(() => {
+        skipAutoTabSwitchRef.current = false;
+      }, 50);
     });
   }, [saveSnapshot, getSpawnPoint]);
 
@@ -3635,7 +3708,6 @@ export function CustomBatikPage() {
     setSelectedLayerId(newLayerId);
     setSelectedObject(text);
     setSelectedObjectType("text");
-    setActiveTab("layer");
     setActiveTool("select"); // auto-switch to select like Canva
 
     // Save spawn state to canvas history BEFORE entering edit mode 
@@ -4047,9 +4119,30 @@ export function CustomBatikPage() {
                             <span className="hidden sm:inline text-[10px] text-[#A89B8F] italic flex-shrink-0">Klik 2x untuk edit teks</span>
                           </div>
                         ) : selectedObjectType === "pattern" ? (
-                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium" style={{ background: "rgba(139,111,71,0.07)", border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}>
-                            <Palette style={{ width: "12px", height: "12px", flexShrink: 0 }} />
-                            <span>Motif dipilih — ganti warna via tab Preset di sidebar kanan</span>
+                          <div className="flex items-center gap-2">
+                            <Palette style={{ width: "12px", height: "12px", color: "#8B6F47", flexShrink: 0 }} />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none hidden sm:inline">Warna</span>
+                            <div className="flex items-center gap-1.5">
+                              {colorPresets.map((preset) => (
+                                <button
+                                  key={preset.name}
+                                  title={preset.name}
+                                  onClick={() => setSelectedPreset(preset)}
+                                  className="rounded-full transition-all hover:scale-110 cursor-pointer flex-shrink-0"
+                                  style={{
+                                    width: selectedPreset.name === preset.name ? "20px" : "16px",
+                                    height: selectedPreset.name === preset.name ? "20px" : "16px",
+                                    background: preset.colors.primary,
+                                    border: `${selectedPreset.name === preset.name ? "2.5" : "1.5"}px solid ${selectedPreset.name === preset.name ? "#3D2B1F" : "rgba(0,0,0,0.12)"}`,
+                                    boxShadow: selectedPreset.name === preset.name ? "0 2px 6px rgba(0,0,0,0.15)" : "none",
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <div className="h-4 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                            <div className="relative rounded-full cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: "20px", height: "20px", border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)" }}>
+                              <input type="color" value={customColor} onChange={(e) => { setCustomColor(e.target.value); setSelectedPreset({ name: "Custom", colors: { primary: e.target.value, secondary: e.target.value, accent: e.target.value, background: "transparent" }, batik: { background: "#f3f3f3", light: e.target.value, mid: e.target.value, dark: e.target.value } }); }} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                            </div>
                           </div>
                         ) : null}
                       </div>
@@ -4219,7 +4312,7 @@ export function CustomBatikPage() {
                       background: canvasBackground,
                       boxShadow: isDragOverCanvas ? "inset 0 0 0 3px #8B6F47" : undefined,
                       transition: "box-shadow 0.15s ease",
-                      touchAction: "manipulation",
+                      touchAction: "none",
                     }}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -4344,7 +4437,7 @@ export function CustomBatikPage() {
                     )}
 
                     {/* Floating context toolbar — Canva-style, appears above selected object */}
-                    {selectedObject && activeTool === "select" && !isDraggingObjectRef.current && (() => {
+                    {selectedObject && (activeTool === "select" || activeTool === "shape") && !isDraggingObjectRef.current && (() => {
                       // Trigger re-render when toolbarUpdate changes
                       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
                       toolbarUpdate;
@@ -4725,12 +4818,38 @@ export function CustomBatikPage() {
       <AnimatePresence>
         {isFullMode && (
           <>
-            {activeTool !== "select" && (
+            {(activeTool !== "select" || (activeTool === "select" && selectedObjectType === "pattern")) && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
                 className="fixed bottom-23 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 transform-none sm:transform z-[101] flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full shadow-2xl backdrop-blur-md overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                 style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(212,184,139,0.25)" }}
               >
+                {activeTool === "select" && selectedObjectType === "pattern" && (
+                  <>
+                    <Palette style={{ width: 13, height: 13, color: "#8B6F47", flexShrink: 0 }} />
+                    <div className="flex items-center gap-1.5">
+                      {colorPresets.map((preset) => (
+                        <button
+                          key={preset.name}
+                          title={preset.name}
+                          onClick={() => setSelectedPreset(preset)}
+                          className="rounded-full transition-all hover:scale-110 cursor-pointer flex-shrink-0"
+                          style={{
+                            width: selectedPreset.name === preset.name ? 18 : 14,
+                            height: selectedPreset.name === preset.name ? 18 : 14,
+                            background: preset.colors.primary,
+                            border: `${selectedPreset.name === preset.name ? "2.5" : "1.5"}px solid ${selectedPreset.name === preset.name ? "#3D2B1F" : "rgba(0,0,0,0.12)"}`,
+                            boxShadow: selectedPreset.name === preset.name ? "0 2px 6px rgba(0,0,0,0.2)" : "none",
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div className="h-4 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                    <div className="relative rounded-full cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: 18, height: 18, border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
+                      <input type="color" value={customColor} onChange={(e) => { setCustomColor(e.target.value); setSelectedPreset({ name: "Custom", colors: { primary: e.target.value, secondary: e.target.value, accent: e.target.value, background: "transparent" }, batik: { background: "#f3f3f3", light: e.target.value, mid: e.target.value, dark: e.target.value } }); }} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                    </div>
+                  </>
+                )}
                 {activeTool === "brush" && (
                   <>
                     <div className="flex items-center gap-1.5">

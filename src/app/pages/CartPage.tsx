@@ -432,7 +432,7 @@ export function CartPage() {
             type: bItem?.category || "custom",
             primary_color: bItem?.primary_color || "#3D2B1F",
             secondary_color: bItem?.secondary_color || "#D4B88B",
-            bg_color: bItem?.bg_color || cData?.canvasThumbnail || cData?.canvasBackground || restoredData?.bg_color || "#FAF8F5",
+            bg_color: bItem?.image_url || cData?.canvasThumbnail || cData?.canvasBackground || restoredData?.bg_color || "#FAF8F5",
             artisan: hasCustomItems && store ? store.name : "RekaBatik Artisan",
             can_review: false,
             reviewed: false,

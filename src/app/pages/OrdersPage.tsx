@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
+import { resolveCatalogImageUrl } from "../constants/batikCatalog";
 import { Order } from "../../types/database";
 import { Skeleton } from "../components/ui/skeleton";
 import { useAuth } from "../../lib/AuthContext";
@@ -321,6 +322,9 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
   onPay: (order: Order) => void;
   onReview?: (order: Order) => void;
 }) {
+  const displayImage = order.bg_color ? resolveCatalogImageUrl(order.bg_color) : null;
+  const isImage = !!(displayImage && !displayImage.startsWith("#"));
+
   const sc = (statusConfig as any)[order.status] || statusConfig.processing;
   const [confirming, setConfirming] = useState(false);
   const [buyingAgain, setBuyingAgain] = useState(false);
@@ -399,14 +403,14 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
           <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-stone-100">
             <div className="flex gap-3.5 items-start">
               <div
-                className={`w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 flex items-center justify-center border border-stone-200 ${order.bg_color?.startsWith("data:image") ? "cursor-zoom-in hover:opacity-90" : ""}`}
-                style={{ background: order.bg_color?.startsWith("data:image") ? undefined : order.bg_color }}
-                onClick={() => { if (order.bg_color?.startsWith("data:image")) onViewFullPreview(order.bg_color, order.item); }}
+                className={`w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 flex items-center justify-center border border-stone-200 ${isImage ? "cursor-zoom-in hover:opacity-90" : ""}`}
+                style={{ background: isImage ? undefined : order.bg_color }}
+                onClick={() => { if (isImage && displayImage) onViewFullPreview(displayImage, order.item); }}
               >
-                {order.bg_color?.startsWith("data:image") ? (
-                  <img src={order.bg_color} alt={order.item} className="w-full h-full object-cover" />
+                {isImage && displayImage ? (
+                  <img src={displayImage} alt={order.item} className="w-full h-full object-cover" />
                 ) : (
-                  <PatternMini primary={order.primary_color} secondary={order.secondary_color} bg={order.bg_color} type={order.type} />
+                  <PatternMini primary={order.primary_color} secondary={order.secondary_color} bg={order.bg_color || "#FAF8F5"} type={order.type} />
                 )}
               </div>
               <div className="flex-1 min-w-0 pt-0.5">
@@ -964,6 +968,9 @@ export function OrdersPage() {
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6 w-full">
             {filtered.map((order, idx) => {
+              const displayImage = order.bg_color ? resolveCatalogImageUrl(order.bg_color) : null;
+              const isImage = !!(displayImage && !displayImage.startsWith("#"));
+
               const isExpired = order.payment_status === "pending" && order.status !== "cancelled" && new Date(order.date).getTime() + 86400000 < Date.now();
               const isUnpaid = order.payment_status === "pending" && order.total > 0 && order.status !== "negotiating" && order.status !== "cancelled" && !isExpired;
 
@@ -1014,23 +1021,23 @@ export function OrdersPage() {
                   <div className="p-3 sm:p-6 flex flex-col gap-3 sm:gap-5 items-start">
                     {/* Image / Canvas Thumbnail */}
                     <div
-                      className={`relative w-full aspect-[4/3] sm:aspect-square lg:aspect-video rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-stone-100 bg-stone-50/80 group/thumb ${order.bg_color?.startsWith("data:image") ? "cursor-zoom-in hover:opacity-90" : ""}`}
+                      className={`relative w-full aspect-[4/3] sm:aspect-square lg:aspect-video rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-stone-100 bg-stone-50/80 group/thumb ${isImage ? "cursor-zoom-in hover:opacity-90" : ""}`}
                       onClick={(e) => {
-                        if (order.bg_color?.startsWith("data:image")) {
+                        if (isImage && displayImage) {
                           e.stopPropagation();
-                          setPreviewImage({ src: order.bg_color, title: order.item });
+                          setPreviewImage({ src: displayImage, title: order.item });
                         }
                       }}
                     >
-                      {order.bg_color?.startsWith("data:image") ? (
+                      {isImage && displayImage ? (
                         <>
-                          <img src={order.bg_color} alt={order.item} className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-105" />
+                          <img src={displayImage} alt={order.item} className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-105" />
                           <div className="absolute inset-0 bg-black/10 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white">
                             <Search className="w-4 h-4" />
                           </div>
                         </>
                       ) : (
-                        <PatternMini primary={order.primary_color} secondary={order.secondary_color} bg={order.bg_color} type={order.type} />
+                        <PatternMini primary={order.primary_color} secondary={order.secondary_color} bg={order.bg_color || "#FAF8F5"} type={order.type} />
                       )}
                     </div>
 
