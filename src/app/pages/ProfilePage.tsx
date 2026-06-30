@@ -2166,16 +2166,16 @@ export function ProfilePage() {
                     sub: "Balas dalam beberapa menit",
                   },
                   {
-                    href: "mailto:info@rekabatik.id",
+                    href: "mailto:rekabatik@gmail.com",
                     icon: <Mail className="w-5 h-5" />,
                     title: "Email Kami",
-                    sub: "info@rekabatik.id",
+                    sub: "rekabatik@gmail.com",
                   },
                   {
-                    href: "https://wa.me/6281200000000",
+                    href: "https://wa.me/6285143898545",
                     icon: <Phone className="w-5 h-5" />,
                     title: "WhatsApp",
-                    sub: "+62 812-0000-0000",
+                    sub: "+62 851-4389-8545",
                   },
                 ].map((c) => (
                   <a

@@ -116,7 +116,7 @@ export function PrivacyPolicyPage() {
             </p>
             <p className="bg-[#FAF8F5] p-4 rounded-xl border border-dashed text-xs">
               <strong>Tim Dukungan RekaBatik</strong><br />
-              Email: info@rekabatik.id<br />
+              Email: rekabatik@gmail.com<br />
               Alamat: Desa Jetis, Sidoarjo, Jawa Timur, Indonesia
             </p>
           </div>

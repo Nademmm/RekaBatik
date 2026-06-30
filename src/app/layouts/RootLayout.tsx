@@ -956,7 +956,7 @@ export function RootLayout() {
             className="flex flex-col md:flex-row items-center justify-between gap-4"
           >
             <p className="text-center md:text-left" style={{ color: "rgba(250,248,245,0.45)", fontSize: "0.9rem" }}>
-              © 2026 RekaBatik. Warisan Budaya, Karya Makna.
+              © 2026 RekaBatik. Reka Desainmu, Lestarikan Budayamu!
             </p>
             
             <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-6 gap-y-2">
