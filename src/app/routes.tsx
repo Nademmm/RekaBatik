@@ -20,13 +20,6 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: HomePage },
       {
-        path: "custom",
-        lazy: () =>
-          import("./pages/CustomBatikPage").then((module) => ({
-            Component: module.CustomBatikPage,
-          })),
-      },
-      {
         path: "catalog",
         lazy: () =>
           import("./pages/CatalogPage").then((module) => ({
@@ -72,6 +65,13 @@ export const router = createBrowserRouter([
       {
         Component: ProtectedRoute,
         children: [
+          {
+            path: "custom",
+            lazy: () =>
+              import("./pages/CustomBatikPage").then((module) => ({
+                Component: module.CustomBatikPage,
+              })),
+          },
           {
             path: "orders",
             lazy: () =>

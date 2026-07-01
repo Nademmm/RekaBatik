@@ -313,6 +313,13 @@ const colorPresets = [
   },
 ];
 
+const blackPreset = {
+  name: "Hitam",
+  colors: { primary: "#000000", secondary: "#333333", accent: "#666666", background: "transparent" },
+  batik: { background: "#ffffff", light: "#cccccc", mid: "#666666", dark: "#000000" }
+};
+
+
 const recolorSVG = (svgString: string, preset: typeof colorPresets[0]) => {
   let result = svgString;
   result = result.replace(/<path(?=[\s>])(?!.*\sfill=)/g, '<path fill="#000000"');
@@ -404,22 +411,23 @@ function makeStarPoints(cx: number, cy: number, numPoints: number, outerR: numbe
 function detectObjectType(target: fabric.Object): "pattern" | "shape" | "text" | null {
   if (!target) return null;
   
-  // Handle ActiveSelection (multiple objects)
-  if (target.type === "activeSelection" && (target as fabric.ActiveSelection).getObjects) {
-    const objects = (target as fabric.ActiveSelection).getObjects();
+  // Handle ActiveSelection or Group (multiple objects)
+  if ((target.type === "activeSelection" || target.type === "group") && (target as any).getObjects) {
+    const objects = (target as any).getObjects();
     if (objects.length === 0) return null;
     
     // Check if all objects have the same type
     const firstType = detectObjectType(objects[0]);
-    if (firstType && objects.every(obj => detectObjectType(obj) === firstType)) {
+    if (firstType && objects.every((obj: fabric.Object) => detectObjectType(obj) === firstType)) {
       return firstType;
     }
-    return null;
+    // Default to pattern if mixed or cannot decide, so user can still recolor
+    return "pattern";
   }
 
   const ctorName = target.constructor?.name?.toLowerCase() ?? "";
   if (ctorName.includes("text") || target.type === "i-text" || target.type === "text") return "text";
-  if (ctorName.includes("image") || target.type === "image") return "pattern";
+  if (ctorName.includes("image") || target.type === "image" || (target as any).data?.patternId) return "pattern";
   if (
     ctorName.includes("rect") ||
     ctorName.includes("ellipse") ||
@@ -469,7 +477,7 @@ interface SidebarTabsProps {
   // on every frame while dragging the custom color picker.
   onCustomColorCommit: (c: string, skipPresetRegen?: boolean) => void;
   addItemToCanvas: (pattern: BatikItem) => void;
-  renderMiniPattern: (pattern: BatikItem, presetName?: string) => React.ReactNode;
+  renderMiniPattern: (pattern: BatikItem, presetName?: string, customColor?: string) => React.ReactNode;
   layers: CustomLayer[];
   selectedLayerId: string | null;
   setSelectedLayerId: (id: string | null) => void;
@@ -519,6 +527,9 @@ const SidebarTabs = memo(({
   // happens once on mouse-release via the input's onChange.
   const customColorInputRef = useRef<HTMLInputElement>(null);
   const customColorTextRef = useRef<HTMLSpanElement>(null);
+  // Debounce timer ref — so onChange (which fires on every drag tick in Chrome)
+  // only commits to React state once, 120 ms after the user stops dragging.
+  const colorCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // [OPT-1b] Keep the uncontrolled input in sync when customColor changes from
   // elsewhere (e.g. user clicks a built-in preset, which also updates customColor).
@@ -608,7 +619,7 @@ const SidebarTabs = memo(({
               const isSelected = selectedPatternIds.has(pattern.id);
               return (
                 <button
-                  key={pattern.id + "-" + selectedPreset.name}
+                 key={pattern.id}
                   onClick={() => {
                     if (isMultiSelectMode) togglePatternSelection(pattern.id);
                     else addItemToCanvas(pattern);
@@ -670,7 +681,7 @@ const SidebarTabs = memo(({
       <TabsContent value="color" className="p-5 m-0 max-h-[420px] sm:max-h-[520px] lg:max-h-[650px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: "#FFFFFF" }}>
         <div className="flex items-center gap-2 mb-4 px-1">
           <Palette className="w-4 h-4 text-[#8B6F47]" />
-          <p style={{ color: "#7A6B5E", fontSize: "0.8rem", fontWeight: 500 }}>Pilih palet warna (klik motif di kanvas dulu):</p>
+          <p style={{ color: "#7A6B5E", fontSize: "0.8rem", fontWeight: 500 }}>Pilih palet warna motif yang tersedia:</p>
         </div>
         <div className="mb-6 p-4 rounded-2xl border bg-[#FAF8F5]" style={{ borderColor: "rgba(139,111,71,0.12)" }}>
           <div className="flex items-center gap-2 mb-3 px-1">
@@ -686,12 +697,23 @@ const SidebarTabs = memo(({
                   ref={customColorInputRef}
                   defaultValue={customColor}
                   // [OPT-1b] onInput fires on every drag tick — update DOM text only, no setState
-                  onInput={(e) => {
+                 onInput={(e) => {
                     const v = (e.target as HTMLInputElement).value;
                     if (customColorTextRef.current) customColorTextRef.current.textContent = v;
                   }}
-                  // [OPT-1b] onChange fires once on mouse-release — commit to React state here
-                  onChange={(e) => onCustomColorCommit(e.target.value)}
+                  // onChange fires on every tick in Chrome's color picker.
+                  // Debounce: only commit to React state 120ms after dragging stops.
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    // Update DOM preview immediately (no re-render)
+                    if (customColorTextRef.current) customColorTextRef.current.textContent = v;
+                    // Debounce the expensive React state update
+                    if (colorCommitTimerRef.current) clearTimeout(colorCommitTimerRef.current);
+                    colorCommitTimerRef.current = setTimeout(() => {
+                      onCustomColorCommit(v);
+                      colorCommitTimerRef.current = null;
+                    }, 150);
+                  }}
                   className="w-full h-full rounded-lg border cursor-pointer"
                   style={{ borderColor: "rgba(139,111,71,0.12)" }}
                 />
@@ -780,7 +802,8 @@ const SidebarTabs = memo(({
                         ) : layer.type === "pattern" ? (
                           renderMiniPattern(
                             patterns.find((p) => p.id === (layer.fabricObject as any)?.data?.patternId) || patterns[0],
-                            (layer.fabricObject as any)?.data?.colorPresetName
+                            (layer.fabricObject as any)?.data?.colorPresetName,
+                            (layer.fabricObject as any)?.data?.customColor
                           )
                         ) : (
                           <div className="flex items-center justify-center w-full h-full">
@@ -927,6 +950,8 @@ export function CustomBatikPage() {
   const [canRedo, setCanRedo] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState(colorPresets[0]);
   const [customColor, setCustomColor] = useState(colorPresets[0].colors.primary);
+  const [sidebarPreset, setSidebarPreset] = useState(blackPreset);
+  const [sidebarCustomColor, setSidebarCustomColor] = useState("#000000");
   const [activeTab, setActiveTab] = useState("pattern");
 
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -958,39 +983,31 @@ export function CustomBatikPage() {
       const fc = fabricCanvasRef.current;
       if (!fc) return next;
 
+      fc.discardActiveObject();
       if (next) {
-        // Masuk mode pilih banyak: matikan selection Fabric biasa 
-        fc.discardActiveObject();
+        // Masuk mode pilih banyak: matikan selection Fabric, selectable pada objek
+        // Kita biarkan evented=true agar findTarget bisa mendeteksi klik
         fc.selection = false;
         fc.defaultCursor = "pointer";
-        fc.hoverCursor = "pointer";
         fc.forEachObject((obj) => {
+          (obj as any)._oldSelectable = obj.selectable;
           obj.selectable = false;
-          obj.evented = true; // tetap bisa di-detect klik 
         });
-        fc.requestRenderAll();
-        setCanvasSelectedIds(new Set());
       } else {
-        // Keluar mode pilih banyak: kembalikan ke select normal 
+        // Keluar mode pilih banyak: kembalikan ke select normal
         fc.selection = true;
         fc.defaultCursor = "default";
-        fc.hoverCursor = "move";
         fc.forEachObject((obj) => {
-          // Restore opacity jika ada 
-          if ((obj as any)._savedOpacity !== undefined) {
-            obj.set({ opacity: (obj as any)._savedOpacity });
-            delete (obj as any)._savedOpacity;
+          if ((obj as any)._oldSelectable !== undefined) {
+            obj.selectable = (obj as any)._oldSelectable;
+            delete (obj as any)._oldSelectable;
+          } else {
+            obj.selectable = true;
           }
-
-          const layerId = (obj as any).data?.layerId;
-          if (!layerId) return;
-          obj.selectable = true;
-          obj.evented = true;
         });
-        fc.discardActiveObject();
-        fc.requestRenderAll();
-        setCanvasSelectedIds(new Set());
       }
+      fc.requestRenderAll();
+      setCanvasSelectedIds(new Set());
       return next;
     });
   }, []);
@@ -1116,6 +1133,8 @@ export function CustomBatikPage() {
   const bgColorRef = useRef("#ffffff");
   const bgColorInputRef = useRef<HTMLInputElement>(null);
   const bgColorSwatchRef = useRef<HTMLDivElement>(null);
+  // [OPT-canvas-preset] Debounce timer ref for canvas custom color picker commits
+  const canvasColorCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bgColorInputRefFull = useRef<HTMLInputElement>(null);
   const bgColorSwatchRefFull = useRef<HTMLDivElement>(null);
   const isApplyingBgUndoRef = useRef(false);
@@ -1263,33 +1282,66 @@ export function CustomBatikPage() {
 
     if (!isCanvasMultiSelectMode) return;
 
-    const handleMultiClick = (e: any) => {
-      if (!e.target) return;
-      const layerId = (e.target as any).data?.layerId;
+    let mouseDownPointer: { x: number; y: number } | null = null;
+
+    const handleMouseDown = (options: any) => {
+      const e = options.e;
+      mouseDownPointer = { x: e.clientX, y: e.clientY };
+    };
+
+    const handleMultiClick = (options: any) => {
+      const e = options.e;
+      if (!mouseDownPointer) return;
+
+      // Check distance moved between mouse down and up to determine if it was a drag/resize
+      const dx = e.clientX - mouseDownPointer.x;
+      const dy = e.clientY - mouseDownPointer.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      mouseDownPointer = null;
+
+      // If moved more than 5 pixels, treat as drag/resize/rotate action, do not toggle selection
+      if (dist > 5) return;
+
+      // Use fabric's official findTarget to find the clicked object (ignoring evented/selectable constraints)
+      const hitObj = fc.findTarget(e, false);
+      if (!hitObj) return;
+
+      const layerId = (hitObj as any).data?.layerId;
       if (!layerId) return;
 
       setCanvasSelectedIds((prev) => {
         const next = new Set(prev);
         if (next.has(layerId)) {
           next.delete(layerId);
-          // Hilangkan highlight visual 
-          (e.target as fabric.Object).set({ opacity: (e.target as any)._savedOpacity ?? 1 });
         } else {
           next.add(layerId);
-          // Simpan opacity asli & redupkan sebagai tanda terpilih 
-          if ((e.target as any)._savedOpacity === undefined) {
-            (e.target as any)._savedOpacity = e.target.opacity ?? 1;
-          }
-          (e.target as fabric.Object).set({ opacity: 0.55 });
         }
+
+        // Rebuild ActiveSelection dynamically so the blue bounding box and handles are visible
+        fc.discardActiveObject();
+        const selectedObjects: fabric.Object[] = [];
+        fc.forEachObject((obj) => {
+          const id = (obj as any).data?.layerId;
+          if (id && next.has(id)) {
+            selectedObjects.push(obj);
+          }
+        });
+
+        if (selectedObjects.length > 0) {
+          const sel = new fabric.ActiveSelection(selectedObjects, { canvas: fc });
+          fc.setActiveObject(sel);
+        }
+
         fc.requestRenderAll();
         return next;
       });
     };
 
-    fc.on("mouse:down", handleMultiClick);
+    fc.on("mouse:down", handleMouseDown);
+    fc.on("mouse:up", handleMultiClick);
     return () => {
-      fc.off("mouse:down", handleMultiClick);
+      fc.off("mouse:down", handleMouseDown);
+      fc.off("mouse:up", handleMultiClick);
     };
   }, [isCanvasMultiSelectMode]);
 
@@ -2105,19 +2157,36 @@ export function CustomBatikPage() {
       }
     });
 
+    const syncSelectionColor = (target: fabric.Object) => {
+      if (target?.data?.layerId) {
+        setSelectedLayerId(target.data.layerId);
+        if (target.data.colorPresetName) {
+          if (target.data.colorPresetName === "Custom") {
+            const hex = target.data.customColor || "#000000";
+            setCustomColor(hex);
+            setSelectedPreset({
+              name: "Custom",
+              colors: { primary: hex, secondary: hex, accent: hex, background: "transparent" },
+              batik: { background: "#f3f3f3", light: hex, mid: hex, dark: hex }
+            });
+          } else {
+            const foundPreset = colorPresets.find((p) => p.name === target.data.colorPresetName);
+            if (foundPreset) {
+              setSelectedPreset(foundPreset);
+              setCustomColor(foundPreset.colors.primary);
+            }
+          }
+        }
+      }
+    };
+
     canvas.on("object:selected", (e) => {
       const target = (e as any).target;
       if (!target) { setSelectedObject(null); setSelectedObjectType(null); return; }
       setSelectedObject(target);
       const objType = detectObjectType(target);
       setSelectedObjectType(objType); // [OPT-2]
-      if (target?.data?.layerId) {
-        setSelectedLayerId(target.data.layerId);
-        if (target.data.colorPresetName) {
-          const foundPreset = colorPresets.find((p) => p.name === target.data.colorPresetName);
-          if (foundPreset) setSelectedPreset(foundPreset);
-        }
-      }
+      syncSelectionColor(target);
     });
 
     canvas.on("selection:updated", (e) => {
@@ -2126,13 +2195,7 @@ export function CustomBatikPage() {
       setSelectedObject(target);
       const objType = detectObjectType(target);
       setSelectedObjectType(objType); // [OPT-2]
-      if (target?.data?.layerId) {
-        setSelectedLayerId(target.data.layerId);
-        if (target.data.colorPresetName) {
-          const foundPreset = colorPresets.find((p) => p.name === target.data.colorPresetName);
-          if (foundPreset) setSelectedPreset(foundPreset);
-        }
-      }
+      syncSelectionColor(target);
     });
 
     canvas.on("selection:cleared", () => {
@@ -2147,9 +2210,7 @@ export function CustomBatikPage() {
         setSelectedObject(e.target);
         const objType = detectObjectType(e.target);
         setSelectedObjectType(objType);
-        if (e.target.data?.layerId) {
-          setSelectedLayerId(e.target.data.layerId);
-        }
+        syncSelectionColor(e.target);
       } else {
         setSelectedObject(null);
         setSelectedObjectType(null);
@@ -3174,10 +3235,17 @@ export function CustomBatikPage() {
     return `<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="${id}" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">${patternContent}</pattern></defs><rect width="200" height="200" fill="url(#${id})" /></svg>`;
   }, [selectedPreset]);
 
-  const renderMiniPattern = useCallback((pattern: BatikItem | undefined, presetName?: string) => {
+  const renderMiniPattern = useCallback((pattern: BatikItem | undefined, presetName?: string, customColor?: string) => {
     if (!pattern) return <div className="w-full h-full bg-[#FAF8F5] rounded-xl animate-pulse" />;
 
-    const preset = presetName ? colorPresets.find(p => p.name === presetName) || selectedPreset : selectedPreset;
+    let preset = sidebarPreset;
+    if (presetName) {
+      if (presetName === "Custom" && customColor) {
+        preset = generatePresetFromPrimary(customColor);
+      } else {
+        preset = colorPresets.find(p => p.name === presetName) || blackPreset;
+      }
+    }
     const svgSource = getBatikSvg(pattern.style_type);
     if (svgSource) {
       const svgString = recolorSVG(svgSource, preset);
@@ -3215,7 +3283,7 @@ export function CustomBatikPage() {
         <Loader2 className="absolute w-4 h-4 animate-spin text-[#8B6F47] opacity-20" />
       </div>
     );
-  }, [selectedPreset]);
+  }, [sidebarPreset]);
 
   const getSpawnPoint = useCallback((dropCoords?: { x: number; y: number }) => {
     if (dropCoords) return dropCoords;
@@ -3273,7 +3341,8 @@ export function CustomBatikPage() {
 
     loadBatikSvg(pattern.style_type)
       .then(() => {
-        const svg = renderPatternSVGString(pattern);
+        const svgSource = getBatikSvg(pattern.style_type);
+        const svg = svgSource ? recolorSVG(svgSource, sidebarPreset) : renderPatternSVGString(pattern);
         return svgStringToPngDataUrl(svg);
       })
       .then((pngUrl) => {
@@ -3297,7 +3366,7 @@ export function CustomBatikPage() {
           });
           img.setCoords();
           const newLayerId = Date.now().toString();
-          (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: selectedPreset.name, customColor: customColor, originalSvg: getBatikSvg(pattern.style_type) || null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
+          (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: sidebarPreset.name, customColor: sidebarCustomColor, originalSvg: getBatikSvg(pattern.style_type) || null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
           
           skipAutoTabSwitchRef.current = true;
           fc.add(img); img.setCoords(); fc.setActiveObject(img); fc.requestRenderAll();
@@ -3305,6 +3374,8 @@ export function CustomBatikPage() {
           setSelectedLayerId(newLayerId);
           setSelectedObject(img);
           setSelectedObjectType("pattern");
+          setSelectedPreset(sidebarPreset);
+          setCustomColor(sidebarCustomColor);
           saveSnapshot();
           setTimeout(() => {
             skipAutoTabSwitchRef.current = false;
@@ -3312,7 +3383,7 @@ export function CustomBatikPage() {
         });
       })
       .catch(() => { toast.error('Gagal memuat motif SVG'); });
-  }, [saveSnapshot, renderPatternSVGString, selectedPreset, customColor, getSpawnPoint]);
+  }, [saveSnapshot, renderPatternSVGString, sidebarPreset, sidebarCustomColor, getSpawnPoint]);
 
   useEffect(() => { addItemToCanvasRef.current = addItemToCanvas; }, [addItemToCanvas]);
 
@@ -3336,20 +3407,21 @@ export function CustomBatikPage() {
     const fc = fabricCanvasRef.current;
     if (!fc || canvasSelectedIds.size === 0) return;
 
-    // Keluar dari mode multi-select dulu (kembalikan evented/selectable & restore opacity) 
+    // Discard active object first to reset selection state before constructing final group
+    fc.discardActiveObject();
+
+    // Keluar dari mode multi-select dulu (kembalikan evented/selectable & restore opacity)
     fc.selection = true;
     fc.defaultCursor = "default";
     fc.hoverCursor = "move";
     fc.forEachObject((obj) => {
-      // Restore opacity jika ada 
-      if ((obj as any)._savedOpacity !== undefined) {
-        obj.set({ opacity: (obj as any)._savedOpacity });
-        delete (obj as any)._savedOpacity;
+      // Restore selectable
+      if ((obj as any)._oldSelectable !== undefined) {
+        obj.selectable = (obj as any)._oldSelectable;
+        delete (obj as any)._oldSelectable;
+      } else {
+        obj.selectable = true;
       }
-
-      const layerId = (obj as any).data?.layerId;
-      if (!layerId) return;
-      obj.selectable = true;
       obj.evented = true;
     });
 
@@ -3366,28 +3438,60 @@ export function CustomBatikPage() {
       return;
     }
 
-    // Buat ActiveSelection 
+    // Buat Group jika lebih dari 1 objek dipilih, atau set active jika hanya 1
     if (selected.length === 1) {
       fc.setActiveObject(selected[0]);
       setSelectedLayerId((selected[0] as any).data?.layerId ?? null);
       setSelectedObject(selected[0]);
       setSelectedObjectType(detectObjectType(selected[0]));
     } else {
-      const sel = new fabric.ActiveSelection(selected, { canvas: fc });
-      fc.setActiveObject(sel);
-      setSelectedObject(sel);
-      setSelectedObjectType(null);
-      setSelectedLayerId(null);
+      const group = new fabric.Group([], { selectable: true, evented: true, hasControls: true, hasBorders: true });
+      const newLayerId = "group_" + Date.now().toString();
+      (group as any).data = { layerId: newLayerId, layerName: 'Grup' };
+      
+      fc.discardActiveObject();
+      selected.forEach(obj => { 
+        fc.remove(obj); 
+        group.addWithUpdate(obj); 
+      });
+      fc.add(group);
+      
+      const layerIdsToRemove = selected.map(obj => (obj as any).data?.layerId).filter(Boolean);
+      setLayers(prev => prev.filter(l => !layerIdsToRemove.includes(l.id)));
+      setLayers(prev => [...prev, { id: newLayerId, type: 'drawing', name: 'Grup', visible: true, locked: false, fabricObject: group }]);
+      
+      fc.setActiveObject(group);
+      group.setCoords();
+      setSelectedObject(group);
+      setSelectedObjectType("pattern"); // Treat group as pattern for recoloring controls
+      setSelectedLayerId(newLayerId);
+
+      // Save snapshot for grouping action
+      const json = JSON.stringify(fc.toJSON(["data"]));
+      historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+      historyRef.current.push(json);
+      historyIndexRef.current = historyRef.current.length - 1;
+      actionStackRef.current.push("pattern");
+      redoStackRef.current = [];
+      setCanUndo(true);
+      setCanRedo(false);
     }
 
     fc.requestRenderAll();
     setIsCanvasMultiSelectMode(false);
     setCanvasSelectedIds(new Set());
-  }, [canvasSelectedIds]);
+  }, [canvasSelectedIds, setLayers]);
   const handleCustomColorCommit = useCallback((newColor: string, skipPresetRegen?: boolean) => {
     setCustomColor(newColor);
     if (!skipPresetRegen) {
       setSelectedPreset(generatePresetFromPrimary(newColor));
+    }
+  }, []);
+
+  const handleSidebarCustomColorCommit = useCallback((newColor: string, skipPresetRegen?: boolean) => {
+    setSidebarCustomColor(newColor);
+    if (!skipPresetRegen) {
+      setSidebarPreset(generatePresetFromPrimary(newColor));
     }
   }, []);
 
@@ -3397,7 +3501,23 @@ export function CustomBatikPage() {
     const activeObjects = fc.getActiveObjects();
     if (activeObjects.length === 0) return;
 
-    activeObjects.forEach((activeObj) => {
+    const getRecolorableObjects = (objs: fabric.Object[]): fabric.Object[] => {
+      let result: fabric.Object[] = [];
+      objs.forEach(obj => {
+        if (obj.type === 'group') {
+          result = result.concat(getRecolorableObjects((obj as fabric.Group).getObjects()));
+        } else {
+          const data = (obj as any).data;
+          if (data && data.patternId) {
+            result.push(obj);
+          }
+        }
+      });
+      return result;
+    };
+
+    const targetObjects = getRecolorableObjects(activeObjects);
+    targetObjects.forEach((activeObj) => {
       const data = (activeObj as any).data;
       if (!data || !data.patternId) return;
       if (data.colorPresetName === selectedPreset.name && selectedPreset.name !== "Custom") return;
@@ -3438,6 +3558,9 @@ export function CustomBatikPage() {
           data.colorPresetName = selectedPreset.name;
           data.customColor = customColor;
           activeObj.setCoords();
+          if (activeObj.group) {
+            activeObj.group.dirty = true;
+          }
           fc.requestRenderAll();
           setLayers((prev) => [...prev]);
           saveSnapshot();
@@ -4139,15 +4262,12 @@ export function CustomBatikPage() {
                     style={{ background: "#FAF9F6" }}
                   >
 
-                    {activeTool === "select" && (
+                    {/* Object-type controls: show whenever something is selected, and NOT in multi-select mode */}
+                    {selectedObject && selectedObjectType && !isCanvasMultiSelectMode && (
                       <div className="flex items-center gap-2 py-2.5">
-                        {!selectedObject ? (
-                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium" style={{ background: "rgba(139,111,71,0.07)", border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}>
-                            <MousePointer2 style={{ width: "12px", height: "12px", flexShrink: 0 }} />
-                            <span>Klik objek di kanvas untuk memilih, lalu geser, putar, atau ubah ukurannya</span>
-                          </div>
-                        ) : selectedObjectType === "shape" ? (
+                        {selectedObjectType === "shape" ? (
                           <div className="flex items-center gap-3">
+                            {/* badge removed */}
                             {!(selectedObject instanceof fabric.Line) && (
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Isi</span>
@@ -4172,6 +4292,7 @@ export function CustomBatikPage() {
                           </div>
                         ) : selectedObjectType === "text" ? (
                           <div className="flex items-center gap-3">
+                            {/* badge removed */}
                             <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="h-8 px-2 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}>
                               <option value="serif">Serif</option>
                               <option value="sans-serif">Sans-serif</option>
@@ -4191,7 +4312,7 @@ export function CustomBatikPage() {
                               </div>
                               <div className="flex gap-1.5">
                                 {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#ffffff"].map((c) => (
-                                  <button key={c} onClick={() => setTextColor(c)} className="rounded-full transition-all hover:scale-110 cursor-pointer" style={{ width: textColor === c ? "20px" : "16px", height: textColor === c ? "20px" : "16px", background: c, border: `${textColor === c ? "2.5" : "1.5"}px solid ${textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)"}` }} />
+                                  <button key={c} onClick={() => setTextColor(c)} className="rounded-md transition-all hover:scale-110 cursor-pointer" style={{ width: textColor === c ? "20px" : "16px", height: textColor === c ? "20px" : "16px", background: c, border: `${textColor === c ? "2.5" : "1.5"}px solid ${textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)"}` }} />
                                 ))}
                               </div>
                             </div>
@@ -4219,11 +4340,31 @@ export function CustomBatikPage() {
                               ))}
                             </div>
                             <div className="h-4 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                            <div className="relative rounded-full cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: "20px", height: "20px", border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)" }}>
-                              <input type="color" value={customColor} onChange={(e) => { setCustomColor(e.target.value); setSelectedPreset({ name: "Custom", colors: { primary: e.target.value, secondary: e.target.value, accent: e.target.value, background: "transparent" }, batik: { background: "#f3f3f3", light: e.target.value, mid: e.target.value, dark: e.target.value } }); }} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                            <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: "24px", height: "24px", border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", borderRadius: "8px" }}>
+                              <input type="color" defaultValue={customColor}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (canvasColorCommitTimerRef.current) clearTimeout(canvasColorCommitTimerRef.current);
+                                  canvasColorCommitTimerRef.current = setTimeout(() => {
+                                    setCustomColor(v);
+                                    setSelectedPreset({ name: "Custom", colors: { primary: v, secondary: v, accent: v, background: "transparent" }, batik: { background: "#f3f3f3", light: v, mid: v, dark: v } });
+                                    canvasColorCommitTimerRef.current = null;
+                                  }, 150);
+                                }}
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
                             </div>
                           </div>
                         ) : null}
+                      </div>
+                    )}
+
+                    {/* No selection hint — only in select mode with nothing selected */}
+                    {activeTool === "select" && !selectedObject && (
+                      <div className="flex items-center gap-2 py-2.5">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium" style={{ background: "rgba(139,111,71,0.07)", border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}>
+                          <MousePointer2 style={{ width: "12px", height: "12px", flexShrink: 0 }} />
+                          <span>Klik objek di kanvas untuk memilih, lalu geser, putar, atau ubah ukurannya</span>
+                        </div>
                       </div>
                     )}
 
@@ -4236,7 +4377,7 @@ export function CustomBatikPage() {
                           </div>
                           <div className="flex items-center gap-1.5">
                             {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#6B3A1F", "#ffffff"].map((c, idx) => (
-                              <button key={c} onClick={() => setBrushColor(c)} title={c} className={`${idx >= 6 ? "hidden sm:inline-flex" : ""} transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0`} style={{ width: brushColor === c ? "20px" : "16px", height: brushColor === c ? "20px" : "16px", borderRadius: "50%", background: c, border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)", boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none" }} />
+                              <button key={c} onClick={() => setBrushColor(c)} title={c} className={`${idx >= 6 ? "hidden sm:inline-flex" : ""} transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0`} style={{ width: brushColor === c ? "20px" : "16px", height: brushColor === c ? "20px" : "16px", borderRadius: "6px", background: c, border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)", boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none" }} />
                             ))}
                           </div>
                         </div>
@@ -4277,7 +4418,7 @@ export function CustomBatikPage() {
                         </div>
                         <div className="flex items-center gap-1.5">
                           {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#6B3A1F", "#ffffff"].map((c, idx) => (
-                            <button key={c} onClick={() => setBrushColor(c)} title={c} className={`${idx >= 6 ? "hidden sm:inline-flex" : ""} transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0`} style={{ width: brushColor === c ? "20px" : "16px", height: brushColor === c ? "20px" : "16px", borderRadius: "50%", background: c, border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)", boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none" }} />
+                            <button key={c} onClick={() => setBrushColor(c)} title={c} className={`${idx >= 6 ? "hidden sm:inline-flex" : ""} transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0`} style={{ width: brushColor === c ? "20px" : "16px", height: brushColor === c ? "20px" : "16px", borderRadius: "6px", background: c, border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)", boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none" }} />
                           ))}
                         </div>
                       </div>
@@ -4350,7 +4491,7 @@ export function CustomBatikPage() {
                           </div>
                           <div className="flex gap-1.5">
                             {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#ffffff"].map((c) => (
-                              <button key={c} onClick={() => setTextColor(c)} className="rounded-full border transition-all hover:scale-110 cursor-pointer" style={{ width: textColor === c ? "20px" : "16px", height: textColor === c ? "20px" : "16px", background: c, border: `${textColor === c ? "2.5" : "1.5"}px solid ${textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)"}` }} />
+                              <button key={c} onClick={() => setTextColor(c)} className="rounded-md border transition-all hover:scale-110 cursor-pointer" style={{ width: textColor === c ? "20px" : "16px", height: textColor === c ? "20px" : "16px", background: c, border: `${textColor === c ? "2.5" : "1.5"}px solid ${textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)"}` }} />
                             ))}
                           </div>
                         </div>
@@ -4515,8 +4656,8 @@ export function CustomBatikPage() {
                       </div>
                     )}
 
-                    {/* Floating context toolbar — Canva-style, appears above selected object */}
-                    {selectedObject && (activeTool === "select" || activeTool === "shape") && !isDraggingObjectRef.current && (() => {
+                    {/* Floating context toolbar — Canva-style, appears above selected object; hidden in multi-select mode to prevent wrong coordinates */}
+                    {selectedObject && !isCanvasMultiSelectMode && (activeTool === "select" || activeTool === "shape") && !isDraggingObjectRef.current && (() => {
                       // Trigger re-render when toolbarUpdate changes
                       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
                       toolbarUpdate;
@@ -4846,10 +4987,10 @@ export function CustomBatikPage() {
                   setActiveTab={setActiveTab}
                   patterns={patterns}
                   loading={loading}
-                  selectedPreset={selectedPreset}
-                  setSelectedPreset={setSelectedPreset}
-                  customColor={customColor}
-                  onCustomColorCommit={handleCustomColorCommit}
+                  selectedPreset={sidebarPreset}
+                  setSelectedPreset={setSidebarPreset}
+                  customColor={sidebarCustomColor}
+                  onCustomColorCommit={handleSidebarCustomColorCommit}
                   addItemToCanvas={addItemToCanvas}
                   renderMiniPattern={renderMiniPattern}
                   layers={layers}
@@ -4882,13 +5023,14 @@ export function CustomBatikPage() {
       <AnimatePresence>
         {isFullMode && (
           <>
-            {(activeTool !== "select" || (activeTool === "select" && selectedObjectType === "pattern")) && (
+            {((activeTool !== "select" && !selectedObject) || (selectedObject && !isCanvasMultiSelectMode)) && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
                 className="fixed bottom-23 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 transform-none sm:transform z-[101] flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full shadow-2xl backdrop-blur-md overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                 style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(212,184,139,0.25)" }}
               >
-                {activeTool === "select" && selectedObjectType === "pattern" && (
+                {/* Selected object controls — visible in any tool mode when object is selected */}
+                {selectedObject && !isCanvasMultiSelectMode && selectedObjectType === "pattern" && (
                   <>
                     <Palette style={{ width: 13, height: 13, color: "#8B6F47", flexShrink: 0 }} />
                     <div className="flex items-center gap-1.5">
@@ -4909,8 +5051,51 @@ export function CustomBatikPage() {
                       ))}
                     </div>
                     <div className="h-4 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                    <div className="relative rounded-full cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: 18, height: 18, border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                      <input type="color" value={customColor} onChange={(e) => { setCustomColor(e.target.value); setSelectedPreset({ name: "Custom", colors: { primary: e.target.value, secondary: e.target.value, accent: e.target.value, background: "transparent" }, batik: { background: "#f3f3f3", light: e.target.value, mid: e.target.value, dark: e.target.value } }); }} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                    <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: 22, height: 22, border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)", borderRadius: "6px" }}>
+                      <input type="color" defaultValue={customColor}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (canvasColorCommitTimerRef.current) clearTimeout(canvasColorCommitTimerRef.current);
+                          canvasColorCommitTimerRef.current = setTimeout(() => {
+                            setCustomColor(v);
+                            setSelectedPreset({ name: "Custom", colors: { primary: v, secondary: v, accent: v, background: "transparent" }, batik: { background: "#f3f3f3", light: v, mid: v, dark: v } });
+                            canvasColorCommitTimerRef.current = null;
+                          }, 150);
+                        }}
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                    </div>
+                  </>
+                )}
+                {selectedObject && !isCanvasMultiSelectMode && selectedObjectType === "shape" && (
+                  <>
+                    {/* badge removed */}
+                    {!(selectedObject instanceof fabric.Line) && (
+                      <div className="relative rounded-lg" style={{ background: shapeFill, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
+                        <input type="color" value={shapeFill} onChange={(e) => setShapeFill(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                      </div>
+                    )}
+                    <div className="relative rounded-lg" style={{ background: shapeStroke, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
+                      <input type="color" value={shapeStroke} onChange={(e) => setShapeStroke(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                    </div>
+                    <input type="range" min="1" max="20" step="1" value={shapeStrokeWidth} onChange={(e) => setShapeStrokeWidth(Number(e.target.value))} style={{ width: 60, accentColor: "#8B6F47" }} />
+                    <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: 22 }}>{shapeStrokeWidth}px</span>
+                    <div className="h-4 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
+                    <input type="range" min="10" max="100" step="10" value={shapeOpacity} onChange={(e) => setShapeOpacity(Number(e.target.value))} style={{ width: 60, accentColor: "#8B6F47" }} />
+                    <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: 28 }}>{shapeOpacity}%</span>
+                  </>
+                )}
+                {selectedObject && !isCanvasMultiSelectMode && selectedObjectType === "text" && (
+                  <>
+                    {/* badge removed */}
+                    <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="h-7 px-2 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}>
+                      <option value="serif">Serif</option>
+                      <option value="sans-serif">Sans-serif</option>
+                      <option value="'Playfair Display', serif">Playfair</option>
+                      <option value="monospace">Mono</option>
+                    </select>
+                    <div className="h-4 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
+                    <div className="relative rounded-lg" style={{ background: textColor, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
+                      <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
                     </div>
                   </>
                 )}
@@ -4951,7 +5136,7 @@ export function CustomBatikPage() {
                     </div>
                   </div>
                 )}
-                {activeTool === "shape" && (
+                {activeTool === "shape" && !selectedObject && (
                   <>
                     <div className="flex items-center gap-1">
                       {(["rect", "circle", "line", "star"] as ShapeType[]).map((t) => {
@@ -4975,7 +5160,7 @@ export function CustomBatikPage() {
                     </div>
                   </>
                 )}
-                {activeTool === "text" && (
+                {activeTool === "text" && !selectedObject && (
                   <>
                     <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="h-7 px-2 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}>
                       <option value="serif">Serif</option>
@@ -5152,10 +5337,10 @@ export function CustomBatikPage() {
                     setActiveTab={setActiveTab}
                     patterns={patterns}
                     loading={loading}
-                    selectedPreset={selectedPreset}
-                    setSelectedPreset={setSelectedPreset}
-                    customColor={customColor}
-                    onCustomColorCommit={handleCustomColorCommit}
+                    selectedPreset={sidebarPreset}
+                    setSelectedPreset={setSidebarPreset}
+                    customColor={sidebarCustomColor}
+                    onCustomColorCommit={handleSidebarCustomColorCommit}
                     addItemToCanvas={addItemToCanvas}
                     renderMiniPattern={renderMiniPattern}
                     layers={layers}
