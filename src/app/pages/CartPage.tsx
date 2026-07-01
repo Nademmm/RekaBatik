@@ -127,34 +127,34 @@ function Stepper({ current, steps = STEPS_NORMAL }: { current: CheckoutStep; ste
   }
 
   return (
-    <div className="flex items-center justify-center mb-10">
+    <div className="flex items-center justify-center mb-8">
       {safeSteps.map((s, i) => {
         const done = current > s.step;
         const active = current === s.step;
         const Icon = s.icon;
         return (
-          <div key={s.step} className="flex items-center">
+          <div key={s.step} className="flex items-center flex-shrink-0">
             <div className="flex flex-col items-center gap-1.5">
               <motion.div
                 animate={{
                   background: done ? "#8B6F47" : active ? "linear-gradient(135deg, #3D2B1F, #8B6F47)" : "rgba(212,184,139,0.2)",
                   scale: active ? 1.1 : 1,
                 }}
-                className="w-10 h-10 rounded-full flex items-center justify-center"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center"
               >
                 {done ? (
-                  <BadgeCheck className="w-5 h-5 text-white" />
+                  <BadgeCheck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 ) : (
-                  <Icon className="w-4 h-4" style={{ color: active ? "#FAF8F5" : "#A89B8F" }} />
+                  <Icon className="w-3 h-3 sm:w-4 sm:h-4" style={{ color: active ? "#FAF8F5" : "#A89B8F" }} />
                 )}
               </motion.div>
-              <span className="text-xs font-medium hidden sm:block" style={{ color: active ? "#3D2B1F" : "#A89B8F" }}>
+              <span className="text-[10px] sm:text-xs font-medium hidden sm:block" style={{ color: active ? "#3D2B1F" : "#A89B8F" }}>
                 {s.label}
               </span>
             </div>
             {i < safeSteps.length - 1 && (
               <div
-                className="w-12 sm:w-20 h-0.5 mx-2 mb-5 transition-all duration-500"
+                className="w-8 sm:w-12 lg:w-20 h-0.5 mx-1 sm:mx-2 transition-all duration-500 flex-shrink-0 sm:mb-4"
                 style={{ background: current > s.step ? "#8B6F47" : "rgba(212,184,139,0.25)" }}
               />
             )}
@@ -678,11 +678,11 @@ export function CartPage() {
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen relative pb-20 max-w-7xl mx-auto" style={{ background: "#FAF8F5" }}>
+    <div className="min-h-screen relative pb-20 w-full overflow-x-hidden" style={{ background: "#FAF8F5" }}>
       <BatikBackground opacity={0.03} patternType="kawung" />
       <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full opacity-5 pointer-events-none" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)", transform: "translate(20%, -20%)" }} />
 
-      <div className="container mx-auto px-4 pt-8 md:pt-12 relative z-10 max-w-5xl">
+      <div className="container mx-auto px-4 pt-8 md:pt-12 relative z-10 max-w-5xl w-full">
         {/* Back */}
         <Link to="/catalog" className="inline-flex items-center gap-1.5 mb-6 text-sm font-medium hover:underline" style={{ color: "#8B6F47" }}>
           <ChevronLeft className="w-4 h-4" />
@@ -697,7 +697,7 @@ export function CartPage() {
         <Stepper current={step} steps={checkoutSteps} />
 
         {loading ? (
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid lg:grid-cols-3 gap-6 w-full">
             <div className="lg:col-span-2 space-y-4">
               {[1, 2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
             </div>
@@ -707,7 +707,7 @@ export function CartPage() {
           // ── EMPTY ───────────────────────────────────────────────────────
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-24 rounded-3xl bg-white"
+            className="flex flex-col items-center justify-center py-24 rounded-3xl bg-white w-full"
             style={{ border: "1px solid rgba(212,184,139,0.2)" }}
           >
             <div className="w-24 h-24 mb-6 rounded-full flex items-center justify-center" style={{ background: "rgba(139,111,71,0.08)" }}>
@@ -726,17 +726,17 @@ export function CartPage() {
             </Link>
           </motion.div>
         ) : (
-          <div className="grid lg:grid-cols-12 gap-6">
+          <div className="grid lg:grid-cols-12 gap-6 w-full">
             {/* ── LEFT: Step Content ─────────────────────────────────────── */}
-            <div className="lg:col-span-8">
+            <div className="lg:col-span-8 w-full">
               <AnimatePresence mode="wait">
 
                 {/* STEP 1: Cart Items */}
                 {step === 1 && (
-                  <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
+                  <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3 w-full">
                     {/* Restored item from rejected negotiation (when notes column not yet added) */}
                     {forceCustomStep && restoredItem && cartItems.length === 0 && (
-                      <div className="flex gap-4 p-4 sm:p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}>
+                      <div className="flex gap-4 p-4 sm:p-5 rounded-2xl bg-white w-full" style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}>
                         <div className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center">
                           {restoredItem.bg_color?.startsWith("data:image") ? (
                             <img src={restoredItem.bg_color} alt="Desain" className="w-full h-full object-cover" />
@@ -745,7 +745,7 @@ export function CartPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate" style={{ color: "#3D2B1F" }}>{restoredItem.item || "Desain Batik Kustom"}</h3>
+                          <h3 className="font-semibold truncate text-sm sm:text-base" style={{ color: "#3D2B1F" }}>{restoredItem.item || "Desain Batik Kustom"}</h3>
                           <p className="text-xs mb-1" style={{ color: "#A89B8F" }}>RekaBatik Studio</p>
                           <span className="text-sm font-semibold" style={{ color: "#8B6F47" }}>Rp xxx.xxx <span className="font-normal text-xs">(harga via negosiasi)</span></span>
                         </div>
@@ -779,7 +779,7 @@ export function CartPage() {
                           <motion.div
                             key={item.id}
                             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -30, height: 0 }}
-                            className="flex gap-4 p-4 sm:p-5 rounded-2xl bg-white"
+                            className="flex gap-4 p-4 sm:p-5 rounded-2xl bg-white w-full"
                             style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
                           >
                             <div className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 rounded-xl overflow-hidden bg-stone-100 flex items-center justify-center">
@@ -795,16 +795,16 @@ export function CartPage() {
                                 <Palette className="w-8 h-8 text-stone-300" />
                               )}
                             </div>
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 w-full">
                               <div className="flex justify-between items-start gap-2 mb-1">
-                                <h3 className="font-semibold truncate" style={{ color: "#3D2B1F" }}>{name}</h3>
+                                <h3 className="font-semibold truncate text-sm sm:text-base w-full" style={{ color: "#3D2B1F" }}>{name}</h3>
                                 <button onClick={() => removeItem(item.id)} className="flex-shrink-0 p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 transition-all group">
                                   <Trash2 className="w-4 h-4 transition-all group-hover:stroke-[2.5px] group-hover:scale-110" />
                                 </button>
                               </div>
                               <p className="text-xs mb-3" style={{ color: "#A89B8F" }}>{origin}</p>
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold" style={{ color: "#8B6F47" }}>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                                <span className="font-bold text-sm sm:text-base w-full break-words" style={{ color: "#8B6F47" }}>
                                   {bItem ? (
                                     `Rp ${(price * item.quantity).toLocaleString("id-ID")}`
                                   ) : (
@@ -812,7 +812,7 @@ export function CartPage() {
                                   )}
                                   {bItem && item.quantity > 1 && <span className="text-xs font-normal ml-1" style={{ color: "#A89B8F" }}>(Rp {price.toLocaleString("id-ID")} × {item.quantity})</span>}
                                 </span>
-                                <div className="flex items-center rounded-xl overflow-hidden" style={{ border: "1.5px solid rgba(139,111,71,0.2)" }}>
+                                <div className="flex items-center rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1.5px solid rgba(139,111,71,0.2)" }}>
                                   <button onClick={() => updateQuantity(item.id, item.quantity, -1)} disabled={item.quantity <= 1} className="px-3 py-1.5 hover:bg-amber-50 disabled:opacity-40 transition-colors" style={{ color: "#5A4A3E" }}><Minus className="w-3.5 h-3.5" /></button>
                                   <div className="px-3 py-1.5 text-sm font-bold min-w-[38px] text-center" style={{ color: "#3D2B1F", background: "#FDFCF8" }}>{item.quantity}</div>
                                   <button onClick={() => updateQuantity(item.id, item.quantity, 1)} className="px-3 py-1.5 hover:bg-amber-50 transition-colors" style={{ color: "#5A4A3E" }}><Plus className="w-3.5 h-3.5" /></button>
@@ -829,7 +829,7 @@ export function CartPage() {
                 {/* STEP 2: Shipping Address */}
                 {step === 2 && (
                   <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                    className="p-6 rounded-2xl bg-white space-y-5"
+                    className="p-6 rounded-2xl bg-white space-y-5 w-full"
                     style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
                   >
                     <div className="flex items-center justify-between">
@@ -1084,7 +1084,7 @@ export function CartPage() {
                 {step === 3 && (
                   hasCustomItems ? (
                     <motion.div key="step3-custom" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                      className="p-6 rounded-2xl bg-white"
+                      className="p-6 rounded-2xl bg-white w-full"
                       style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
                     >
                       <h2 className="font-bold text-lg mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Pilih Toko Pengrajin</h2>
@@ -1119,7 +1119,7 @@ export function CartPage() {
                     </motion.div>
                   ) : (
                     <motion.div key="step3-normal" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                      className="p-6 rounded-2xl bg-white"
+                      className="p-6 rounded-2xl bg-white w-full"
                       style={{ border: "1px solid rgba(212,184,139,0.2)", boxShadow: "0 2px 8px rgba(61,43,31,0.03)" }}
                     >
                       <h2 className="font-bold text-lg mb-6" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Metode Pembayaran</h2>
@@ -1159,9 +1159,9 @@ export function CartPage() {
 
                 {/* STEP 4: Review & Confirm */}
                 {step === 4 && (
-                  <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                  <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4 w-full">
                     {/* Items Review */}
-                    <div className="p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
+                    <div className="p-5 rounded-2xl bg-white w-full" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
                       <h3 className="font-semibold mb-3" style={{ color: "#3D2B1F" }}>Barang Pesanan</h3>
                       {cartItems.map(item => {
                         const bItem = item.batik_items;
@@ -1212,7 +1212,7 @@ export function CartPage() {
                     </div>
 
                     {/* Address Review */}
-                    <div className="p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
+                    <div className="p-5 rounded-2xl bg-white w-full" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
                       <div className="flex items-center gap-2 mb-3">
                         <MapPin className="w-4 h-4" style={{ color: "#8B6F47" }} />
                         <h3 className="font-semibold" style={{ color: "#3D2B1F" }}>Alamat Pengiriman</h3>
@@ -1224,7 +1224,7 @@ export function CartPage() {
 
                     {/* Payment or Store Review */}
                     {hasCustomItems && selectedStore ? (
-                      <div className="p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
+                      <div className="p-5 rounded-2xl bg-white w-full" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
                         <div className="flex items-center gap-2 mb-3">
                           <Store className="w-4 h-4" style={{ color: "#8B6F47" }} />
                           <h3 className="font-semibold" style={{ color: "#3D2B1F" }}>Toko Pengrajin</h3>
@@ -1240,7 +1240,7 @@ export function CartPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="p-5 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
+                      <div className="p-5 rounded-2xl bg-white w-full" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
                         <div className="flex items-center gap-2 mb-3">
                           <CreditCard className="w-4 h-4" style={{ color: "#8B6F47" }} />
                           <h3 className="font-semibold" style={{ color: "#3D2B1F" }}>Metode Pembayaran</h3>
@@ -1255,7 +1255,7 @@ export function CartPage() {
               </AnimatePresence>
 
               {/* Navigation Buttons */}
-              <div className="flex gap-3 mt-6">
+              <div className="flex gap-3 mt-6 w-full">
                 {step > 1 && (
                   <motion.button
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
@@ -1299,7 +1299,7 @@ export function CartPage() {
 
             {/* ── RIGHT: Order Summary ───────────────────────────────────── */}
             <div className="lg:col-span-4">
-              <div className="sticky top-24 p-6 rounded-2xl bg-white" style={{ border: "1px solid rgba(212,184,139,0.25)", boxShadow: "0 8px 30px rgba(61,43,31,0.04)" }}>
+              <div className="lg:sticky lg:top-24 p-6 rounded-2xl bg-white w-full" style={{ border: "1px solid rgba(212,184,139,0.25)", boxShadow: "0 8px 30px rgba(61,43,31,0.04)" }}>
                 <h3 className="font-bold text-lg mb-5" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Ringkasan</h3>
                 <div className="space-y-3 mb-4">
                   {cartItems.map(item => {
@@ -1311,9 +1311,9 @@ export function CartPage() {
                     try { if (cItem?.drawing_data) cData = JSON.parse(cItem.drawing_data); } catch {}
                     const name = bItem ? bItem.name : (cData?.projectInfo?.name || "Desain Batik Kustom");
                     return (
-                      <div key={item.id} className="flex justify-between text-sm">
-                        <span className="truncate max-w-[140px]" style={{ color: "#7A6B5E" }}>{name} ×{item.quantity}</span>
-                        <span className="font-medium flex-shrink-0 ml-2" style={{ color: "#5A4A3E" }}>
+                      <div key={item.id} className="flex justify-between text-sm gap-2">
+                        <span className="truncate flex-1 min-w-0" style={{ color: "#7A6B5E" }}>{name} ×{item.quantity}</span>
+                        <span className="font-medium flex-shrink-0" style={{ color: "#5A4A3E" }}>
                           {bItem ? `Rp ${(price * item.quantity).toLocaleString("id-ID")}` : "Rp xxx.xxx"}
                         </span>
                       </div>
