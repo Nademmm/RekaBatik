@@ -2780,20 +2780,28 @@ export function CustomBatikPage() {
 
     // [MOBILE-PAN + PINCH-ZOOM] Touch pan untuk mobile & pinch-to-zoom dengan 2 jari
     // Fabric intercept touch events tapi tidak handle pan/zoom,
-    // jadi kita pasang listener langsung di canvas wrapper
+    // jadi kita pasang listener langsung di canvas wrapper.
+    //
+    // FIX: Gunakan rasio jarak antar jari (multiplicative) bukan delta-step agar
+    // pinch terasa halus & responsif. Intercept touchstart non-passive agar bisa
+    // preventDefault() saat pinch dimulai – mencegah Fabric memproses touch ke-2
+    // yang menyebabkan selection:cleared (item ter-deselect saat pinch).
     const fabricEl = fc.getElement();
     const fabricWrapper = fabricEl?.parentElement;
     const panTarget = fabricWrapper ?? fabricEl;
 
     let touchPanActive = false;
     let touchPanStart = { x: 0, y: 0 };
+    let lastPinchMid = { x: 0, y: 0 };
     let touchMoved = false;
     let touchOnObject = false;
-    const PAN_THRESHOLD = 8;
+    const PAN_THRESHOLD = 6;
 
     // Pinch-to-zoom state
     let lastPinchDist = 0;
     let isPinching = false;
+    // Simpan object yang sedang diselect sebelum pinch agar bisa di-restore
+    let pinchSavedActiveObject: fabric.Object | null = null;
 
     const getTouchDist = (t: TouchList) => {
       const dx = t[0].clientX - t[1].clientX;
@@ -2810,17 +2818,32 @@ export function CustomBatikPage() {
 
     const onTouchPanStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
-        // Start pinch
+        // --- Mulai pinch-to-zoom ---
+        // Simpan active object sebelum Fabric sempat clear selection
+        pinchSavedActiveObject = fc.getActiveObject() ?? null;
+
+        // Prevent browser default (scroll/native zoom) & cegah Fabric
+        // memproses sentuhan ke-2 (yang akan trigger selection:cleared)
+        e.preventDefault();
+
         isPinching = true;
         touchPanActive = false;
-        lastPinchDist = getTouchDist(e.touches);
+
+        const dist = getTouchDist(e.touches);
+        lastPinchDist = dist > 0 ? dist : 1;
+
+        const rect = (panTarget as HTMLElement).getBoundingClientRect();
+        lastPinchMid = getTouchMidpoint(e.touches, rect);
         return;
       }
 
       if (activeToolRef.current !== "select") return;
       if (e.touches.length !== 1) return;
 
-      isPinching = false;
+      // Jika kita baru saja selesai pinch, abaikan single-touch pertama
+      // supaya tidak langsung pan / deselect
+      if (isPinching) return;
+
       const touch = e.touches[0];
       touchPanStart = { x: touch.clientX, y: touch.clientY };
       touchMoved = false;
@@ -2837,46 +2860,60 @@ export function CustomBatikPage() {
     };
 
     const onTouchPanMove = (e: TouchEvent) => {
-      // Pinch-to-zoom with 2 fingers
-      if (e.touches.length === 2 && isPinching) {
+      // --- Pinch-to-zoom dengan 2 jari ---
+      if (isPinching && e.touches.length >= 2) {
         e.preventDefault();
+
         const newDist = getTouchDist(e.touches);
         if (lastPinchDist === 0) {
-          lastPinchDist = newDist;
+          lastPinchDist = newDist > 0 ? newDist : 1;
           return;
         }
-        const distDelta = newDist - lastPinchDist;
-        lastPinchDist = newDist;
 
-        // Only zoom if meaningful movement
-        if (Math.abs(distDelta) < 1) return;
+        // Hitung ratio multiplicative → zoom langsung proporsional terhadap
+        // gerakan jari, tanpa quantisasi discrete → terasa sangat halus
+        const ratio = newDist / lastPinchDist;
+        lastPinchDist = newDist;
 
         const rect = (panTarget as HTMLElement).getBoundingClientRect();
         const mid = getTouchMidpoint(e.touches, rect);
 
-        // Convert screen midpoint to canvas coordinates
+        // Current Fabric zoom → new zoom (clamp ke 50%–400%)
+        const currentFabricZoom = fc.getZoom();
+        const newFabricZoom = Math.max(
+          getEffectiveZoom(50),
+          Math.min(getEffectiveZoom(400), currentFabricZoom * ratio),
+        );
+
+        // Hitung zoomLevel% dari effective Fabric zoom
+        const newZoomPct = Math.round((newFabricZoom / (baseScaleRef.current || 1)) * 100);
+        const clampedPct = Math.max(50, Math.min(400, newZoomPct));
+        zoomLevelRef.current = clampedPct;
+        setZoomLevel(clampedPct);
+
+        // Zoom to pinch midpoint (smooth, tidak snap)
+        fc.zoomToPoint(new fabric.Point(mid.x, mid.y), newFabricZoom);
+
+        // Pan sesuai pergerakan midpoint kedua jari (agar canvas "ikut" jari)
         const vpt = fc.viewportTransform;
-        const zoom = fc.getZoom();
-        if (!vpt) return;
-
-        // Scale factor: distDelta per 200px = 1 zoom level step
-        const zoomDelta = (distDelta / 200) * 50;
-        const newZoom = Math.max(50, Math.min(300, zoomLevelRef.current + zoomDelta));
-
-        const snapped = Math.round(newZoom / 5) * 5;
-        zoomLevelRef.current = snapped;
-        setZoomLevel(snapped);
-
-        const scale = getEffectiveZoom(snapped);
-        fc.zoomToPoint(new fabric.Point(mid.x, mid.y), scale);
-        if (fc.viewportTransform) {
-          fc.setViewportTransform(clampViewport(fc.viewportTransform));
+        if (vpt) {
+          vpt[4] += mid.x - lastPinchMid.x;
+          vpt[5] += mid.y - lastPinchMid.y;
+          fc.setViewportTransform(clampViewport(vpt));
         }
+        lastPinchMid = mid;
+
         fc.requestRenderAll();
+
+        // Pastikan object tetap terpilih selama pinch
+        if (pinchSavedActiveObject && !fc.getActiveObject()) {
+          fc.setActiveObject(pinchSavedActiveObject);
+          fc.requestRenderAll();
+        }
         return;
       }
 
-      // Single-finger pan
+      // --- Single-finger pan ---
       if (!touchPanActive || e.touches.length !== 1) return;
       if (activeToolRef.current !== "select") return;
       if (touchOnObject) return;
@@ -2901,9 +2938,26 @@ export function CustomBatikPage() {
     };
 
     const onTouchPanEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) {
+      if (e.touches.length < 2 && isPinching) {
         isPinching = false;
         lastPinchDist = 0;
+
+        // Snap zoomLevel ke kelipatan 5 setelah pinch selesai (UI display only)
+        const snappedPct = Math.max(50, Math.min(400, Math.round(zoomLevelRef.current / 5) * 5));
+        zoomLevelRef.current = snappedPct;
+        setZoomLevel(snappedPct);
+
+        // Restore selection jika hilang akibat pinch
+        if (pinchSavedActiveObject) {
+          // Delay satu frame agar Fabric selesai memproses touch-end events
+          requestAnimationFrame(() => {
+            if (!fc.getActiveObject() && pinchSavedActiveObject) {
+              fc.setActiveObject(pinchSavedActiveObject);
+              fc.requestRenderAll();
+            }
+            pinchSavedActiveObject = null;
+          });
+        }
       }
       if (e.touches.length === 0) {
         touchPanActive = false;
@@ -2913,9 +2967,10 @@ export function CustomBatikPage() {
     };
 
     if (panTarget) {
-      panTarget.addEventListener("touchstart", onTouchPanStart, { passive: true });
+      // Non-passive agar bisa preventDefault() saat pinch untuk blokir Fabric
+      panTarget.addEventListener("touchstart", onTouchPanStart, { passive: false });
       panTarget.addEventListener("touchmove", onTouchPanMove, { passive: false });
-      panTarget.addEventListener("touchend", onTouchPanEnd);
+      panTarget.addEventListener("touchend", onTouchPanEnd, { passive: false });
     }
 
     return () => {
