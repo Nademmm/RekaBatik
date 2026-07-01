@@ -2778,25 +2778,17 @@ export function CustomBatikPage() {
     fc.on("mouse:move", onPanMouseMove);
     fc.on("mouse:up", onPanMouseUp);
 
-    // [MOBILE-PAN + PINCH-ZOOM v3] Touch pan + pinch-to-zoom yang benar-benar robust
+
+
+    // [MOBILE-PAN + PINCH-ZOOM v4] Touch pan + pinch-to-zoom 100% di Capture Phase
     //
-    // MASALAH UTAMA SEBELUMNYA:
-    // - Fabric mendaftarkan listener touchstart di fabricEl (canvas) pada saat init,
-    //   sebelum kita pasang listener kita. Karena urutan listener FIFO dalam fase
-    //   yang sama, Fabric SELALU jalan duluan → selection:cleared terpanggil
-    //   SEBELUM kita sempat simpan active object.
-    // - Pinch dari area kosong (bukan di atas item) juga menyebabkan deselect
-    //   karena jari pertama sudah memicu Fabric mouse:down → selection:cleared.
-    //
-    // SOLUSI:
-    // 1. Daftarkan listener capture-phase (useCapture=true) di fabricWrapper,
-    //    sehingga kita jalan SEBELUM listener bubble-phase Fabric di fabricEl.
-    // 2. Saat touch ke-2 terdeteksi: simpan active object, set isPinching=true,
-    //    lalu panggil e.stopPropagation() + e.preventDefault() agar Fabric
-    //    tidak pernah melihat event ini sama sekali.
-    // 3. Selama isPinching aktif: intercept SEMUA touchstart/touchmove/touchend
-    //    di capture phase dan stopPropagation() sehingga Fabric buta total.
-    // 4. Setelah pinch selesai: restore active object via requestAnimationFrame.
+    // MENYELESAIKAN SEMUA MASALAH SELECTION:
+    // 1. Pinch Zoom: Berjalan di Capture Phase sehingga Fabric.js tidak pernah melihat
+    //    touch ke-2, menjaga selection tetap utuh.
+    // 2. Drag/Pan Canvas: Jika menyeret canvas dari area kosong, kita tangkap di Capture Phase
+    //    dan hentikan propagasi ke Fabric (sehingga item tidak ter-unselect).
+    // 3. Tap vs Drag: Jika hanya mengetuk area kosong (tanpa seret), kita lakukan unselect
+    //    secara manual di end-handler. Jika diseret, selection tetap dipertahankan.
     const fabricEl = fc.getElement();
     const fabricWrapper = fabricEl?.parentElement;
     const panTarget = fabricWrapper ?? fabricEl;
@@ -2805,16 +2797,13 @@ export function CustomBatikPage() {
     let touchPanStart = { x: 0, y: 0 };
     let lastPinchMid = { x: 0, y: 0 };
     let touchMoved = false;
-    let touchOnObject = false;
-    const PAN_THRESHOLD = 6;
+    const PAN_THRESHOLD = 5;
 
     // Pinch-to-zoom state
     let lastPinchDist = 0;
     let isPinching = false;
-    // Simpan selection sebelum pinch dimulai
+    // Simpan selection sebelum gesture dimulai
     let pinchSavedActiveObject: fabric.Object | null = null;
-    // Cooldown setelah pinch selesai: block Fabric touchstart singkat agar
-    // sisa touch-up tidak meng-clear selection
     let pinchEndCooldown = false;
 
     const getTouchDist = (t: TouchList) => {
@@ -2830,12 +2819,9 @@ export function CustomBatikPage() {
       };
     };
 
-    // ─── CAPTURE-PHASE interceptor ───────────────────────────────────────────
-    // Jalan SEBELUM listener Fabric. Tugas: (a) simpan selection saat 2 jari
-    // terdeteksi, (b) blokir Fabric total selama pinch aktif.
     const onCaptureStart = (e: TouchEvent) => {
+      // --- Pinch-to-zoom (2 Jari) ---
       if (e.touches.length === 2) {
-        // Simpan active object SEBELUM Fabric sempat memprosesnya
         if (!isPinching) {
           pinchSavedActiveObject = fc.getActiveObject() ?? null;
         }
@@ -2848,23 +2834,35 @@ export function CustomBatikPage() {
         const rect = (panTarget as HTMLElement).getBoundingClientRect();
         lastPinchMid = getTouchMidpoint(e.touches, rect);
 
-        // Blokir Fabric dari melihat event ini sama sekali
         e.stopPropagation();
         e.preventDefault();
         return;
       }
 
-      // Selama pinch aktif atau cooldown: blokir semua single-touch ke Fabric
-      // agar Fabric tidak memproses finger-lift sebagai "tap di empty area"
-      if (isPinching || pinchEndCooldown) {
-        e.stopPropagation();
-        e.preventDefault();
-        return;
+      // --- Canvas Pan / Tap Empty Area (1 Jari) ---
+      if (e.touches.length === 1 && activeToolRef.current === "select") {
+        if (isPinching || pinchEndCooldown) {
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
+
+        const target = fc.findTarget(e as any, false);
+        // Jika menyentuh area kosong (tidak mengenai object apapun)
+        if (!target) {
+          touchPanActive = true;
+          touchMoved = false;
+          pinchSavedActiveObject = fc.getActiveObject() ?? null;
+          touchPanStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+          // Blokir dari Fabric agar tidak langsung men-deselect item
+          e.stopPropagation();
+        }
       }
     };
 
     const onCaptureMove = (e: TouchEvent) => {
-      // Jalankan zoom kalkulasi di capture phase
+      // 1. Tangani Pinch Zoom (2 Jari)
       if (isPinching && e.touches.length >= 2) {
         e.stopPropagation();
         e.preventDefault();
@@ -2888,9 +2886,8 @@ export function CustomBatikPage() {
         );
 
         const newZoomPct = Math.round((newFabricZoom / (baseScaleRef.current || 1)) * 100);
-        const clampedPct = Math.max(50, Math.min(400, newZoomPct));
-        zoomLevelRef.current = clampedPct;
-        setZoomLevel(clampedPct);
+        zoomLevelRef.current = Math.max(50, Math.min(400, newZoomPct));
+        setZoomLevel(zoomLevelRef.current);
 
         fc.zoomToPoint(new fabric.Point(mid.x, mid.y), newFabricZoom);
 
@@ -2901,10 +2898,8 @@ export function CustomBatikPage() {
           fc.setViewportTransform(clampViewport(vpt));
         }
         lastPinchMid = mid;
-
         fc.requestRenderAll();
 
-        // Paksa maintain selection selama pinch berlangsung
         if (pinchSavedActiveObject && !fc.getActiveObject()) {
           fc.setActiveObject(pinchSavedActiveObject);
           fc.requestRenderAll();
@@ -2912,12 +2907,39 @@ export function CustomBatikPage() {
         return;
       }
 
-      if (isPinching || pinchEndCooldown) {
+      // 2. Tangani Single Finger Canvas Pan (1 Jari)
+      if (touchPanActive && e.touches.length === 1) {
         e.stopPropagation();
+        e.preventDefault();
+
+        const dx = e.touches[0].clientX - touchPanStart.x;
+        const dy = e.touches[0].clientY - touchPanStart.y;
+
+        if (!touchMoved) {
+          if (Math.abs(dx) < PAN_THRESHOLD && Math.abs(dy) < PAN_THRESHOLD) return;
+          touchMoved = true;
+        }
+
+        touchPanStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+        const vpt = fc.viewportTransform;
+        if (vpt) {
+          vpt[4] += dx;
+          vpt[5] += dy;
+          fc.setViewportTransform(clampViewport(vpt));
+          fc.requestRenderAll();
+        }
+
+        // Pertahankan selection agar tidak berkedip / hilang selama pan
+        if (pinchSavedActiveObject && !fc.getActiveObject()) {
+          fc.setActiveObject(pinchSavedActiveObject);
+          fc.requestRenderAll();
+        }
       }
     };
 
     const onCaptureEnd = (e: TouchEvent) => {
+      // Selesai Pinch Zoom (2 Jari)
       if (isPinching && e.touches.length < 2) {
         e.stopPropagation();
         e.preventDefault();
@@ -2931,7 +2953,7 @@ export function CustomBatikPage() {
 
         pinchEndCooldown = true;
         requestAnimationFrame(() => {
-          if (pinchSavedActiveObject && !fc.getActiveObject()) {
+          if (pinchSavedActiveObject) {
             fc.setActiveObject(pinchSavedActiveObject);
             fc.requestRenderAll();
           }
@@ -2943,73 +2965,37 @@ export function CustomBatikPage() {
         return;
       }
 
-      if (e.touches.length === 0) {
+      // Selesai Single Finger Pan / Tap
+      if (touchPanActive && e.touches.length === 0) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        // Jika hanya mengetuk area kosong (TIDAK menyeret) → hilangkan selection secara manual
+        if (!touchMoved) {
+          fc.discardActiveObject();
+          fc.requestRenderAll();
+          setSelectedObject(null);
+          setSelectedObjectType(null);
+          setSelectedLayerId(null);
+        } else {
+          // Jika menyeret/menggeser canvas → Kembalikan selection yang kita amankan tadi
+          if (pinchSavedActiveObject) {
+            fc.setActiveObject(pinchSavedActiveObject);
+            fc.requestRenderAll();
+          }
+        }
+
         touchPanActive = false;
         touchMoved = false;
-        touchOnObject = false;
-        isPinching = false;
-        lastPinchDist = 0;
-      }
-    };
-
-    // ─── BUBBLE-PHASE handlers (setelah capture, untuk single-finger pan) ────
-    const onTouchPanStart = (e: TouchEvent) => {
-      if (e.touches.length === 2 || isPinching) return;
-      if (e.touches.length !== 1) return;
-      if (activeToolRef.current !== "select") return;
-
-      const touch = e.touches[0];
-      touchPanStart = { x: touch.clientX, y: touch.clientY };
-      touchMoved = false;
-
-      const target = fc.findTarget(e as any, false);
-      touchOnObject = !!target;
-
-      touchPanActive = !touchOnObject;
-    };
-
-    const onTouchPanMove = (e: TouchEvent) => {
-      if (!touchPanActive || e.touches.length !== 1) return;
-      if (activeToolRef.current !== "select") return;
-      if (touchOnObject) return;
-
-      const dx = e.touches[0].clientX - touchPanStart.x;
-      const dy = e.touches[0].clientY - touchPanStart.y;
-
-      if (!touchMoved) {
-        if (Math.abs(dx) < PAN_THRESHOLD && Math.abs(dy) < PAN_THRESHOLD) return;
-        touchMoved = true;
-      }
-
-      touchPanStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-
-      const vpt = fc.viewportTransform;
-      if (!vpt) return;
-      vpt[4] += dx;
-      vpt[5] += dy;
-      fc.setViewportTransform(clampViewport(vpt));
-      fc.requestRenderAll();
-      e.preventDefault();
-    };
-
-    const onTouchPanEnd = (e: TouchEvent) => {
-      if (e.touches.length === 0) {
-        touchPanActive = false;
-        touchMoved = false;
-        touchOnObject = false;
+        pinchSavedActiveObject = null;
       }
     };
 
     if (panTarget) {
-      // CAPTURE PHASE: jalan sebelum Fabric — blokir event ke Fabric saat pinch
+      // Daftarkan listener di Capture Phase saja agar mendahului Fabric.js
       panTarget.addEventListener("touchstart", onCaptureStart, { capture: true, passive: false });
       panTarget.addEventListener("touchmove", onCaptureMove, { capture: true, passive: false });
       panTarget.addEventListener("touchend", onCaptureEnd, { capture: true, passive: false });
-
-      // BUBBLE PHASE: tangani pan dan pinch move setelah capture
-      panTarget.addEventListener("touchstart", onTouchPanStart, { passive: false });
-      panTarget.addEventListener("touchmove", onTouchPanMove, { passive: false });
-      panTarget.addEventListener("touchend", onTouchPanEnd, { passive: false });
     }
 
     return () => {
@@ -3023,14 +3009,9 @@ export function CustomBatikPage() {
       window.removeEventListener("keydown", onKeyDownPan);
       window.removeEventListener("keyup", onKeyUpPan);
       if (panTarget) {
-        // Remove capture-phase listeners
         panTarget.removeEventListener("touchstart", onCaptureStart, { capture: true });
         panTarget.removeEventListener("touchmove", onCaptureMove, { capture: true });
         panTarget.removeEventListener("touchend", onCaptureEnd, { capture: true });
-        // Remove bubble-phase listeners
-        panTarget.removeEventListener("touchstart", onTouchPanStart);
-        panTarget.removeEventListener("touchmove", onTouchPanMove);
-        panTarget.removeEventListener("touchend", onTouchPanEnd);
       }
     };
   }, [saveSnapshot, applyZoom, clampViewport]);
