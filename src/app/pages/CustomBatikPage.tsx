@@ -1137,6 +1137,11 @@ export function CustomBatikPage() {
   useEffect(() => { fontSizeRef.current = fontSize; }, [fontSize]);
   useEffect(() => { fontFamilyRef.current = fontFamily; }, [fontFamily]);
   useEffect(() => { isFullModeRef.current = isFullMode; }, [isFullMode]);
+  useEffect(() => {
+    return () => {
+      setIsFullMode(false);
+    };
+  }, [setIsFullMode]);
   // resetZoomRef allows the isFullMode useEffect below to call resetZoom
   // before the resetZoom useCallback is declared (forward reference pattern).
   const resetZoomRef = useRef<(() => void) | null>(null);
@@ -2095,6 +2100,9 @@ export function CustomBatikPage() {
     fabricCanvasRef.current = canvas;
     canvas.on("after:render", () => {
       syncDisplayTransformRef.current?.();
+      if (canvas.getActiveObject()) {
+        setToolbarUpdate(v => v + 1);
+      }
     });
 
     canvas.on("object:selected", (e) => {
