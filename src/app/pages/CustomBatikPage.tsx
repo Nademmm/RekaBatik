@@ -2861,77 +2861,12 @@ export function CustomBatikPage() {
         e.preventDefault();
         return;
       }
-
-      // Single-touch normal: tidak diblokir, Fabric boleh proses
     };
 
     const onCaptureMove = (e: TouchEvent) => {
-      if (isPinching || pinchEndCooldown) {
-        e.stopPropagation();
-        // Tidak preventDefault di sini agar onTouchPanMove bisa menangani scroll
-      }
-    };
-
-    const onCaptureEnd = (e: TouchEvent) => {
-      // Saat salah satu jari diangkat dari pinch (tersisa < 2 jari)
-      if (isPinching && e.touches.length < 2) {
-        e.stopPropagation();
-        e.preventDefault();
-
-        isPinching = false;
-        lastPinchDist = 0;
-
-        // Snap zoomLevel ke kelipatan 5 setelah pinch selesai
-        const snappedPct = Math.max(50, Math.min(400, Math.round(zoomLevelRef.current / 5) * 5));
-        zoomLevelRef.current = snappedPct;
-        setZoomLevel(snappedPct);
-
-        // Aktifkan cooldown: blokir Fabric selama 1 frame berikutnya
-        pinchEndCooldown = true;
-        requestAnimationFrame(() => {
-          // Restore selection jika hilang
-          if (pinchSavedActiveObject && !fc.getActiveObject()) {
-            fc.setActiveObject(pinchSavedActiveObject);
-            fc.requestRenderAll();
-          }
-          pinchSavedActiveObject = null;
-          // Matikan cooldown setelah restore selesai
-          requestAnimationFrame(() => {
-            pinchEndCooldown = false;
-          });
-        });
-        return;
-      }
-
-      if (e.touches.length === 0) {
-        touchPanActive = false;
-        touchMoved = false;
-        touchOnObject = false;
-        isPinching = false;
-        lastPinchDist = 0;
-      }
-    };
-
-    // ─── BUBBLE-PHASE handlers (setelah capture, untuk pan + pinch zoom) ────
-    const onTouchPanStart = (e: TouchEvent) => {
-      // Pinch sudah ditangani sepenuhnya di capture phase
-      if (e.touches.length === 2 || isPinching) return;
-      if (e.touches.length !== 1) return;
-      if (activeToolRef.current !== "select") return;
-
-      const touch = e.touches[0];
-      touchPanStart = { x: touch.clientX, y: touch.clientY };
-      touchMoved = false;
-
-      const target = fc.findTarget(e as any, false);
-      touchOnObject = !!target;
-
-      touchPanActive = !touchOnObject;
-    };
-
-    const onTouchPanMove = (e: TouchEvent) => {
-      // --- Pinch-to-zoom dengan 2 jari (jalan di bubble phase juga) ---
+      // Jalankan zoom kalkulasi di capture phase
       if (isPinching && e.touches.length >= 2) {
+        e.stopPropagation();
         e.preventDefault();
 
         const newDist = getTouchDist(e.touches);
@@ -2977,7 +2912,63 @@ export function CustomBatikPage() {
         return;
       }
 
-      // --- Single-finger pan ---
+      if (isPinching || pinchEndCooldown) {
+        e.stopPropagation();
+      }
+    };
+
+    const onCaptureEnd = (e: TouchEvent) => {
+      if (isPinching && e.touches.length < 2) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        isPinching = false;
+        lastPinchDist = 0;
+
+        const snappedPct = Math.max(50, Math.min(400, Math.round(zoomLevelRef.current / 5) * 5));
+        zoomLevelRef.current = snappedPct;
+        setZoomLevel(snappedPct);
+
+        pinchEndCooldown = true;
+        requestAnimationFrame(() => {
+          if (pinchSavedActiveObject && !fc.getActiveObject()) {
+            fc.setActiveObject(pinchSavedActiveObject);
+            fc.requestRenderAll();
+          }
+          pinchSavedActiveObject = null;
+          requestAnimationFrame(() => {
+            pinchEndCooldown = false;
+          });
+        });
+        return;
+      }
+
+      if (e.touches.length === 0) {
+        touchPanActive = false;
+        touchMoved = false;
+        touchOnObject = false;
+        isPinching = false;
+        lastPinchDist = 0;
+      }
+    };
+
+    // ─── BUBBLE-PHASE handlers (setelah capture, untuk single-finger pan) ────
+    const onTouchPanStart = (e: TouchEvent) => {
+      if (e.touches.length === 2 || isPinching) return;
+      if (e.touches.length !== 1) return;
+      if (activeToolRef.current !== "select") return;
+
+      const touch = e.touches[0];
+      touchPanStart = { x: touch.clientX, y: touch.clientY };
+      touchMoved = false;
+
+      const target = fc.findTarget(e as any, false);
+      touchOnObject = !!target;
+
+      touchPanActive = !touchOnObject;
+    };
+
+    const onTouchPanMove = (e: TouchEvent) => {
       if (!touchPanActive || e.touches.length !== 1) return;
       if (activeToolRef.current !== "select") return;
       if (touchOnObject) return;
@@ -3012,7 +3003,7 @@ export function CustomBatikPage() {
     if (panTarget) {
       // CAPTURE PHASE: jalan sebelum Fabric — blokir event ke Fabric saat pinch
       panTarget.addEventListener("touchstart", onCaptureStart, { capture: true, passive: false });
-      panTarget.addEventListener("touchmove", onCaptureMove, { capture: true, passive: true });
+      panTarget.addEventListener("touchmove", onCaptureMove, { capture: true, passive: false });
       panTarget.addEventListener("touchend", onCaptureEnd, { capture: true, passive: false });
 
       // BUBBLE PHASE: tangani pan dan pinch move setelah capture
