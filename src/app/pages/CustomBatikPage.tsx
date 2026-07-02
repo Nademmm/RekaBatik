@@ -410,12 +410,12 @@ function makeStarPoints(cx: number, cy: number, numPoints: number, outerR: numbe
 // [OPT-2] detectObjectType — centralized helper, defined once outside the component
 function detectObjectType(target: fabric.Object): "pattern" | "shape" | "text" | null {
   if (!target) return null;
-  
+
   // Handle ActiveSelection or Group (multiple objects)
   if ((target.type === "activeSelection" || target.type === "group") && (target as any).getObjects) {
     const objects = (target as any).getObjects();
     if (objects.length === 0) return null;
-    
+
     // Check if all objects have the same type
     const firstType = detectObjectType(objects[0]);
     if (firstType && objects.every((obj: fabric.Object) => detectObjectType(obj) === firstType)) {
@@ -619,7 +619,7 @@ const SidebarTabs = memo(({
               const isSelected = selectedPatternIds.has(pattern.id);
               return (
                 <button
-                 key={pattern.id}
+                  key={pattern.id}
                   onClick={() => {
                     if (isMultiSelectMode) togglePatternSelection(pattern.id);
                     else addItemToCanvas(pattern);
@@ -632,9 +632,8 @@ const SidebarTabs = memo(({
                     e.dataTransfer.setData("application/x-batik-pattern-id", String(pattern.id));
                     e.dataTransfer.effectAllowed = "copy";
                   }}
-                  className={`relative p-2.5 sm:p-3.5 rounded-2xl border-2 transition-all duration-200 text-left flex flex-col items-stretch group ${
-                    isMultiSelectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
-                  } ${isSelected ? "bg-[rgba(139,111,71,0.08)]" : "bg-[#FAF8F5] hover:bg-[#FFFFFF]"}`}
+                  className={`relative p-2.5 sm:p-3.5 rounded-2xl border-2 transition-all duration-200 text-left flex flex-col items-stretch group ${isMultiSelectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+                    } ${isSelected ? "bg-[rgba(139,111,71,0.08)]" : "bg-[#FAF8F5] hover:bg-[#FFFFFF]"}`}
                   style={{ borderColor: isSelected ? "#8B6F47" : "rgba(139,111,71,0.12)" }}
                 >
                   {isMultiSelectMode && (
@@ -697,7 +696,7 @@ const SidebarTabs = memo(({
                   ref={customColorInputRef}
                   defaultValue={customColor}
                   // [OPT-1b] onInput fires on every drag tick — update DOM text only, no setState
-                 onInput={(e) => {
+                  onInput={(e) => {
                     const v = (e.target as HTMLInputElement).value;
                     if (customColorTextRef.current) customColorTextRef.current.textContent = v;
                   }}
@@ -1356,13 +1355,13 @@ export function CustomBatikPage() {
   const checkOffscreenHasContent = () => {
     const offscreen = offscreenRef.current;
     if (!offscreen) return false;
-    
+
     // If we have history beyond the initial state, it's definitely not "empty" in terms of user action
     if (offscreenHistoryIndexRef.current > 0) return true;
 
     const initial = initialOffscreenImageDataRef.current;
     if (!initial) return false;
-    
+
     const ctx = offscreen.getContext("2d")!;
     // Check the center 800x600 region for visual content
     const current = ctx.getImageData(1600, 1200, 800, 600);
@@ -1408,20 +1407,20 @@ export function CustomBatikPage() {
     const visibleH = fc.getHeight() / zoom;  // ← dynamic, bukan 600/extraScale
 
     const leftX = 1600 - (vpt[4] / zoom);
-    const topY  = 1200 - (vpt[5] / zoom);
+    const topY = 1200 - (vpt[5] / zoom);
 
-    const hThumbWidthPct  = Math.max(10, Math.min(100, (visibleW / virtualW) * 100));
+    const hThumbWidthPct = Math.max(10, Math.min(100, (visibleW / virtualW) * 100));
     const vThumbHeightPct = Math.max(10, Math.min(100, (visibleH / virtualH) * 100));
     const maxLeftX = virtualW - visibleW;
-    const maxTopY  = virtualH - visibleH;
+    const maxTopY = virtualH - visibleH;
 
     const hPosPct = maxLeftX > 0 ? Math.max(0, Math.min(100, (leftX / maxLeftX) * (100 - hThumbWidthPct))) : 0;
-    const vPosPct = maxTopY  > 0 ? Math.max(0, Math.min(100, (topY  / maxTopY)  * (100 - vThumbHeightPct))) : 0;
+    const vPosPct = maxTopY > 0 ? Math.max(0, Math.min(100, (topY / maxTopY) * (100 - vThumbHeightPct))) : 0;
 
-    hThumb.style.width  = `${hThumbWidthPct}%`;
-    hThumb.style.left   = `${hPosPct}%`;
+    hThumb.style.width = `${hThumbWidthPct}%`;
+    hThumb.style.left = `${hPosPct}%`;
     vThumb.style.height = `${vThumbHeightPct}%`;
-    vThumb.style.top    = `${vPosPct}%`;
+    vThumb.style.top = `${vPosPct}%`;
   }, []);
 
   const clampViewport = useCallback((vpt: number[]) => {
@@ -2513,7 +2512,7 @@ export function CustomBatikPage() {
       // isDraggingObjectRef.current = true; // REMOVED: so toolbar follows during drag
       const obj = e.target;
       if (!obj) return;
-      
+
       const objWidth = obj.width ? obj.width * (obj.scaleX || 1) : 0;
       const objHeight = obj.height ? obj.height * (obj.scaleY || 1) : 0;
 
@@ -3088,7 +3087,7 @@ export function CustomBatikPage() {
   // Text tool event listener — mouse:down spawn removed (Canva-style: spawn on toolbar button click)
   useEffect(() => {
     // No mouse:down listener needed; text is spawned directly via spawnTextObject()
-    return () => {};
+    return () => { };
   }, [saveSnapshot]);
 
   // Switch tool
@@ -3367,7 +3366,7 @@ export function CustomBatikPage() {
           img.setCoords();
           const newLayerId = Date.now().toString();
           (img as any).data = { layerId: newLayerId, patternId: pattern.id, layerName: pattern.name || 'Motif', styleType: pattern.style_type, colorPresetName: sidebarPreset.name, customColor: sidebarCustomColor, originalSvg: getBatikSvg(pattern.style_type) || null, originalScale: scale, originalWidth: rawW, originalHeight: rawH };
-          
+
           skipAutoTabSwitchRef.current = true;
           fc.add(img); img.setCoords(); fc.setActiveObject(img); fc.requestRenderAll();
           setLayers((prev) => [...prev, { id: newLayerId, type: 'pattern', name: pattern.name || 'Motif', visible: true, locked: false, fabricObject: img }]);
@@ -3448,18 +3447,18 @@ export function CustomBatikPage() {
       const group = new fabric.Group([], { selectable: true, evented: true, hasControls: true, hasBorders: true });
       const newLayerId = "group_" + Date.now().toString();
       (group as any).data = { layerId: newLayerId, layerName: 'Grup' };
-      
+
       fc.discardActiveObject();
-      selected.forEach(obj => { 
-        fc.remove(obj); 
-        group.addWithUpdate(obj); 
+      selected.forEach(obj => {
+        fc.remove(obj);
+        group.addWithUpdate(obj);
       });
       fc.add(group);
-      
+
       const layerIdsToRemove = selected.map(obj => (obj as any).data?.layerId).filter(Boolean);
       setLayers(prev => prev.filter(l => !layerIdsToRemove.includes(l.id)));
       setLayers(prev => [...prev, { id: newLayerId, type: 'drawing', name: 'Grup', visible: true, locked: false, fabricObject: group }]);
-      
+
       fc.setActiveObject(group);
       group.setCoords();
       setSelectedObject(group);
@@ -3625,8 +3624,8 @@ export function CustomBatikPage() {
     const fc = fabricCanvasRef.current;
     if (!fc) return;
 
-    const targetLayerIds = layerId 
-      ? [layerId] 
+    const targetLayerIds = layerId
+      ? [layerId]
       : fc.getActiveObjects().map(obj => (obj as any).data?.layerId).filter(Boolean);
 
     if (targetLayerIds.length === 0) return;
@@ -3646,8 +3645,8 @@ export function CustomBatikPage() {
     const fc = fabricCanvasRef.current;
     if (!fc) return;
 
-    const targetLayerIds = layerId 
-      ? [layerId] 
+    const targetLayerIds = layerId
+      ? [layerId]
       : fc.getActiveObjects().map(obj => (obj as any).data?.layerId).filter(Boolean);
 
     if (targetLayerIds.length === 0) return;
@@ -3924,24 +3923,99 @@ export function CustomBatikPage() {
   }, [saveSnapshot, getSpawnPoint]);
 
   // Build final canvas for download/save
+  // Smart export: auto-frames all content so off-center designs look correct.
   const buildFinalCanvas = async (): Promise<HTMLCanvasElement> => {
     const fc = fabricCanvasRef.current!;
     const offscreen = offscreenRef.current!;
+    const EXPORT_W = 800;
+    const EXPORT_H = 600;
+
     const final = document.createElement("canvas");
-    final.width = 800; final.height = 600;
+    final.width = EXPORT_W;
+    final.height = EXPORT_H;
     const ctx = final.getContext("2d")!;
     ctx.fillStyle = canvasBackground || "#ffffff";
-    ctx.fillRect(0, 0, 800, 600);
+    ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
 
-    // Simpan state canvas saat ini
+    // ── Step 1: compute tight bounding box of ALL fabric objects ──────────────
+    const objects = fc.getObjects();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasFabricContent = false;
+
+    objects.forEach((obj) => {
+      if (!obj.visible) return;
+      const br = obj.getBoundingRect(true, true);
+      if (br.width > 0 && br.height > 0) {
+        minX = Math.min(minX, br.left);
+        minY = Math.min(minY, br.top);
+        maxX = Math.max(maxX, br.left + br.width);
+        maxY = Math.max(maxY, br.top + br.height);
+        hasFabricContent = true;
+      }
+    });
+
+    // ── Step 2: check if offscreen (brush) layer has any content ──────────────
+    const offCtx = offscreen.getContext("2d")!;
+    const offW = offscreen.width;   // 4000
+    const offH = offscreen.height;  // 3000
+    const sample = offCtx.getImageData(0, 0, offW, offH);
+    let bMinX = offW, bMinY = offH, bMaxX = 0, bMaxY = 0;
+    let hasBrushContent = false;
+    const step = 4; // scan every 4th pixel for performance
+    for (let y = 0; y < offH; y += step) {
+      for (let x = 0; x < offW; x += step) {
+        const a = sample.data[(y * offW + x) * 4 + 3];
+        if (a > 10) {
+          if (x < bMinX) bMinX = x;
+          if (y < bMinY) bMinY = y;
+          if (x > bMaxX) bMaxX = x;
+          if (y > bMaxY) bMaxY = y;
+          hasBrushContent = true;
+        }
+      }
+    }
+
+    // ── Step 3: determine final bounding box in Fabric logical coords ─────────
+    let exportLeft = 0, exportTop = 0, exportWidth = EXPORT_W, exportHeight = EXPORT_H;
+
+    if (hasBrushContent) {
+      const bFabricMinX = bMinX - 1600;
+      const bFabricMinY = bMinY - 1200;
+      const bFabricMaxX = bMaxX - 1600;
+      const bFabricMaxY = bMaxY - 1200;
+      minX = Math.min(minX, bFabricMinX);
+      minY = Math.min(minY, bFabricMinY);
+      maxX = Math.max(maxX, bFabricMaxX);
+      maxY = Math.max(maxY, bFabricMaxY);
+    }
+
+    const hasAnyContent = hasFabricContent || hasBrushContent;
+    if (hasAnyContent && isFinite(minX) && isFinite(minY) && maxX > minX && maxY > minY) {
+      const PAD = 24;
+      const contentW = maxX - minX;
+      const contentH = maxY - minY;
+      const scaleX = (EXPORT_W - PAD * 2) / contentW;
+      const scaleY = (EXPORT_H - PAD * 2) / contentH;
+      const scale = Math.min(scaleX, scaleY, 1.5); // cap upscale at 1.5x
+
+      exportLeft = minX - (EXPORT_W / scale - contentW) / 2;
+      exportTop  = minY - (EXPORT_H / scale - contentH) / 2;
+      exportWidth  = EXPORT_W / scale;
+      exportHeight = EXPORT_H / scale;
+    }
+
+    // ── Step 4: render Fabric objects into export canvas ──────────────────────
     const savedVpt = fc.viewportTransform ? [...fc.viewportTransform] as number[] : null;
-    const savedW   = fc.getWidth();
-    const savedH   = fc.getHeight();
+    const savedW = fc.getWidth();
+    const savedH = fc.getHeight();
 
-    // Reset sementara ke 800×600 neutral viewport untuk ekspor yang konsisten
-    fc.setWidth(800);
-    fc.setHeight(600);
-    fc.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    const vptScale = EXPORT_W / exportWidth;
+    const vptX = -exportLeft * vptScale;
+    const vptY = -exportTop * (EXPORT_H / exportHeight);
+
+    fc.setWidth(EXPORT_W);
+    fc.setHeight(EXPORT_H);
+    fc.setViewportTransform([vptScale, 0, 0, EXPORT_H / exportHeight, vptX, vptY]);
     fc.renderAll();
     const fabricDataUrl = fc.toDataURL({ format: "png", multiplier: 1 });
 
@@ -3953,19 +4027,26 @@ export function CustomBatikPage() {
 
     await new Promise<void>((res, rej) => {
       const img = new Image();
-      img.onload = () => { ctx.drawImage(img, 0, 0, 800, 600); res(); };
+      img.onload = () => { ctx.drawImage(img, 0, 0, EXPORT_W, EXPORT_H); res(); };
       img.onerror = rej;
       img.src = fabricDataUrl;
     });
-    ctx.drawImage(offscreen, 1600, 1200, 800, 600, 0, 0, 800, 600);
 
+    // ── Step 5: composite brush layer using same framing ──────────────────────
+    const offSrcX = (exportLeft + 1600);
+    const offSrcY = (exportTop + 1200);
+    const offSrcW = exportWidth;
+    const offSrcH = exportHeight;
+    ctx.drawImage(offscreen, offSrcX, offSrcY, offSrcW, offSrcH, 0, 0, EXPORT_W, EXPORT_H);
+
+    // ── Step 6: watermarks ────────────────────────────────────────────────────
     // Watermark besar
     ctx.save();
     ctx.globalAlpha = 0.12;
     ctx.font = "bold 80px 'Playfair Display', serif";
     ctx.fillStyle = "#4A2F1A";
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.translate(400, 300); ctx.rotate(-25 * Math.PI / 180);
+    ctx.translate(EXPORT_W / 2, EXPORT_H / 2); ctx.rotate(-25 * Math.PI / 180);
     ctx.shadowColor = "rgba(0,0,0,0.15)"; ctx.shadowBlur = 8;
     ctx.fillText("RekaBatik", 0, 0);
     ctx.restore();
@@ -3977,7 +4058,7 @@ export function CustomBatikPage() {
     ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 5;
     ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
     ctx.textAlign = "right"; ctx.textBaseline = "bottom";
-    ctx.fillText("RekaBatik", 780, 580);
+    ctx.fillText("RekaBatik", EXPORT_W - 20, EXPORT_H - 20);
     ctx.restore();
     return final;
   };
@@ -4031,7 +4112,7 @@ export function CustomBatikPage() {
       const thumbnailDataUrl = final.toDataURL("image/png");
       const designJson = fabricCanvasRef.current.toJSON(["data"]);
       const payload = { ...designJson, offscreenDataUrl: offscreenRef.current?.toDataURL("image/png") || null, canvasBackground, canvasThumbnail: thumbnailDataUrl, projectInfo };
-      
+
       if (savedDesignId) {
         const { error } = await supabase
           .from("custom_designs")
@@ -4118,9 +4199,11 @@ export function CustomBatikPage() {
     const displayWidth = br.width * zoom;
     const containerWidth = container.getBoundingClientRect().width;
     const rawLeft = displayLeft + displayWidth / 2;
+    const toolbarHeight = 52;
+    const toolbarGap = 37;
     return {
       left: Math.max(60, Math.min(containerWidth - 60, rawLeft)),
-      top: Math.max(8, displayTop - 52),
+      top: Math.max(8, displayTop - toolbarHeight - toolbarGap),
     };
   };
 
@@ -4823,9 +4906,9 @@ export function CustomBatikPage() {
                                   if (!fc) return null;
                                   const activeObjects = fc.getActiveObjects();
                                   if (activeObjects.length === 0) return null;
-                                  
+
                                   const allVisible = activeObjects.every(obj => obj.visible !== false);
-                                  
+
                                   return (
                                     <button
                                       onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(null); setShowObjectMenu(false); }}
@@ -4844,9 +4927,9 @@ export function CustomBatikPage() {
                                   if (!fc) return null;
                                   const activeObjects = fc.getActiveObjects();
                                   if (activeObjects.length === 0) return null;
-                                  
+
                                   const anyLocked = activeObjects.some(obj => !obj.selectable);
-                                  
+
                                   return (
                                     <button
                                       onClick={(e) => { e.stopPropagation(); toggleLayerLock(null); setShowObjectMenu(false); }}
@@ -5292,79 +5375,79 @@ export function CustomBatikPage() {
             </motion.div>
 
             {/* Floating sidebar — always mounted, slides via y so drag+close animates smoothly */}
-              <motion.div
-                drag="y"
-                dragControls={sidebarDragControls}
-                dragListener={false}
-                dragConstraints={{ top: 0, bottom: 0 }}
-                dragElastic={{ top: 0.12, bottom: 0.6 }}
-                animate={{ y: showFloatingSidebar ? "0%" : "150%", opacity: showFloatingSidebar ? 1 : 0 }}
-                transition={{ type: "spring", damping: 32, stiffness: 320, mass: 0.9 }}
-                onDragEnd={(_, info) => {
-                  if (info.offset.y > 110 || info.velocity.y > 450) {
-                    closeFloatingSidebar();
-                  } else if (info.offset.y < -60 || info.velocity.y < -350) {
-                    setIsSidebarExpanded(true);
-                  } else if (info.offset.y > 30 && isSidebarExpanded) {
-                    setIsSidebarExpanded(false);
-                  }
-                }}
-                className={`fixed inset-x-0 bottom-0 top-auto ${isSidebarExpanded ? "max-h-[92vh]" : "max-h-[60vh]"} rounded-t-[28px] rounded-b-none sm:top-6 sm:right-6 sm:left-auto sm:bottom-28 sm:max-h-none sm:rounded-[28px] z-[101] sm:w-[380px] sm:max-w-[90vw] shadow-2xl backdrop-blur-md overflow-hidden flex flex-col touch-none sm:touch-auto`}
-                style={{ background: "rgba(255,255,255,0.97)", border: "1px solid rgba(212,184,139,0.25)", transition: "max-height 0.3s ease-out", pointerEvents: showFloatingSidebar ? "auto" : "none" }}
+            <motion.div
+              drag="y"
+              dragControls={sidebarDragControls}
+              dragListener={false}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0.12, bottom: 0.6 }}
+              animate={{ y: showFloatingSidebar ? "0%" : "150%", opacity: showFloatingSidebar ? 1 : 0 }}
+              transition={{ type: "spring", damping: 32, stiffness: 320, mass: 0.9 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 110 || info.velocity.y > 450) {
+                  closeFloatingSidebar();
+                } else if (info.offset.y < -60 || info.velocity.y < -350) {
+                  setIsSidebarExpanded(true);
+                } else if (info.offset.y > 30 && isSidebarExpanded) {
+                  setIsSidebarExpanded(false);
+                }
+              }}
+              className={`fixed inset-x-0 bottom-0 top-auto ${isSidebarExpanded ? "max-h-[92vh]" : "max-h-[60vh]"} rounded-t-[28px] rounded-b-none sm:top-6 sm:right-6 sm:left-auto sm:bottom-28 sm:max-h-none sm:rounded-[28px] z-[101] sm:w-[380px] sm:max-w-[90vw] shadow-2xl backdrop-blur-md overflow-hidden flex flex-col touch-none sm:touch-auto`}
+              style={{ background: "rgba(255,255,255,0.97)", border: "1px solid rgba(212,184,139,0.25)", transition: "max-height 0.3s ease-out", pointerEvents: showFloatingSidebar ? "auto" : "none" }}
+            >
+              <div
+                className="flex flex-col items-center pt-3 pb-1 sm:hidden flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
+                style={{ touchAction: "none" }}
+                onPointerDown={(e) => { if (window.innerWidth < 640) sidebarDragControls.start(e); }}
               >
-                <div
-                  className="flex flex-col items-center pt-3 pb-1 sm:hidden flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
-                  style={{ touchAction: "none" }}
-                  onPointerDown={(e) => { if (window.innerWidth < 640) sidebarDragControls.start(e); }}
-                >
-                  <div className="w-10 h-1.5 rounded-full mb-1" style={{ background: "rgba(139,111,71,0.35)" }} />
-                  <span className="text-[10px] text-[#A89B8F] font-medium">Geser untuk menutup</span>
-                </div>
-                <div
-                  className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 cursor-grab active:cursor-grabbing sm:cursor-default select-none"
-                  style={{ borderColor: "rgba(139,111,71,0.1)" }}
-                  onPointerDown={(e) => { if (window.innerWidth < 640) sidebarDragControls.start(e); }}
-                >
-                  <p className="text-sm font-bold" style={{ color: "#3D2B1F", fontFamily: "'Playfair Display', serif" }}>Panel Desain</p>
-                  <button onClick={closeFloatingSidebar} title="Tutup panel" className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-stone-100 cursor-pointer" style={{ color: "#A89B8F" }}>
-                    <X style={{ width: 14, height: 14 }} />
-                  </button>
-                </div>
-                <div className="flex-1 min-h-0 overflow-hidden touch-auto">
-                  {/* [OPT-6] Reuse SidebarTabs component in fullmode floating panel */}
-                  <SidebarTabs
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    patterns={patterns}
-                    loading={loading}
-                    selectedPreset={sidebarPreset}
-                    setSelectedPreset={setSidebarPreset}
-                    customColor={sidebarCustomColor}
-                    onCustomColorCommit={handleSidebarCustomColorCommit}
-                    addItemToCanvas={addItemToCanvas}
-                    renderMiniPattern={renderMiniPattern}
-                    layers={layers}
-                    selectedLayerId={selectedLayerId}
-                    setSelectedLayerId={setSelectedLayerId}
-                    setSelectedObject={setSelectedObject}
-                    setSelectedObjectType={setSelectedObjectType}
-                    fabricCanvasRef={fabricCanvasRef}
-                    moveLayer={moveLayer}
-                    toggleLayerVisibility={toggleLayerVisibility}
-                    toggleLayerLock={toggleLayerLock}
-                    duplicateLayer={duplicateLayer}
-                    deleteSelectedLayer={deleteSelectedLayer}
-                    layerItemRefs={layerItemRefs}
-                    addUploadedImageToCanvas={addUploadedImageToCanvas}
-                    flipLayer={flipLayer}
-                    isMultiSelectMode={isMultiSelectMode}
-                    toggleMultiSelectMode={toggleMultiSelectMode}
-                    selectedPatternIds={selectedPatternIds}
-                    togglePatternSelection={togglePatternSelection}
-                    onAddSelectedPatterns={addSelectedPatternsToCanvas}
-                  />
-                </div>
-              </motion.div>
+                <div className="w-10 h-1.5 rounded-full mb-1" style={{ background: "rgba(139,111,71,0.35)" }} />
+                <span className="text-[10px] text-[#A89B8F] font-medium">Geser untuk menutup</span>
+              </div>
+              <div
+                className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 cursor-grab active:cursor-grabbing sm:cursor-default select-none"
+                style={{ borderColor: "rgba(139,111,71,0.1)" }}
+                onPointerDown={(e) => { if (window.innerWidth < 640) sidebarDragControls.start(e); }}
+              >
+                <p className="text-sm font-bold" style={{ color: "#3D2B1F", fontFamily: "'Playfair Display', serif" }}>Panel Desain</p>
+                <button onClick={closeFloatingSidebar} title="Tutup panel" className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-stone-100 cursor-pointer" style={{ color: "#A89B8F" }}>
+                  <X style={{ width: 14, height: 14 }} />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden touch-auto">
+                {/* [OPT-6] Reuse SidebarTabs component in fullmode floating panel */}
+                <SidebarTabs
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  patterns={patterns}
+                  loading={loading}
+                  selectedPreset={sidebarPreset}
+                  setSelectedPreset={setSidebarPreset}
+                  customColor={sidebarCustomColor}
+                  onCustomColorCommit={handleSidebarCustomColorCommit}
+                  addItemToCanvas={addItemToCanvas}
+                  renderMiniPattern={renderMiniPattern}
+                  layers={layers}
+                  selectedLayerId={selectedLayerId}
+                  setSelectedLayerId={setSelectedLayerId}
+                  setSelectedObject={setSelectedObject}
+                  setSelectedObjectType={setSelectedObjectType}
+                  fabricCanvasRef={fabricCanvasRef}
+                  moveLayer={moveLayer}
+                  toggleLayerVisibility={toggleLayerVisibility}
+                  toggleLayerLock={toggleLayerLock}
+                  duplicateLayer={duplicateLayer}
+                  deleteSelectedLayer={deleteSelectedLayer}
+                  layerItemRefs={layerItemRefs}
+                  addUploadedImageToCanvas={addUploadedImageToCanvas}
+                  flipLayer={flipLayer}
+                  isMultiSelectMode={isMultiSelectMode}
+                  toggleMultiSelectMode={toggleMultiSelectMode}
+                  selectedPatternIds={selectedPatternIds}
+                  togglePatternSelection={togglePatternSelection}
+                  onAddSelectedPatterns={addSelectedPatternsToCanvas}
+                />
+              </div>
+            </motion.div>
           </>
         )}
       </AnimatePresence>
@@ -5473,7 +5556,7 @@ export function CustomBatikPage() {
             <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-8 text-center shadow-2xl" style={{ border: "1px solid rgba(212,184,139,0.3)" }}>
               <button onClick={() => setShowAIModal(false)} className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
-              
+
               <div className="relative w-24 h-24 mx-auto mb-6">
                 <div className="absolute inset-0 rounded-full animate-pulse blur-xl bg-[#8B6F47]/30" />
                 <div className="relative w-full h-full rounded-full flex items-center justify-center shadow-lg" style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}>
@@ -5487,7 +5570,7 @@ export function CustomBatikPage() {
               <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "rgba(139,111,71,0.1)", color: "#8B6F47", border: "1px solid rgba(139,111,71,0.2)" }}>
                 Premium Feature
               </div>
-              
+
               <p className="text-[#7A6B5E] mb-8 text-sm leading-relaxed">
                 Biarkan AI menganalisis desain batik Anda dan memberikan sentuhan artistik otomatis untuk hasil yang lebih memukau.
               </p>
@@ -5513,8 +5596,8 @@ export function CustomBatikPage() {
 
       {/* Navigation Blocker Confirmation Modal */}
       {blocker.state === "blocked" && (
-        <AlertDialog 
-          open={true} 
+        <AlertDialog
+          open={true}
           onOpenChange={(open) => {
             if (!open && !isProceeding) {
               blocker.reset?.();

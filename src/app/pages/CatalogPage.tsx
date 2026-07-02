@@ -11,11 +11,6 @@ import { useCart } from "../../lib/CartContext";
 import { useNavigate } from "react-router";
 import { fallbackCatalogItems, resolveCatalogItems } from "../constants/batikCatalog";
 import { ImageWithFallback } from "../components/ImageWithFallback";
-
-
-
-
-
 import { BatikDetailModal, PatternMini, getPatternType } from "../components/BatikDetailModal";
 
 // ── Main Page ──────────────────────────────────────────────────────────────
@@ -28,6 +23,7 @@ export function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [isSearchDocked, setIsSearchDocked] = useState(false);
   
   const [selectedBatik, setSelectedBatik] = useState<BatikItem | null>(null);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -107,6 +103,17 @@ export function CatalogPage() {
   }, [search]);
 
   useEffect(() => {
+    const handleScroll = () => {
+      setIsSearchDocked(window.scrollY > 72);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
     fetchFavorites();
   }, [user]);
 
@@ -183,18 +190,45 @@ export function CatalogPage() {
         </motion.div>
 
         {/* Sticky Search Bar */}
-        <div className="sticky top-20 md:top-24 max-w-2xl mx-auto bg-white/80 backdrop-blur-xl p-2 md:p-3 rounded-2xl mb-8 transition-all shadow-[0_4px_20px_rgba(61,43,31,0.04)] border" style={{ borderColor: "rgba(212,184,139,0.35)" }}>
-          <div className="relative w-full max-w-2xl mx-auto">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: "#7A6B5E" }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari batik (contoh: Mega Mendung)..."
-              className="w-full pl-11 pr-4 py-3 rounded-xl outline-none transition-all focus:ring-2"
-              style={{ background: "#FAF8F5", border: "1px solid rgba(212,184,139,0.5)", color: "#3D2B1F", "--tw-ring-color": "#8B6F47" } as React.CSSProperties}
+        <div className="sticky top-20 md:top-24 z-30 mb-8">
+          <motion.div
+            animate={{
+              y: isSearchDocked ? 0 : 6,
+              scale: isSearchDocked ? 1 : 0.985,
+              boxShadow: isSearchDocked
+                ? "0 18px 48px rgba(61,43,31,0.12)"
+                : "0 6px 24px rgba(61,43,31,0.05)",
+              borderColor: isSearchDocked
+                ? "rgba(212,184,139,0.55)"
+                : "rgba(212,184,139,0.35)",
+              backgroundColor: "#FFFFFF",
+            }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            className="relative max-w-2xl mx-auto rounded-[1.65rem] border p-2 md:p-3"
+          >
+            <div
+              className="pointer-events-none absolute inset-x-5 top-0 h-px"
+              style={{ background: "linear-gradient(90deg, transparent, rgba(212,184,139,0.7), transparent)" }}
             />
-          </div>
+            <div className="relative w-full max-w-2xl mx-auto">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5" style={{ color: "#7A6B5E" }} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cari batik (contoh: Mega Mendung)..."
+                className="w-full pl-11 pr-4 py-3.5 rounded-[1.1rem] outline-none transition-all focus:ring-2"
+                style={{
+                  background: isSearchDocked ? "rgba(250,248,245,0.92)" : "#FAF8F5",
+                  border: isSearchDocked
+                    ? "1px solid rgba(212,184,139,0.38)"
+                    : "1px solid rgba(212,184,139,0.5)",
+                  color: "#3D2B1F",
+                  "--tw-ring-color": "#8B6F47",
+                } as React.CSSProperties}
+              />
+            </div>
+          </motion.div>
         </div>
 
         {/* Grid Katalog */}

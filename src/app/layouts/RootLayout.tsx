@@ -148,9 +148,30 @@ export function RootLayout() {
   const totalNotif = notifications.unpaidCount + notifications.negotiatingCount + notifications.awaitingVerificationCount;
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    const collapseEnterY = 72;
+    const collapseExitY = 28;
+    let rafId: number | null = null;
+
+    const updateScrolled = () => {
+      const currentY = window.scrollY;
+      setScrolled((prev) => (prev ? currentY > collapseExitY : currentY > collapseEnterY));
+      rafId = null;
+    };
+
+    const handleScroll = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(updateScrolled);
+    };
+
+    updateScrolled();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   // Handle OAuth / authentication errors from URL query parameters

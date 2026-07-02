@@ -129,7 +129,7 @@ function ReviewModal({ order, onClose, onSubmit }: { order: Order; onClose: () =
             <h3 className="font-bold text-lg" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Berikan Ulasan</h3>
             <p className="text-xs" style={{ color: "#A89B8F" }}>Bagikan pengalaman Anda membeli {order.item}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-full">
             <X className="w-5 h-5" style={{ color: "#7A6B5E" }} />
           </button>
         </div>
@@ -146,7 +146,7 @@ function ReviewModal({ order, onClose, onSubmit }: { order: Order; onClose: () =
                   onClick={() => setRating(star)}
                   onMouseEnter={() => setHoverRating(star)}
                   onMouseLeave={() => setHoverRating(null)}
-                  className="p-1 focus:outline-none transition-transform active:scale-95 cursor-pointer"
+                  className="p-1 focus:outline-none cursor-pointer"
                 >
                   <Star
                     className="w-8 h-8 transition-colors"
@@ -181,15 +181,14 @@ function ReviewModal({ order, onClose, onSubmit }: { order: Order; onClose: () =
           </div>
 
           {/* Submit button */}
-          <motion.button
+          <button
             type="submit"
             disabled={loading}
-            whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
             className="w-full py-4 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 cursor-pointer"
             style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Kirim Ulasan"}
-          </motion.button>
+          </button>
         </form>
       </motion.div>
     </motion.div>
@@ -236,7 +235,7 @@ function PaymentModal({ order, onClose, onPaid }: { order: Order; onClose: () =>
               <h3 className="font-bold" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>Metode Pembayaran</h3>
               <p className="text-[10px] mt-0.5" style={{ color: "#A89B8F" }}>Pesanan: <span className="font-mono text-[9px]">{order.id}</span></p>
             </div>
-            <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+            <button onClick={onClose} className="p-2 rounded-full">
               <X className="w-5 h-5" style={{ color: "#7A6B5E" }} />
             </button>
           </div>
@@ -264,11 +263,10 @@ function PaymentModal({ order, onClose, onPaid }: { order: Order; onClose: () =>
 
         <div className="px-6 py-5 space-y-3">
           {methods.map(m => (
-            <motion.button
+            <button
               key={m.key}
-              whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
               onClick={() => setSelected(m.key)}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all text-left"
+              className="w-full flex items-center gap-4 p-4 rounded-2xl text-left"
               style={{
                 border: `2px solid ${selected === m.key ? m.color : "rgba(212,184,139,0.2)"}`,
                 background: selected === m.key ? `${m.color}08` : "#FAFAF8",
@@ -288,11 +286,10 @@ function PaymentModal({ order, onClose, onPaid }: { order: Order; onClose: () =>
               >
                 {selected === m.key && <div className="w-2.5 h-2.5 rounded-full" style={{ background: m.color }} />}
               </div>
-            </motion.button>
+            </button>
           ))}
 
-          <motion.button
-            whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+          <button
             disabled={!selected || loading}
             onClick={async () => {
               if (!selected) return;
@@ -305,7 +302,7 @@ function PaymentModal({ order, onClose, onPaid }: { order: Order; onClose: () =>
             style={{ background: "linear-gradient(135deg, #3D2B1F 0%, #8B6F47 100%)", boxShadow: "0 4px 20px rgba(61,43,31,0.3)" }}
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Wallet className="w-4 h-4" />Konfirmasi Pembayaran</>}
-          </motion.button>
+          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -364,7 +361,7 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
               <p className="text-[9px] font-medium" style={{ color: "#A89B8F" }}>{new Date(order.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"><X className="w-5 h-5" style={{ color: "#7A6B5E" }} /></button>
+          <button onClick={onClose} className="p-1.5 rounded-full flex-shrink-0"><X className="w-5 h-5" style={{ color: "#7A6B5E" }} /></button>
         </div>
 
         <div className="p-4 space-y-4">
@@ -489,42 +486,38 @@ function OrderDetailModal({ order, onClose, onConfirmReceived, onBuyAgain, onVie
 
           {/* Action Buttons (Compact) */}
           <div className="flex gap-2.5 pt-2">
-            <motion.button
-              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            <button
               onClick={() => { onClose(); navigate("/chat"); }}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px] transition-all"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px]"
               style={{ border: "1.5px solid rgba(139,111,71,0.2)", color: "#8B6F47", background: "rgba(139,111,71,0.03)" }}
             >
               <MessageCircle className="w-3.5 h-3.5" /> Chat
-            </motion.button>
+            </button>
 
             {order.status === "delivered" && order.can_review && !order.reviewed ? (
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              <button
                 onClick={() => { onClose(); onReview?.(order); }}
                 className="flex-[1.5] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px] text-white"
                 style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)" }}
               >
                 <Star className="w-3.5 h-3.5 fill-white" /> Ulasan
-              </motion.button>
+              </button>
             ) : order.status === "shipping" ? (
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              <button
                 onClick={() => { onClose(); onConfirmReceived(order.id); }}
                 className="flex-[1.5] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px] text-white"
                 style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Konfirmasi
-              </motion.button>
+              </button>
             ) : (
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              <button
                 onClick={async () => { await onBuyAgain(order); onClose(); }}
                 className="flex-[1.5] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-[10px] text-white"
                 style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}
               >
                 <ShoppingCart className="w-3.5 h-3.5" /> Beli Lagi
-              </motion.button>
+              </button>
             )}
           </div>
         </div>
@@ -558,11 +551,11 @@ function ImageLightbox({ src, title, onClose }: { src: string; title: string; on
             <p className="text-[10px] sm:text-xs text-stone-400">Desain Batik Kustom Anda</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={handleDownload} className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all hover:bg-stone-800 text-stone-200 hover:text-white flex items-center gap-1.5 border border-stone-700 bg-stone-900/50">
+            <button onClick={handleDownload} className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-stone-200 flex items-center gap-1.5 border border-stone-700 bg-stone-900/50">
               <Download className="w-3.5 h-3.5 sm:w-4 h-4" />
               <span className="hidden sm:inline text-xs font-semibold">Unduh</span>
             </button>
-            <button onClick={onClose} className="p-1.5 sm:p-2 rounded-full hover:bg-stone-800 text-stone-400 hover:text-white transition-colors border border-stone-800">
+            <button onClick={onClose} className="p-1.5 sm:p-2 rounded-full text-stone-400 border border-stone-800">
               <X className="w-4 h-4 sm:w-5 h-5" />
             </button>
           </div>
@@ -614,24 +607,22 @@ function ConfirmReceivedDialog({ onConfirm, onCancel }: { onConfirm: () => void;
         </div>
 
         <div className="flex gap-3 mt-6">
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+          <button
             onClick={onCancel}
             className="flex-1 py-3 rounded-xl font-semibold text-sm"
             style={{ border: "1.5px solid rgba(139,111,71,0.3)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
             disabled={loading}
           >
             Batal
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+          </button>
+          <button
             onClick={handleConfirm}
             className="flex-1 py-3 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2"
             style={{ background: "linear-gradient(135deg, #16A34A, #15803D)" }}
             disabled={loading}
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Ya, Konfirmasi"}
-          </motion.button>
+          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -856,7 +847,7 @@ export function OrdersPage() {
             <p style={{ color: "#7A6B5E" }}>Lacak dan kelola semua pesanan batik Anda</p>
           </div>
           <Link to="/catalog"
-            className="flex items-center gap-2 px-5 py-3 rounded-2xl text-white font-semibold text-sm transition-all hover:opacity-90"
+            className="flex items-center justify-center gap-2 px-6 py-3 rounded-full text-white font-bold text-sm w-full sm:w-auto"
             style={{ background: "linear-gradient(135deg, #8B6F47, #A88967)", boxShadow: "0 4px 16px rgba(139,111,71,0.25)" }}
           >
             <Plus className="w-4 h-4" /> Pesan Baru
@@ -915,9 +906,9 @@ export function OrdersPage() {
               const active = filterStatus === tab.key;
               const count = (counts as any)[tab.key] ?? 0;
               return (
-                <motion.button key={tab.key} whileTap={{ scale: 0.97 }}
+                <button key={tab.key}
                   onClick={() => setFilterStatus(tab.key)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap"
                   style={{
                     background: active ? tab.color : "rgba(255,255,255,0.9)",
                     color: active ? "#FFFFFF" : "#7A6B5E",
@@ -930,7 +921,7 @@ export function OrdersPage() {
                   <span className="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full" style={{ background: active ? "rgba(255,255,255,0.25)" : "rgba(139,111,71,0.1)", color: active ? "#fff" : "#8B6F47" }}>
                     {count}
                   </span>
-                </motion.button>
+                </button>
               );
             })}
             </div>
@@ -957,12 +948,12 @@ export function OrdersPage() {
               {searchId || filterStatus !== "all" ? "Coba ubah kata kunci atau filter yang digunakan." : "Mulai berbelanja batik pilihan dari pengrajin terbaik!"}
             </p>
             <Link to="/catalog">
-              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              <button
                 className="px-7 py-3 rounded-full font-semibold text-sm text-white"
                 style={{ background: "linear-gradient(135deg, #3D2B1F, #5A3D2B)" }}
               >
                 Belanja Sekarang
-              </motion.button>
+              </button>
             </Link>
           </motion.div>
         ) : (
@@ -1081,7 +1072,7 @@ export function OrdersPage() {
                         e.stopPropagation();
                         setSelectedOrder(order);
                       }}
-                      className="flex-1 py-1.5 sm:py-2 border border-stone-200 hover:bg-stone-50 text-[#7A6B5E] text-[10px] sm:text-xs font-bold rounded-lg transition-all"
+                      className="flex-1 py-1.5 sm:py-2 border border-stone-200 text-[#7A6B5E] text-[10px] sm:text-xs font-bold rounded-lg"
                     >
                       Detail
                     </button>
