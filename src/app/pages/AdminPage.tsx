@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import {
   LayoutDashboard, Package, MessageCircle, TrendingUp, Clock,
   CheckCircle, Truck, DollarSign, Star, Search, Send, ChevronRight,
@@ -908,6 +908,38 @@ export function AdminPage() {
       </div>
     );
   }
+  const renderStoreStatusBanner = () => {
+    if (!storeInfo) return null;
+    const isComplete = (storeInfo as any).is_profile_complete;
+    if (storeInfo.status === "approved" && !isComplete) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between gap-4 p-4 mb-6 rounded-2xl border bg-red-50/50 border-red-200"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-100 flex-shrink-0">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-red-800">Toko Anda Belum Tampil Publik!</p>
+              <p className="text-[11px] text-red-600 mt-0.5">
+                Toko Anda sudah disetujui, tapi belum lengkap. Pelanggan tidak bisa melihat toko Anda di Desa Jetis sebelum profil lengkap.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/my-store"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-all flex-shrink-0"
+          >
+            Lengkapi Sekarang
+          </Link>
+        </motion.div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="min-h-screen relative" style={{ background: "#FAF8F5", fontFamily: "'Inter', sans-serif" }}>
@@ -915,6 +947,7 @@ export function AdminPage() {
       <BatikBackground opacity={0.025} patternType="mega" />
 
       <div className={`${activeTab === "chat" ? "max-w-[96%] lg:max-w-[98%] mx-auto px-2 sm:px-4 py-4" : "max-w-7xl mx-auto px-4 sm:px-6 py-8"} relative z-10 transition-all duration-300`}>
+        {renderStoreStatusBanner()}
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-300 ${activeTab === "chat" ? "mb-4" : "mb-8"}`}>

@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { ShoppingBag, Menu, X, Instagram, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck, Home, Grid, Palette, Info } from "lucide-react";
+import { ShoppingBag, Menu, X, Instagram, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck, Home, Grid, Palette, Info, Store } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BatikBackground } from "../components/BatikBackground";
@@ -482,6 +482,18 @@ export function RootLayout() {
                               )}
                             </Link>
                           )}
+                          {/* Kelola Toko — artisan only */}
+                          {userRole === "artisan" && (
+                            <Link
+                              to="/my-store"
+                              onClick={() => setUserMenuOpen(false)}
+                              className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-[#8B6F47]/[0.06]"
+                              style={{ color: "#5A4A3E" }}
+                            >
+                              <Store className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                              Kelola Toko Saya
+                            </Link>
+                          )}
                           <Link
                             to="/profile"
                             onClick={() => setUserMenuOpen(false)}
@@ -685,6 +697,25 @@ export function RootLayout() {
                         {notifications.awaitingVerificationCount + notifications.negotiatingCount}
                       </span>
                     )}
+                    <ChevronRight className="w-4 h-4 opacity-50" />
+                  </Link>
+                )}
+                {/* Kelola Toko — artisan only */}
+                {userRole === "artisan" && (
+                  <Link
+                    to="/my-store"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 hover:bg-[#8B6F47]/[0.06]"
+                    style={{
+                      color: location.pathname === "/my-store" ? "#3D2B1F" : "#5A4A3E",
+                      fontWeight: location.pathname === "/my-store" ? 600 : 500,
+                      background: location.pathname === "/my-store" ? "rgba(139,111,71,0.06)" : "transparent",
+                    }}
+                  >
+                    <span className="text-sm flex items-center gap-3 flex-1">
+                      <Store className="w-4.5 h-4.5 transition-transform duration-300" style={{ color: "#8B6F47" }} />
+                      <span>Kelola Toko Saya</span>
+                    </span>
                     <ChevronRight className="w-4 h-4 opacity-50" />
                   </Link>
                 )}

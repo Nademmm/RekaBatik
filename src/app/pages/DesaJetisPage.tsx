@@ -81,7 +81,8 @@ export function DesaJetisPage() {
       const { data, error } = await supabase
         .from("stores")
         .select("*")
-        .eq("status", "approved");
+        .eq("status", "approved")
+        .eq("is_profile_complete", true);
       if (error) throw error;
       setStores(data || []);
     } catch (error) {
@@ -531,7 +532,14 @@ export function DesaJetisPage() {
                   style={{ background: "white", border: "1px solid #E8E1DA", boxShadow: "0 2px 8px rgba(61, 43, 31, 0.04)" }}
                 >
                   <div className="h-36 sm:h-48 relative overflow-hidden flex-shrink-0">
-                    <img src={store.image} alt={store.name} className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" />
+                    <img 
+                      src={store.image || batikFabricImg} 
+                      alt={store.name} 
+                      className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = batikFabricImg;
+                      }}
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
                     <button
                       onClick={(e) => toggleFavoriteStore(store.id, e)}

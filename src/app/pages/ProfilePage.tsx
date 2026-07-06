@@ -74,7 +74,6 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "addresses", label: "Alamat", icon: <MapPin className="w-4 h-4" /> },
   { id: "favorites", label: "Favorit", icon: <Heart className="w-4 h-4" /> },
   { id: "orders", label: "Pesanan", icon: <Package className="w-4 h-4" /> },
-  { id: "store", label: "Kelola Toko", icon: <Store className="w-4 h-4" /> },
   { id: "support", label: "Bantuan", icon: <MessageCircle className="w-4 h-4" /> },
 ];
 
@@ -897,11 +896,9 @@ export function ProfilePage() {
                   >
                     {displayName}
                   </h1>
-                  <p className="text-sm mb-3" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  <p className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
                     {email}
                   </p>
-                  
-                
                 </>
               )}
             </div>

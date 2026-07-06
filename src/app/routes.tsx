@@ -108,6 +108,13 @@ export const router = createBrowserRouter([
               })),
           },
           {
+            path: "my-store",
+            lazy: () =>
+              import("./pages/ArtisanStorePage").then((module) => ({
+                Component: module.ArtisanStorePage,
+              })),
+          },
+          {
             path: "admin",
             lazy: () =>
               import("./pages/AdminPage").then((module) => ({

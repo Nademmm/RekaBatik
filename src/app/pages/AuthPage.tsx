@@ -643,7 +643,7 @@ export function AuthPage() {
                       </div>
 
                       {inputField(
-                        "storePhone", "Nomor Telepon Toko", storePhone, setStorePhone, "tel", "Contoh: +62 812-3456-7890",
+                        "storePhone", "Nomor Telepon Toko", storePhone, setStorePhone, "tel", "Contoh: 08123456789",
                         <Phone className="w-[18px] h-[18px]" style={{ color: focusedField === "storePhone" ? "#8B6F47" : "#B8A898" }} />,
                         errors.storePhone
                       )}

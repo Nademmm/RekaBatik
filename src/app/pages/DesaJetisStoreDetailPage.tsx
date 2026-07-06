@@ -269,7 +269,7 @@ export function DesaJetisStoreDetailPage() {
     );
   }
 
-  const heroImage = store.hero_image || store.image || defaultImages.hero;
+  const heroImage = store.hero_image || defaultImages.hero;
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", background: "#FAF8F5", minHeight: "100vh" }} className="pb-24 sm:pb-10">
@@ -330,7 +330,7 @@ export function DesaJetisStoreDetailPage() {
                   {store.name}
                 </h1>
                 {isOwner && (
-                  <Link to="/profile?tab=store" className="mt-4 p-3 rounded-full bg-[#D4B88B] text-[#3D2B1F] shadow-lg hover:scale-110 transition-transform">
+                  <Link to="/my-store" className="mt-4 p-3 rounded-full bg-[#D4B88B] text-[#3D2B1F] shadow-lg hover:scale-110 transition-transform">
                     <Edit className="w-5 h-5" />
                   </Link>
                 )}
