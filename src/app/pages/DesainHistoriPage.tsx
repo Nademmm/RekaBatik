@@ -39,11 +39,13 @@ function DesignCard({
   onDelete,
   onOrder,
   onDetail,
+  onEdit,
 }: {
   design: DesainItem;
   onDelete: (design: DesainItem) => void;
   onOrder: (design: DesainItem) => void;
   onDetail: (design: DesainItem) => void;
+  onEdit: (design: DesainItem) => void;
 }) {
   const navigate = useNavigate();
 
@@ -63,7 +65,7 @@ function DesignCard({
   };
 
   const handleEdit = () => {
-    navigate(`/custom?editDesignId=${design.id}`);
+    onEdit(design);
   };
 
   return (
@@ -209,6 +211,16 @@ export function DesainHistoriPage() {
       toast.success("Desain berhasil dihapus");
     } catch {
       toast.error("Gagal menghapus desain");
+    }
+  };
+
+  const handleEdit = (design: DesainItem) => {
+    const subscriptionPlan = user?.user_metadata?.subscription_plan || "gratis";
+    if (subscriptionPlan === "gratis") {
+      toast.error("Akun Gratis tidak dapat mengedit desain yang sudah disimpan. Silakan upgrade ke Premium!");
+      navigate("/pricing");
+    } else {
+      navigate(`/custom?editDesignId=${design.id}`);
     }
   };
 
@@ -360,6 +372,7 @@ export function DesainHistoriPage() {
                   onDelete={handleDelete}
                   onOrder={handleOrder}
                   onDetail={setDetailTarget}
+                  onEdit={handleEdit}
                 />
               ))}
             </div>

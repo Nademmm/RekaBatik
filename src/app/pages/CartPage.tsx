@@ -4,7 +4,7 @@ import {
   Trash2, Plus, Minus, ShoppingBag, ArrowRight, Loader2, ChevronLeft,
   MapPin, CreditCard, CheckCircle2, Package, ChevronRight, User, Phone,
   Building2, Navigation, Hash, StickyNote, BadgeCheck, Palette, Store, MessageCircle, X,
-  BookUser, Check
+  BookUser, Check, Copy, Upload
 } from "lucide-react";
 import {
   Select,
@@ -210,6 +210,12 @@ export function CartPage() {
   const [notes, setNotes] = useState<string>(() => {
     return sessionStorage.getItem('checkoutNotes') || "";
   });
+
+  // Payment proof states
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofFileName, setPaymentProofFileName] = useState<string | null>(null);
+  const [paymentSenderName, setPaymentSenderName] = useState("");
+  const [paymentBankFrom, setPaymentBankFrom] = useState("");
 
   // Address Book state in Cart
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -468,6 +474,40 @@ export function CartPage() {
           shipping_address: address,
           notes: null,
         }];
+      }
+
+      // Check transfer constraints
+      const isBankTransfer = paymentMethod === "transfer_bca" || paymentMethod === "transfer_mandiri";
+      if (isBankTransfer && !hasCustomItems) {
+        if (!paymentSenderName.trim()) return toast.error("Masukkan nama pengirim transfer.");
+        if (!paymentBankFrom.trim()) return toast.error("Masukkan asal bank transfer.");
+        if (!paymentProofFile) return toast.error("Silakan unggah bukti transfer pembayaran.");
+      }
+
+      // Upload file first if exists
+      let uploadedUrl: string | null = null;
+      if (isBankTransfer && paymentProofFile && !hasCustomItems) {
+        const fileExt = paymentProofFile.name.split('.').pop();
+        const pathName = `receipts/orders-${user.id}-${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from("store-images")
+          .upload(pathName, paymentProofFile, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from("store-images")
+          .getPublicUrl(pathName);
+        uploadedUrl = publicUrlData?.publicUrl || null;
+      }
+
+      // Add proof url to orders
+      if (ordersToInsert.length > 0) {
+        ordersToInsert = ordersToInsert.map(o => ({
+          ...o,
+          payment_proof_url: uploadedUrl,
+          notes: o.notes ? `${o.notes} (Transfer oleh: ${paymentSenderName} via ${paymentBankFrom})` : `Transfer oleh: ${paymentSenderName} via ${paymentBankFrom}`
+        }));
       }
 
       const { error: insertError } = await supabase.from("orders").insert(ordersToInsert).select();
@@ -1247,6 +1287,115 @@ export function CartPage() {
                         </div>
                         <p className="text-sm font-medium" style={{ color: "#3D2B1F" }}>{selectedPayment.icon} {selectedPayment.label}</p>
                         <p className="text-xs" style={{ color: "#A89B8F" }}>{selectedPayment.desc}</p>
+                      </div>
+                    )}
+
+                    {/* Step 4 Professional Payment details for Bank Transfers */}
+                    {(paymentMethod === "transfer_bca" || paymentMethod === "transfer_mandiri") && !hasCustomItems && (
+                      <div className="p-5 rounded-2xl bg-white w-full space-y-4" style={{ border: "1px solid rgba(212,184,139,0.2)" }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <CreditCard className="w-4 h-4" style={{ color: "#8B6F47" }} />
+                          <h3 className="font-semibold" style={{ color: "#3D2B1F" }}>Instruksi Transfer Bank</h3>
+                        </div>
+                        
+                        <div className="p-3.5 rounded-xl space-y-3" style={{ background: "#FAF8F5", border: "1px solid rgba(139,111,71,0.1)" }}>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-[#8E7F72]">Bank Tujuan</span>
+                            <span className="font-bold text-[#3D2B1F]">{paymentMethod === "transfer_bca" ? "BCA" : "Mandiri"}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-[#8E7F72]">Nomor Rekening</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-[#3D2B1F]">
+                                {paymentMethod === "transfer_bca" ? "880 000 1234 56" : "140 000 1234 567"}
+                              </span>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(paymentMethod === "transfer_bca" ? "880000123456" : "1400001234567");
+                                  toast.success("Nomor rekening disalin!");
+                                }}
+                                className="p-1 hover:bg-stone-200 rounded transition-colors text-[#8B6F47]"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-[#8E7F72]">Atas Nama</span>
+                            <span className="text-[#5A4A3E]">RekaBatik</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs border-t pt-2" style={{ borderColor: "rgba(139,111,71,0.1)" }}>
+                            <span className="text-[#8E7F72] font-semibold">Total Transfer</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#8B6F47] text-sm">
+                                Rp {(total).toLocaleString("id-ID")}
+                              </span>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(String(total));
+                                  toast.success("Nominal disalin!");
+                                }}
+                                className="p-1 hover:bg-stone-200 rounded transition-colors text-[#8B6F47]"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Sender Fields */}
+                        <div className="space-y-3 pt-2">
+                          <div>
+                            <label className="block text-xs font-semibold text-[#8E7F72] mb-1">Nama Pengirim Transfer *</label>
+                            <input 
+                              type="text"
+                              value={paymentSenderName}
+                              onChange={e => setPaymentSenderName(e.target.value)}
+                              placeholder="cth: Budi Santoso"
+                              className="w-full px-3 py-2 border rounded-xl text-xs outline-none focus:border-[#8B6F47]"
+                              style={{ borderColor: "rgba(139,111,71,0.2)" }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#8E7F72] mb-1">Asal Bank Transfer *</label>
+                            <input 
+                              type="text"
+                              value={paymentBankFrom}
+                              onChange={e => setPaymentBankFrom(e.target.value)}
+                              placeholder="cth: BCA Tabungan, Mandiri Mandiri"
+                              className="w-full px-3 py-2 border rounded-xl text-xs outline-none focus:border-[#8B6F47]"
+                              style={{ borderColor: "rgba(139,111,71,0.2)" }}
+                            />
+                          </div>
+                          
+                          {/* Bukti File Upload */}
+                          <div>
+                            <label className="block text-xs font-semibold text-[#8E7F72] mb-1">Bukti Transfer (Wajib) *</label>
+                            <input 
+                              type="file" 
+                              accept="image/*,application/pdf"
+                              className="hidden"
+                              id="order-payment-file"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) {
+                                  if (f.size > 5 * 1024 * 1024) return toast.error("Ukuran file maksimal 5MB");
+                                  setPaymentProofFile(f);
+                                  setPaymentProofFileName(f.name);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => document.getElementById("order-payment-file")?.click()}
+                              className="w-full py-2.5 border border-dashed rounded-xl flex items-center justify-center gap-2 text-xs transition-colors hover:border-[#8B6F47]"
+                              style={{ borderColor: paymentProofFileName ? "#8B6F47" : "rgba(139,111,71,0.3)", color: paymentProofFileName ? "#8B6F47" : "#8E7F72" }}
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              {paymentProofFileName || "Unggah Bukti Transfer (Gambar / PDF)"}
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </motion.div>

@@ -38,6 +38,7 @@ import {
   FlipVertical,
   Sparkles,
   Wand2,
+  Clock,
 } from "lucide-react";
 import { useNavigate, useSearchParams, useBlocker } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -933,6 +934,16 @@ export function CustomBatikPage() {
   const [showProjectModal, setShowProjectModal] = useState<"save" | "cart" | "order" | null>(null);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
+
+  const handleAIEnhanceClick = () => {
+    const subscriptionPlan = user?.user_metadata?.subscription_plan || "gratis";
+    if (subscriptionPlan === "gratis") {
+      toast.error("Fitur AI Recommendation hanya tersedia untuk member Premium!");
+      navigate("/pricing");
+    } else {
+      setShowAIModal(true);
+    }
+  };
   const [projectInfo, setProjectInfo] = useState({ name: "", description: "", fabric: "Katun Primisima" });
   const [savedDesignId, setSavedDesignId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -3927,8 +3938,12 @@ export function CustomBatikPage() {
   const buildFinalCanvas = async (): Promise<HTMLCanvasElement> => {
     const fc = fabricCanvasRef.current!;
     const offscreen = offscreenRef.current!;
-    const EXPORT_W = 800;
-    const EXPORT_H = 600;
+    
+    const subscriptionPlan = user?.user_metadata?.subscription_plan || "gratis";
+    const isPremium = subscriptionPlan === "weekly" || subscriptionPlan === "monthly";
+
+    const EXPORT_W = isPremium ? 2000 : 800;
+    const EXPORT_H = isPremium ? 1500 : 600;
 
     const final = document.createElement("canvas");
     final.width = EXPORT_W;
@@ -4040,21 +4055,24 @@ export function CustomBatikPage() {
     ctx.drawImage(offscreen, offSrcX, offSrcY, offSrcW, offSrcH, 0, 0, EXPORT_W, EXPORT_H);
 
     // ── Step 6: watermarks ────────────────────────────────────────────────────
-    // Watermark besar
-    ctx.save();
-    ctx.globalAlpha = 0.12;
-    ctx.font = "bold 80px 'Playfair Display', serif";
-    ctx.fillStyle = "#4A2F1A";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.translate(EXPORT_W / 2, EXPORT_H / 2); ctx.rotate(-25 * Math.PI / 180);
-    ctx.shadowColor = "rgba(0,0,0,0.15)"; ctx.shadowBlur = 8;
-    ctx.fillText("RekaBatik", 0, 0);
-    ctx.restore();
+    // Watermark besar (Hanya untuk pengguna GRATIS)
+    if (!isPremium) {
+      ctx.save();
+      ctx.globalAlpha = 0.15;
+      ctx.font = "bold 60px 'Playfair Display', serif";
+      ctx.fillStyle = "#8B6F47";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.translate(EXPORT_W / 2, EXPORT_H / 2); ctx.rotate(-25 * Math.PI / 180);
+      ctx.shadowColor = "rgba(0,0,0,0.1)"; ctx.shadowBlur = 6;
+      ctx.fillText("RekaBatik - Akun Gratis", 0, 0);
+      ctx.restore();
+    }
+
     // Watermark pojok
     ctx.save();
-    ctx.globalAlpha = 0.7;
-    ctx.font = "bold 20px 'Playfair Display', serif";
-    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = isPremium ? 0.4 : 0.7;
+    ctx.font = isPremium ? "bold 25px 'Playfair Display', serif" : "bold 20px 'Playfair Display', serif";
+    ctx.fillStyle = isPremium ? "rgba(255, 255, 255, 0.6)" : "#ffffff";
     ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 5;
     ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
     ctx.textAlign = "right"; ctx.textBaseline = "bottom";
@@ -4108,6 +4126,38 @@ export function CustomBatikPage() {
     if (!fabricCanvasRef.current) return null;
     setIsSaving(true);
     try {
+      const subscriptionPlan = user.user_metadata?.subscription_plan || "gratis";
+
+      // 1. Check block edit limit for Gratis plan
+      if (savedDesignId && subscriptionPlan === "gratis") {
+        toast.error("Akun Gratis tidak dapat mengedit dan menyimpan ulang desain. Silakan upgrade ke Premium!");
+        navigate("/pricing");
+        return null;
+      }
+
+      // 2. Check design capacity count limits for Gratis and Weekly plans
+      if (!savedDesignId) {
+        const { count, error: countError } = await supabase
+          .from("custom_designs")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id);
+
+        if (countError) throw countError;
+
+        const currentCount = count || 0;
+        if (subscriptionPlan === "gratis" && currentCount >= 2) {
+          toast.error("Batas simpan akun Gratis adalah 2 desain. Silakan upgrade ke Premium untuk menambah kapasitas!");
+          navigate("/pricing");
+          return null;
+        }
+
+        if (subscriptionPlan === "weekly" && currentCount >= 12) {
+          toast.error("Batas simpan paket Premium Mingguan adalah 12 desain. Silakan upgrade ke Premium Bulanan untuk tanpa batas!");
+          navigate("/pricing");
+          return null;
+        }
+      }
+
       const final = await buildFinalCanvas();
       const thumbnailDataUrl = final.toDataURL("image/png");
       const designJson = fabricCanvasRef.current.toJSON(["data"]);
@@ -4588,7 +4638,7 @@ export function CustomBatikPage() {
                         <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => setShowAIModal(true)}
+                          onClick={handleAIEnhanceClick}
                           className="flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl font-bold text-white shadow-sm transition-all hover:shadow-md group overflow-hidden relative cursor-pointer"
                           style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}
                         >
@@ -5349,7 +5399,7 @@ export function CustomBatikPage() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowAIModal(true)}
+                    onClick={handleAIEnhanceClick}
                     className="flex items-center justify-center w-8 h-8 rounded-full font-bold text-white shadow-lg transition-all hover:shadow-[0_0_15px_rgba(139,111,71,0.5)] group overflow-hidden relative cursor-pointer flex-shrink-0"
                     style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}
                   >
@@ -5557,38 +5607,41 @@ export function CustomBatikPage() {
               className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-8 text-center shadow-2xl" style={{ border: "1px solid rgba(212,184,139,0.3)" }}>
               <button onClick={() => setShowAIModal(false)} className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
 
-              <div className="relative w-24 h-24 mx-auto mb-6">
-                <div className="absolute inset-0 rounded-full animate-pulse blur-xl bg-[#8B6F47]/30" />
-                <div className="relative w-full h-full rounded-full flex items-center justify-center shadow-lg" style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}>
-                  <Sparkles className="w-10 h-10 text-white animate-bounce" />
+              <div className="relative w-20 h-20 mx-auto mb-6">
+                <div className="absolute inset-0 rounded-full animate-pulse blur-md bg-[#8B6F47]/20" />
+                <div className="relative w-full h-full rounded-full flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}>
+                  <Sparkles className="w-8 h-8 text-white" />
                 </div>
               </div>
 
-              <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
-                AI Smart Enhance
+              <h3 className="text-2xl font-bold mb-1.5" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+                AI Smart Recommendation
               </h3>
-              <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "rgba(139,111,71,0.1)", color: "#8B6F47", border: "1px solid rgba(139,111,71,0.2)" }}>
+              <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "rgba(196,157,101,0.1)", color: "#C49D65", border: "1px solid rgba(196,157,101,0.2)" }}>
                 Premium Feature
               </div>
 
-              <p className="text-[#7A6B5E] mb-8 text-sm leading-relaxed">
-                Biarkan AI menganalisis desain batik Anda dan memberikan sentuhan artistik otomatis untuk hasil yang lebih memukau.
+              <p className="text-[#7A6B5E] mb-6 text-xs leading-relaxed max-w-xs mx-auto">
+                Dapatkan rekomendasi motif cerdas dan tata letak batik kustom otomatis yang dioptimalkan oleh kecerdasan buatan.
               </p>
 
-              <div className="p-4 rounded-2xl mb-8 flex items-center gap-3 text-left" style={{ background: "rgba(139,111,71,0.05)", border: "1px solid rgba(139,111,71,0.1)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "white" }}>
-                  <Wand2 className="w-5 h-5 text-[#8B6F47]" />
-                </div>
+              <div className="p-4 rounded-2xl mb-6 text-left flex items-start gap-3" style={{ background: "rgba(196,157,101,0.06)", border: "1px solid rgba(196,157,101,0.15)" }}>
+                <Clock className="w-4 h-4 text-[#C49D65] flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-bold text-[#3D2B1F]">Tahap Pengembangan</p>
-                  <p className="text-[10px] text-[#8E7F72]">Fitur ini akan segera hadir eksklusif untuk member Premium RekaBatik.</p>
+                  <h4 className="text-xs font-bold text-[#3D2B1F]">Segera Hadir</h4>
+                  <p className="text-[10.5px] text-[#8E7F72] leading-relaxed mt-0.5">
+                    Asisten cerdas AI kami sedang disempurnakan dan akan segera diluncurkan secara eksklusif untuk member Premium RekaBatik.
+                  </p>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <button onClick={() => setShowAIModal(false)} className="w-full py-3.5 rounded-xl font-bold text-white transition-all hover:opacity-95 shadow-md active:scale-95" style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}>Berlangganan Premium</button>
-                <button onClick={() => setShowAIModal(false)} className="w-full py-3.5 rounded-xl font-bold transition-all hover:bg-stone-50" style={{ color: "#8B6F47" }}>Nanti Saja</button>
-              </div>
+              <button
+                onClick={() => setShowAIModal(false)}
+                className="w-full py-3 rounded-xl font-bold transition-all text-xs cursor-pointer"
+                style={{ color: "#8B6F47", border: "1px solid rgba(139,111,71,0.2)", background: "rgba(139,111,71,0.02)" }}
+              >
+                Kembali
+              </button>
             </motion.div>
           </div>
         )}

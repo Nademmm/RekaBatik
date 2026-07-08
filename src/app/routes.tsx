@@ -48,6 +48,13 @@ export const router = createBrowserRouter([
           })),
       },
       {
+        path: "pricing",
+        lazy: () =>
+          import("./pages/PricingPage").then((module) => ({
+            Component: module.PricingPage,
+          })),
+      },
+      {
         path: "privacy-policy",
         lazy: () =>
           import("./pages/PrivacyPolicyPage").then((module) => ({
@@ -70,6 +77,13 @@ export const router = createBrowserRouter([
             lazy: () =>
               import("./pages/CustomBatikPage").then((module) => ({
                 Component: module.CustomBatikPage,
+              })),
+          },
+          {
+            path: "checkout",
+            lazy: () =>
+              import("./pages/CheckoutPage").then((module) => ({
+                Component: module.CheckoutPage,
               })),
           },
           {

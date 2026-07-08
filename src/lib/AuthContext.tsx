@@ -75,6 +75,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
+  // Sync subscription status from premium_subscriptions table to user_metadata
+  useEffect(() => {
+    if (!user) return;
+    const syncSubscription = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("premium_subscriptions")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("id", { ascending: false })
+          .limit(1);
+
+        if (error) return;
+        if (data && data.length > 0) {
+          const latestSub = data[0];
+          const isExpired = new Date(latestSub.expires_at) < new Date();
+
+          let targetPlan = "gratis";
+          let targetExpires = null;
+          let targetPending = false;
+
+          if (!isExpired) {
+            if (latestSub.status === "approved") {
+              targetPlan = latestSub.plan_id;
+              targetExpires = latestSub.expires_at;
+            } else if (latestSub.status === "pending") {
+              targetPending = true;
+            }
+          }
+
+          const currentPlan = user.user_metadata?.subscription_plan || "gratis";
+          const currentExpires = user.user_metadata?.subscription_expires_at || null;
+          const currentPending = !!user.user_metadata?.subscription_pending;
+
+          if (
+            currentPlan !== targetPlan ||
+            currentExpires !== targetExpires ||
+            currentPending !== targetPending
+          ) {
+            await supabase.auth.updateUser({
+              data: {
+                subscription_plan: targetPlan,
+                subscription_expires_at: targetExpires,
+                subscription_pending: targetPending,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Subscription sync failed:", err);
+      }
+    };
+    syncSubscription();
+  }, [user?.id, user?.user_metadata]);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);

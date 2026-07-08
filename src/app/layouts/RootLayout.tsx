@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { ShoppingBag, Menu, X, Instagram, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck, Home, Grid, Palette, Info, Store } from "lucide-react";
+import { ShoppingBag, Menu, X, Instagram, ChevronRight, User, LogOut, Package, Settings, MessageCircle, BookOpen, LayoutDashboard, ShieldCheck, Home, Grid, Palette, Info, Store, Crown } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BatikBackground } from "../components/BatikBackground";
@@ -54,6 +54,8 @@ const getNavItemIcon = (label: string, isActive: boolean) => {
       return <MessageCircle className={iconClass} />;
     case "Profil":
       return <User className={iconClass} />;
+    case "Premium":
+      return <Crown className={iconClass} />;
     default:
       return null;
   }
@@ -73,16 +75,60 @@ export function RootLayout() {
   const notificationTimerRef = useRef<number | null>(null);
   const artisanStoreNameRef = useRef<string | null>(null);
 
-  const [notifications, setNotifications] = useState({ unpaidCount: 0, negotiatingCount: 0, awaitingVerificationCount: 0 });
+  const [notifications, setNotifications] = useState({ unpaidCount: 0, negotiatingCount: 0, awaitingVerificationCount: 0, pendingPremiumCount: 0 });
+
+  // Expiry notification warning effect (only shows once per session)
+  useEffect(() => {
+    if (!user || userRole === "super_admin" || userRole === "artisan") return;
+    const plan = user.user_metadata?.subscription_plan || "gratis";
+    const expiresAtStr = user.user_metadata?.subscription_expires_at;
+    if (plan !== "gratis" && expiresAtStr) {
+      const expiresAt = new Date(expiresAtStr);
+      const remainingDays = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      
+      if (remainingDays >= 0 && remainingDays <= 2) {
+        const hasShown = sessionStorage.getItem("has_shown_expiry_warning");
+        if (!hasShown) {
+          toast.warning(`Masa aktif Premium Anda tinggal ${remainingDays} hari. Silakan lakukan perpanjangan paket agar akses tidak terputus.`, {
+            action: {
+              label: "Perpanjang",
+              onClick: () => navigate("/pricing")
+            },
+            duration: 8000
+          });
+          sessionStorage.setItem("has_shown_expiry_warning", "true");
+        }
+      }
+    }
+  }, [user, userRole, navigate]);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) {
-      setNotifications({ unpaidCount: 0, negotiatingCount: 0, awaitingVerificationCount: 0 });
+      setNotifications({ unpaidCount: 0, negotiatingCount: 0, awaitingVerificationCount: 0, pendingPremiumCount: 0 });
       return;
     }
 
     try {
-      if (userRole === "artisan") {
+      if (userRole === "super_admin") {
+        // Fetch pending premium subscriptions
+        const { count: pendingSubs } = await supabase
+          .from("premium_subscriptions")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pending");
+
+        // Fetch pending store registrations
+        const { count: pendingStores } = await supabase
+          .from("stores")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pending");
+
+        setNotifications({ 
+          unpaidCount: 0, 
+          negotiatingCount: 0, 
+          awaitingVerificationCount: pendingStores || 0, 
+          pendingPremiumCount: pendingSubs || 0 
+        });
+      } else if (userRole === "artisan") {
         let storeName = artisanStoreNameRef.current;
         if (!storeName) {
           const { data: storeData } = await supabase
@@ -102,7 +148,7 @@ export function RootLayout() {
           if (orders) {
             const awaiting = orders.filter(o => o.payment_status === "awaiting_verification").length;
             const nego = orders.filter(o => o.status === "negotiating").length;
-            setNotifications({ unpaidCount: 0, negotiatingCount: nego, awaitingVerificationCount: awaiting });
+            setNotifications({ unpaidCount: 0, negotiatingCount: nego, awaitingVerificationCount: awaiting, pendingPremiumCount: 0 });
           }
         }
       } else {
@@ -113,7 +159,7 @@ export function RootLayout() {
         if (orders) {
           const unpaid = orders.filter(o => o.payment_status === "pending" && o.total > 0 && o.status !== "negotiating" && (new Date(o.date).getTime() + 86400000 > Date.now())).length;
           const nego = orders.filter(o => o.status === "negotiating").length;
-          setNotifications({ unpaidCount: unpaid, negotiatingCount: nego, awaitingVerificationCount: 0 });
+          setNotifications({ unpaidCount: unpaid, negotiatingCount: nego, awaitingVerificationCount: 0, pendingPremiumCount: 0 });
         }
       }
     } catch (err) {
@@ -124,28 +170,52 @@ export function RootLayout() {
   useEffect(() => {
     fetchNotifications();
     if (!user) return;
-    const channel = supabase
-      .channel("navbar-orders-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        if (notificationTimerRef.current) {
-          window.clearTimeout(notificationTimerRef.current);
-        }
-
-        notificationTimerRef.current = window.setTimeout(() => {
+    
+    // Subscribe to premium_subscriptions if super_admin
+    const channels: any[] = [];
+    
+    if (userRole === "super_admin") {
+      const subChannel = supabase
+        .channel("admin-subs-realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "premium_subscriptions" }, () => {
           fetchNotifications();
-        }, 250);
-      })
-      .subscribe();
+        })
+        .subscribe();
+      channels.push(subChannel);
+      
+      const storeChannel = supabase
+        .channel("admin-stores-realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "stores" }, () => {
+          fetchNotifications();
+        })
+        .subscribe();
+      channels.push(storeChannel);
+    } else {
+      const orderChannel = supabase
+        .channel("navbar-orders-realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+          if (notificationTimerRef.current) {
+            window.clearTimeout(notificationTimerRef.current);
+          }
+
+          notificationTimerRef.current = window.setTimeout(() => {
+            fetchNotifications();
+          }, 250);
+        })
+        .subscribe();
+      channels.push(orderChannel);
+    }
+    
     return () => {
       if (notificationTimerRef.current) {
         window.clearTimeout(notificationTimerRef.current);
         notificationTimerRef.current = null;
       }
-      supabase.removeChannel(channel);
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [user, fetchNotifications]);
+  }, [user, fetchNotifications, userRole]);
 
-  const totalNotif = notifications.unpaidCount + notifications.negotiatingCount + notifications.awaitingVerificationCount;
+  const totalNotif = notifications.unpaidCount + notifications.negotiatingCount + notifications.awaitingVerificationCount + notifications.pendingPremiumCount;
 
   useEffect(() => {
     const collapseEnterY = 72;
@@ -231,6 +301,7 @@ export function RootLayout() {
     { path: "/desa-jetis", label: "Tentang Kami" },
     { path: "/chat", label: "Chat" },
     { path: "/profile", label: "Profil" },
+    { path: "/pricing", label: "Premium" },
   ];
 
   const serviceItems = [
@@ -242,7 +313,7 @@ export function RootLayout() {
   ];
 
   const desktopNavItems = navItems.filter(item => 
-    !["Desainku", "Pesanan", "Chat", "Profil"].includes(item.label)
+    !["Desainku", "Pesanan", "Chat", "Profil", "Premium"].includes(item.label)
   );
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Pengguna";
@@ -456,7 +527,12 @@ export function RootLayout() {
                               style={{ color: "#1D4ED8" }}
                             >
                               <ShieldCheck className="w-4 h-4" style={{ color: "#1D4ED8" }} />
-                              Portal Super Admin
+                              <span className="flex-1">Portal Super Admin</span>
+                              {(notifications.pendingPremiumCount + notifications.awaitingVerificationCount) > 0 && (
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white bg-red-500">
+                                  {notifications.pendingPremiumCount + notifications.awaitingVerificationCount}
+                                </span>
+                              )}
                             </Link>
                           )}
                           {/* Admin Dashboard — artisan only */}
@@ -553,6 +629,17 @@ export function RootLayout() {
                           >
                             <Settings className="w-4 h-4" style={{ color: "#8B6F47" }} />
                             Studio Kustom
+                          </Link>
+                          <Link
+                            to="/pricing"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-[#8B6F47]/[0.04]"
+                            style={{
+                              color: "#8B6F47",
+                            }}
+                          >
+                            <Crown className="w-4 h-4" style={{ color: "#D4B88B" }} />
+                            <span className="flex-1">Plan Premium</span>
                           </Link>
                         </div>
 

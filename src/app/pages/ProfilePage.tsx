@@ -22,6 +22,9 @@ import {
   Trash2,
   Plus,
   Edit,
+  Crown,
+  Zap,
+  RotateCcw,
 } from "lucide-react";
 import { useNavigate, Link } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
@@ -67,13 +70,14 @@ function getInitials(user: {
   return (user.email || "U").slice(0, 2).toUpperCase();
 }
 
-type TabId = "account" | "favorites" | "orders" | "support" | "addresses" | "store";
+type TabId = "account" | "favorites" | "orders" | "support" | "addresses" | "store" | "premium";
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "account", label: "Akun", icon: <User className="w-4 h-4" /> },
   { id: "addresses", label: "Alamat", icon: <MapPin className="w-4 h-4" /> },
   { id: "favorites", label: "Favorit", icon: <Heart className="w-4 h-4" /> },
   { id: "orders", label: "Pesanan", icon: <Package className="w-4 h-4" /> },
+  { id: "premium", label: "Premium", icon: <Crown className="w-4 h-4" /> },
   { id: "support", label: "Bantuan", icon: <MessageCircle className="w-4 h-4" /> },
 ];
 
@@ -219,6 +223,261 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   );
 }
 
+// ─── Subscription status card ─────────────────────────────────────────────────
+function SubscriptionCard({ user }: { user: any }) {
+  const plan: string = user.user_metadata?.subscription_plan || "gratis";
+  const expiresAt: string | undefined = user.user_metadata?.subscription_expires_at;
+  const pending: boolean = user.user_metadata?.subscription_pending === "true" || (user.user_metadata?.subscription_pending as unknown) === true;
+
+  const planLabel: Record<string, string> = {
+    gratis: "Gratis",
+    weekly: "Premium Mingguan",
+    monthly: "Premium Bulanan",
+  };
+
+  const durationDays: Record<string, number> = { weekly: 7, monthly: 30 };
+  const isPremium = plan === "weekly" || plan === "monthly";
+
+  // Compute time remaining
+  let daysLeft = 0;
+  let progress = 0;
+  if (isPremium && expiresAt) {
+    const now = Date.now();
+    const exp = new Date(expiresAt).getTime();
+    const dur = (durationDays[plan] || 1) * 24 * 60 * 60 * 1000;
+    daysLeft = Math.max(0, Math.ceil((exp - now) / (1000 * 60 * 60 * 24)));
+    progress = Math.min(100, Math.max(0, ((dur - (exp - now)) / dur) * 100));
+  }
+
+  const isExpired = isPremium && expiresAt && new Date(expiresAt) < new Date();
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+
+  const handleCancel = async () => {
+    try {
+      setCanceling(true);
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          subscription_plan: "gratis",
+          subscription_expires_at: null,
+          subscription_pending: false,
+        },
+      });
+      if (error) throw error;
+      
+      // Update premium_subscriptions record status to rejected/cancelled if pending or approved
+      const { data: latest } = await supabase
+        .from("premium_subscriptions")
+        .select("id")
+        .eq("user_id", user.id || "")
+        .order("id", { ascending: false })
+        .limit(1);
+
+      if (latest && latest.length > 0) {
+        await supabase
+          .from("premium_subscriptions")
+          .update({ expires_at: new Date().toISOString() }) // expire now
+          .eq("id", latest[0].id);
+      }
+
+      toast.success("Langganan berhasil dibatalkan. Paket Anda kembali ke Plan Gratis.");
+      window.location.reload();
+    } catch {
+      toast.error("Gagal membatalkan langganan.");
+    } finally {
+      setCanceling(false);
+      setShowCancelConfirm(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-3xl overflow-hidden"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid rgba(212,184,139,0.18)",
+        boxShadow: "0 1px 3px rgba(61,43,31,0.06)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="px-6 py-4 flex items-center gap-3 border-b"
+        style={{ borderColor: "rgba(212,184,139,0.14)" }}
+      >
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(196,157,101,0.1)", border: "1px solid rgba(196,157,101,0.25)" }}
+        >
+          <Crown className="w-4 h-4" style={{ color: "#C49D65" }} />
+        </div>
+        <div>
+          <p className="text-[13px] font-semibold" style={{ color: "#3D2B1F" }}>Status Langganan</p>
+          <p className="text-[11.5px]" style={{ color: "#9B8C80" }}>Kelola paket aktif Anda</p>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="px-6 py-5 space-y-4">
+        {/* Plan badge row */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[16px] font-semibold"
+              style={{ color: "#3D2B1F", fontFamily: "'Fraunces', serif" }}
+            >
+              {planLabel[plan] || "Gratis"}
+            </span>
+            {pending && (
+              <span
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(196,157,101,0.12)", color: "#C49D65", border: "1px solid rgba(196,157,101,0.3)" }}
+              >
+                Menunggu verifikasi
+              </span>
+            )}
+            {isExpired && (
+              <span
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(180,60,60,0.1)", color: "#B43C3C", border: "1px solid rgba(180,60,60,0.2)" }}
+              >
+                Kedaluwarsa
+              </span>
+            )}
+            {isPremium && !isExpired && !pending && (
+              <span
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(50,160,80,0.1)", color: "#2A9040", border: "1px solid rgba(50,160,80,0.2)" }}
+              >
+                Aktif
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Expiry info + progress */}
+        {isPremium && expiresAt && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[12px]">
+              <span style={{ color: "#9B8C80" }}>
+                {isExpired ? "Berakhir sejak" : "Berlaku hingga"}
+              </span>
+              <span style={{ color: "#3D2B1F", fontWeight: 500 }}>
+                {new Date(expiresAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+              </span>
+            </div>
+            {!isExpired && (
+              <>
+                <div
+                  className="h-1.5 rounded-full overflow-hidden"
+                  style={{ background: "rgba(212,184,139,0.15)" }}
+                >
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                    className="h-full rounded-full"
+                    style={{
+                      background: daysLeft <= 2
+                        ? "#B43C3C"
+                        : daysLeft <= 5
+                        ? "#C49D65"
+                        : "#2A9040",
+                    }}
+                  />
+                </div>
+                <p className="text-[11.5px]" style={{ color: "#9B8C80" }}>
+                  Sisa <strong style={{ color: "#3D2B1F" }}>{daysLeft} hari</strong> tersisa
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {!isPremium && (
+          <p className="text-[12.5px] leading-relaxed" style={{ color: "#9B8C80" }}>
+            Anda sedang menggunakan <strong>Plan Gratis</strong> — maks. 2 desain, tanpa AI, dan tanpa edit desain tersimpan.
+            Upgrade untuk membuka semua fitur.
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className="flex flex-wrap gap-2 pt-1">
+          {!isPremium && (
+            <a
+              href="/pricing"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12.5px] font-semibold transition-opacity hover:opacity-90"
+              style={{ background: "#C49D65", color: "#1A1209" }}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Upgrade ke Premium
+            </a>
+          )}
+          {isPremium && (
+            <a
+              href={`/checkout?plan=${plan}`}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12.5px] font-semibold transition-opacity hover:opacity-90"
+              style={{ background: "#C49D65", color: "#1A1209" }}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Perpanjang
+            </a>
+          )}
+          {isPremium && (
+            <button
+              onClick={() => setShowCancelConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12.5px] font-medium transition-colors"
+              style={{
+                background: "transparent",
+                border: "1px solid rgba(212,184,139,0.25)",
+                color: "#9B8C80",
+              }}
+            >
+              Batalkan Langganan
+            </button>
+          )}
+          <a
+            href="/pricing"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-medium transition-colors"
+            style={{
+              background: "transparent",
+              border: "1px solid rgba(212,184,139,0.25)",
+              color: "#8B6F47",
+            }}
+          >
+            Lihat semua plan
+            <ChevronRight className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+
+      {/* Cancellation Alert Dialog */}
+      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <AlertDialogContent className="rounded-3xl max-w-sm w-[calc(100%-2rem)]">
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
+              Batalkan Premium?
+            </AlertDialogTitle>
+            <AlertDialogDescription style={{ color: "#7A6B5E" }}>
+              Apakah Anda yakin ingin membatalkan paket Premium? Anda akan kehilangan semua akses fitur eksklusif seperti rekomendasi AI Motif, penyimpanan desain tak terbatas, dan ekspor resolusi tinggi HD.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 pt-2">
+            <AlertDialogCancel className="rounded-xl text-xs h-9">Kembali</AlertDialogCancel>
+            <Button
+              onClick={handleCancel}
+              disabled={canceling}
+              className="rounded-xl text-xs h-9 px-4 text-white font-bold"
+              style={{ background: "#C0392B" }}
+            >
+              {canceling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Ya, Batalkan"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export function ProfilePage() {
   const { user, signOut, userRole } = useAuth();
@@ -250,6 +509,10 @@ export function ProfilePage() {
   // Orders
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
+
+  // Premium Subscriptions History
+  const [premiumHistory, setPremiumHistory] = useState<any[]>([]);
+  const [loadingPremium, setLoadingPremium] = useState(true);
 
   // Address Book state
   const [addresses, setAddresses] = useState<any[]>([]);
@@ -397,6 +660,25 @@ export function ProfilePage() {
       toast.error("Gagal memuat alamat");
     } finally {
       setLoadingAddresses(false);
+    }
+  };
+
+  const fetchPremiumHistory = async () => {
+    if (!user) return;
+    try {
+      setLoadingPremium(true);
+      const { data, error } = await supabase
+        .from("premium_subscriptions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("id", { ascending: false });
+      if (!error && data) {
+        setPremiumHistory(data);
+      }
+    } catch (err) {
+      console.error("Gagal memuat riwayat premium:", err);
+    } finally {
+      setLoadingPremium(false);
     }
   };
 
@@ -709,6 +991,7 @@ export function ProfilePage() {
       fetchFavorites();
       fetchAddresses();
       fetchOrders();
+      fetchPremiumHistory();
       if (userRole === "artisan") {
         fetchStore();
       } else {
@@ -979,6 +1262,9 @@ export function ProfilePage() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
+            {/* Status Langganan */}
+            {user && <SubscriptionCard user={user} />}
+
             {/* Informasi Akun */}
             <SectionCard
               icon={<User className="w-4 h-4" />}
@@ -2136,6 +2422,98 @@ export function ProfilePage() {
                       )}
                     </>
                   )}
+                </div>
+              )}
+            </SectionCard>
+          </motion.div>
+        )}
+
+        {/* ── Tab: Premium ── */}
+        {activeTab === "premium" && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-4"
+          >
+            {user && <SubscriptionCard user={user} />}
+
+            <SectionCard
+              icon={<Crown className="w-4 h-4" />}
+              title="Riwayat Premium"
+              description="Daftar pembayaran dan status paket Anda"
+            >
+              {loadingPremium ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#8B6F47]" />
+                </div>
+              ) : premiumHistory.length === 0 ? (
+                <p className="text-center py-6 text-xs text-[#9B8C80]">
+                  Belum ada riwayat transaksi premium.
+                </p>
+              ) : (
+                <div className="space-y-3.5">
+                  {premiumHistory.map((history) => {
+                    const expires = new Date(history.expires_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+                    const created = new Date(history.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+                    const isApp = history.status === "approved";
+                    const isRej = history.status === "rejected";
+                    const isPend = history.status === "pending";
+                    
+                    return (
+                      <div
+                        key={history.id}
+                        className="p-4 rounded-2xl flex flex-col gap-2 border"
+                        style={{ borderColor: "rgba(212,184,139,0.15)", background: "#FAF8F5" }}
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div>
+                            <p className="text-sm font-semibold" style={{ color: "#3D2B1F" }}>
+                              {history.plan_id === "weekly" ? "Premium Mingguan" : "Premium Bulanan"}
+                            </p>
+                            <p className="text-[11px]" style={{ color: "#9B8C80" }}>
+                              Transaksi: {created}
+                            </p>
+                          </div>
+                          <span
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                            style={
+                              isApp 
+                                ? { background: "rgba(50,160,80,0.1)", color: "#2A9040", border: "1px solid rgba(50,160,80,0.2)" }
+                                : isRej 
+                                ? { background: "rgba(180,60,60,0.1)", color: "#B43C3C", border: "1px solid rgba(180,60,60,0.2)" }
+                                : { background: "rgba(196,157,101,0.12)", color: "#C49D65", border: "1px solid rgba(196,157,101,0.3)" }
+                            }
+                          >
+                            {isApp ? "Disetujui" : isRej ? "Ditolak" : "Pending"}
+                          </span>
+                        </div>
+                        
+                        <div className="flex justify-between text-xs pt-1 border-t border-dashed" style={{ borderColor: "rgba(212,184,139,0.15)" }}>
+                          <span style={{ color: "#9B8C80" }}>Nominal</span>
+                          <span className="font-bold text-[#8B6F47]">Rp {history.price.toLocaleString("id-ID")}</span>
+                        </div>
+                        
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: "#9B8C80" }}>Masa Berlaku</span>
+                          <span className="font-medium text-[#3D2B1F]">s/d {expires}</span>
+                        </div>
+
+                        {history.attachment_url && (
+                          <div className="flex justify-between text-xs items-center mt-1">
+                            <span style={{ color: "#9B8C80" }}>Bukti Transfer</span>
+                            <a 
+                              href={history.attachment_url} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              className="text-[#8B6F47] hover:underline font-semibold flex items-center gap-1 text-[11px]"
+                            >
+                              Lihat Gambar ↗
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </SectionCard>
