@@ -1913,6 +1913,18 @@ export function CustomBatikPage() {
   useEffect(() => {
     const editDesignId = searchParams.get("editDesignId");
     if (!editDesignId || !user) return;
+
+    // Guard: Hanya user Premium yang bisa edit desain tersimpan
+    const subscriptionPlan = user?.user_metadata?.subscription_plan || "gratis";
+    if (subscriptionPlan === "gratis") {
+      toast.error("Fitur edit desain tersimpan hanya untuk pengguna Premium.", {
+        description: "Upgrade ke Premium untuk membuka fitur ini!",
+        duration: 5000,
+      });
+      navigate("/histori");
+      return;
+    }
+
     const loadDesign = async () => {
       try {
         const { data, error } = await supabase.from("custom_designs").select("*").eq("id", editDesignId).eq("user_id", user.id).single();
@@ -1963,6 +1975,7 @@ export function CustomBatikPage() {
     loadDesign();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user]);
+
 
   // [OPT-3] keyboard handler — extracted as useCallback outside init useEffect
   const handleKeyDown = useCallback((e: KeyboardEvent) => {

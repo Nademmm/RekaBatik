@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   Palette, Clock, Edit2, ArrowRight, Trash2, Package,
   Plus, CheckCircle, ShoppingBag, X, Loader2, ChevronRight,
-  Star, Sparkles
+  Star, Sparkles, Lock
 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { BatikBackground } from "../components/BatikBackground";
@@ -40,12 +40,14 @@ function DesignCard({
   onOrder,
   onDetail,
   onEdit,
+  userPlan,
 }: {
   design: DesainItem;
   onDelete: (design: DesainItem) => void;
   onOrder: (design: DesainItem) => void;
   onDetail: (design: DesainItem) => void;
   onEdit: (design: DesainItem) => void;
+  userPlan: string;
 }) {
   const navigate = useNavigate();
 
@@ -131,10 +133,18 @@ function DesignCard({
               handleEdit();
             }}
             className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-semibold transition-all hover:shadow-sm active:scale-95"
-            style={{ border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
+            style={userPlan === "gratis"
+              ? { border: "1.5px solid rgba(139,111,71,0.15)", color: "rgba(139,111,71,0.45)", background: "rgba(139,111,71,0.03)", cursor: "not-allowed" }
+              : { border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }
+            }
+            title={userPlan === "gratis" ? "Fitur ini membutuhkan akun Premium" : "Edit desain"}
           >
-            <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            Edit
+            {userPlan === "gratis" ? (
+              <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            ) : (
+              <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            )}
+            {userPlan === "gratis" ? "Premium" : "Edit"}
           </button>
           <button
             onClick={(e) => {
@@ -373,6 +383,7 @@ export function DesainHistoriPage() {
                   onOrder={handleOrder}
                   onDetail={setDetailTarget}
                   onEdit={handleEdit}
+                  userPlan={user?.user_metadata?.subscription_plan || "gratis"}
                 />
               ))}
             </div>
@@ -593,14 +604,36 @@ export function DesainHistoriPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => {
+                            const plan = user?.user_metadata?.subscription_plan || "gratis";
+                            if (plan === "gratis") {
+                              toast.error("Fitur edit desain tersimpan hanya untuk pengguna Premium.", {
+                                description: "Upgrade sekarang untuk membuka fitur ini!",
+                                action: { label: "Upgrade", onClick: () => navigate("/pricing") },
+                                duration: 5000,
+                              });
+                              return;
+                            }
                             setDetailTarget(null);
                             navigate(`/custom?editDesignId=${detailTarget.id}`);
                           }}
                           className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all hover:shadow-sm active:scale-95"
-                          style={{ border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" }}
+                          style={(() => {
+                            const plan = user?.user_metadata?.subscription_plan || "gratis";
+                            return plan === "gratis"
+                              ? { border: "1.5px solid rgba(139,111,71,0.15)", color: "rgba(139,111,71,0.45)", background: "rgba(139,111,71,0.03)" }
+                              : { border: "1.5px solid rgba(139,111,71,0.25)", color: "#8B6F47", background: "rgba(139,111,71,0.04)" };
+                          })()}
+                          title={(() => {
+                            const plan = user?.user_metadata?.subscription_plan || "gratis";
+                            return plan === "gratis" ? "Fitur ini membutuhkan Premium" : "Edit desain";
+                          })()}
                         >
-                          <Edit2 className="w-4 h-4" />
-                          Edit Desain
+                          {(user?.user_metadata?.subscription_plan || "gratis") === "gratis" ? (
+                            <Lock className="w-4 h-4" />
+                          ) : (
+                            <Edit2 className="w-4 h-4" />
+                          )}
+                          {(user?.user_metadata?.subscription_plan || "gratis") === "gratis" ? "Butuh Premium" : "Edit Desain"}
                         </button>
                         <button
                           onClick={() => {
