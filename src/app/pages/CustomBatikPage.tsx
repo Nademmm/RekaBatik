@@ -39,7 +39,7 @@ import {
   Sparkles,
   Wand2,
 } from "lucide-react";
-import { useNavigate, useSearchParams, useBlocker } from "react-router";
+import { useNavigate, useSearchParams, useBlocker, useLocation } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
@@ -913,6 +913,7 @@ SidebarTabs.displayName = "SidebarTabs";
 // Main Component
 export function CustomBatikPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { addToCart: addToCartFromContext } = useCart();
@@ -932,7 +933,6 @@ export function CustomBatikPage() {
   const [showSuccessModal, setShowSuccessModal] = useState<"saved" | "cart" | "order" | null>(null);
   const [showProjectModal, setShowProjectModal] = useState<"save" | "cart" | "order" | null>(null);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
   const [projectInfo, setProjectInfo] = useState({ name: "", description: "", fabric: "Katun Primisima" });
   const [savedDesignId, setSavedDesignId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1898,36 +1898,55 @@ export function CustomBatikPage() {
     fetchPatterns();
   }, []);
 
-  // Load design from history if ?editDesignId
+  // Load design from history if ?editDesignId or from AI Premium state
   useEffect(() => {
     const editDesignId = searchParams.get("editDesignId");
-    if (!editDesignId || !user) return;
+    const improvedDesign = location.state?.improvedDesign;
+    const improvedDesignId = location.state?.improvedDesignId;
+
+    if (!improvedDesign && (!editDesignId || !user)) return;
+
     const loadDesign = async () => {
       try {
-        const { data, error } = await supabase.from("custom_designs").select("*").eq("id", editDesignId).eq("user_id", user.id).single();
-        if (error || !data) return;
+        let designData = null;
+
+        if (improvedDesign) {
+          designData = typeof improvedDesign === 'string' ? JSON.parse(improvedDesign) : improvedDesign;
+        } else if (editDesignId && user) {
+          const { data, error } = await supabase.from("custom_designs").select("*").eq("id", editDesignId).eq("user_id", user.id).single();
+          if (error || !data) return;
+          try { designData = JSON.parse(data.drawing_data); } catch { return; }
+        }
+
+        if (!designData) return;
+
         const waitForCanvas = () => new Promise<void>(resolve => {
           const check = () => { if (fabricCanvasRef.current) resolve(); else setTimeout(check, 100); };
           check();
         });
         await waitForCanvas();
         const fc = fabricCanvasRef.current!;
-        let parsed: any = null;
-        try { parsed = JSON.parse(data.drawing_data); } catch { return; }
-        if (parsed.canvasBackground) setCanvasBackground(parsed.canvasBackground);
-        if (parsed.projectInfo) setProjectInfo(parsed.projectInfo);
-        if (parsed.objects) {
-          fc.loadFromJSON({ objects: parsed.objects, background: parsed.canvasBackground || "#ffffff" }, () => {
+
+        // Clear current layers before loading new design
+        setLayers([]);
+        fc.clear();
+
+        if (designData.canvasBackground) setCanvasBackground(designData.canvasBackground);
+        if (designData.projectInfo) setProjectInfo(designData.projectInfo);
+        
+        if (designData.objects) {
+          fc.loadFromJSON({ objects: designData.objects, background: designData.canvasBackground || "#ffffff" }, () => {
             fc.getObjects().forEach((obj: any) => {
               if (obj.data?.layerId) {
                 setLayers(prev => [...prev, { id: obj.data.layerId, type: "pattern" as const, name: obj.data.layerName || "Layer", visible: true, locked: false, fabricObject: obj }]);
               }
             });
             fc.requestRenderAll();
-            setHasUnsavedChanges(false);
+            setHasUnsavedChanges(improvedDesign ? true : false);
           });
         }
-        if (parsed.offscreenDataUrl && offscreenRef.current) {
+        
+        if (designData.offscreenDataUrl && offscreenRef.current) {
           const img = new Image();
           img.onload = () => {
             const ctx = offscreenRef.current!.getContext("2d")!;
@@ -1939,19 +1958,28 @@ export function CustomBatikPage() {
             }
             syncDisplay();
             setHasOffscreenContent(true);
-            setHasUnsavedChanges(false);
+            if (!improvedDesign) setHasUnsavedChanges(false);
           };
-          img.src = parsed.offscreenDataUrl;
+          img.src = designData.offscreenDataUrl;
         }
-        setSavedDesignId(Number(editDesignId));
-        toast.success("Desain berhasil dimuat untuk diedit");
+
+        if (editDesignId) setSavedDesignId(Number(editDesignId));
+        if (improvedDesignId) setSavedDesignId(Number(improvedDesignId));
+        
+        if (improvedDesign) {
+          toast.success("Desain premium telah diterapkan ke kanvas");
+          // Clear location state to prevent re-loading on refresh
+          window.history.replaceState({}, document.title);
+        } else {
+          toast.success("Desain berhasil dimuat untuk diedit");
+        }
       } catch (err) {
         toast.error("Gagal memuat desain");
       }
     };
     loadDesign();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user]);
+  }, [searchParams, user, location.state?.improvedDesign, location.state?.improvedDesignId]);
 
   // [OPT-3] keyboard handler — extracted as useCallback outside init useEffect
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -4138,6 +4166,69 @@ export function CustomBatikPage() {
     finally { setIsSaving(false); }
   };
 
+  const handleAINavigate = useCallback(async () => {
+    if (!user) {
+      toast.error("Silakan login terlebih dahulu untuk menggunakan fitur AI Premium");
+      navigate("/auth?redirect=/custom");
+      return;
+    }
+
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    // Auto-fill project name if empty
+    if (!projectInfo.name.trim()) {
+      setProjectInfo(prev => ({ ...prev, name: `AI Smart Enhance - ${new Date().toLocaleDateString('id-ID')}` }));
+    }
+
+    // Show loading state
+    const saveToastId = toast.loading("Menyiapkan desain untuk AI...");
+
+    try {
+      // Save design first
+      const designId = await saveDesign();
+      if (!designId) {
+        toast.dismiss(saveToastId);
+        return; // saveDesign already handles error toast
+      }
+
+      // Deselect all objects first to get a clean preview
+      const activeObj = fc.getActiveObject();
+      fc.discardActiveObject();
+      fc.requestRenderAll();
+
+      // Small delay to ensure render finishes
+      setTimeout(() => {
+        const designImage = fc.toDataURL({
+          format: 'png',
+          quality: 1,
+          multiplier: 2 // Higher quality for AI analysis
+        });
+
+        const designDataStr = JSON.stringify(fc.toJSON(["data"]));
+
+        // Restore selection
+        if (activeObj) {
+          fc.setActiveObject(activeObj);
+          fc.requestRenderAll();
+        }
+
+        toast.dismiss(saveToastId);
+        navigate("/custom/ai-premium", {
+          state: {
+            designImage,
+            designData: designDataStr,
+            designId
+          }
+        });
+      }, 100);
+    } catch (err) {
+      console.error(err);
+      toast.dismiss(saveToastId);
+      toast.error("Gagal menyiapkan fitur AI");
+    }
+  }, [navigate, user, projectInfo, saveDesign]);
+
   const triggerSaveAction = (type: "save" | "cart" | "order") => {
     if (!user) { toast.error("Silakan login terlebih dahulu"); navigate("/auth?redirect=/custom"); return; }
     if (layers.length === 0 && !hasOffscreenContent) { toast.error("Kanvas masih kosong! Tambahkan motif atau gambar terlebih dahulu."); return; }
@@ -4588,7 +4679,7 @@ export function CustomBatikPage() {
                         <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => setShowAIModal(true)}
+                          onClick={handleAINavigate}
                           className="flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl font-bold text-white shadow-sm transition-all hover:shadow-md group overflow-hidden relative cursor-pointer"
                           style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}
                         >
@@ -5349,7 +5440,7 @@ export function CustomBatikPage() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowAIModal(true)}
+                    onClick={handleAINavigate}
                     className="flex items-center justify-center w-8 h-8 rounded-full font-bold text-white shadow-lg transition-all hover:shadow-[0_0_15px_rgba(139,111,71,0.5)] group overflow-hidden relative cursor-pointer flex-shrink-0"
                     style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}
                   >
@@ -5542,52 +5633,6 @@ export function CustomBatikPage() {
               <div className="space-y-3">
                 <button onClick={confirmClearAll} className="w-full py-3.5 rounded-xl font-bold text-white transition-all hover:opacity-95" style={{ background: "linear-gradient(135deg, #DC2626, #EF4444)" }}>Ya, Bersihkan</button>
                 <button onClick={() => setShowClearConfirmModal(false)} className="w-full py-3.5 rounded-xl font-bold transition-all" style={{ color: "#8B6F47", border: "1.5px solid rgba(139,111,71,0.2)", background: "rgba(139,111,71,0.04)" }}>Batal</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* AI Premium Modal */}
-      <AnimatePresence>
-        {showAIModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAIModal(false)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-8 text-center shadow-2xl" style={{ border: "1px solid rgba(212,184,139,0.3)" }}>
-              <button onClick={() => setShowAIModal(false)} className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
-
-              <div className="relative w-24 h-24 mx-auto mb-6">
-                <div className="absolute inset-0 rounded-full animate-pulse blur-xl bg-[#8B6F47]/30" />
-                <div className="relative w-full h-full rounded-full flex items-center justify-center shadow-lg" style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}>
-                  <Sparkles className="w-10 h-10 text-white animate-bounce" />
-                </div>
-              </div>
-
-              <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
-                AI Smart Enhance
-              </h3>
-              <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "rgba(139,111,71,0.1)", color: "#8B6F47", border: "1px solid rgba(139,111,71,0.2)" }}>
-                Premium Feature
-              </div>
-
-              <p className="text-[#7A6B5E] mb-8 text-sm leading-relaxed">
-                Biarkan AI menganalisis desain batik Anda dan memberikan sentuhan artistik otomatis untuk hasil yang lebih memukau.
-              </p>
-
-              <div className="p-4 rounded-2xl mb-8 flex items-center gap-3 text-left" style={{ background: "rgba(139,111,71,0.05)", border: "1px solid rgba(139,111,71,0.1)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "white" }}>
-                  <Wand2 className="w-5 h-5 text-[#8B6F47]" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-[#3D2B1F]">Tahap Pengembangan</p>
-                  <p className="text-[10px] text-[#8E7F72]">Fitur ini akan segera hadir eksklusif untuk member Premium RekaBatik.</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <button onClick={() => setShowAIModal(false)} className="w-full py-3.5 rounded-xl font-bold text-white transition-all hover:opacity-95 shadow-md active:scale-95" style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)" }}>Berlangganan Premium</button>
-                <button onClick={() => setShowAIModal(false)} className="w-full py-3.5 rounded-xl font-bold transition-all hover:bg-stone-50" style={{ color: "#8B6F47" }}>Nanti Saja</button>
               </div>
             </motion.div>
           </div>

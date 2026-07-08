@@ -73,6 +73,13 @@ export const router = createBrowserRouter([
               })),
           },
           {
+            path: "custom/ai-premium",
+            lazy: () =>
+              import("./pages/AIPremiumPage").then((module) => ({
+                Component: module.AIPremiumPage,
+              })),
+          },
+          {
             path: "orders",
             lazy: () =>
               import("./pages/OrdersPage").then((module) => ({
