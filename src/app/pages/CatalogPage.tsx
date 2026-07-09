@@ -325,7 +325,9 @@ export function CatalogPage() {
                       </p>
                       
                       <div className="mt-auto pt-2 sm:pt-3 border-t border-gray-50 flex items-center justify-between">
-                        <span className="font-bold text-sm sm:text-lg" style={{ color: "#8B6F47" }}>Rp {item.price.toLocaleString("id-ID")}</span>
+                        <span style={{ color: "#B8935F", fontWeight: 700, fontSize: "clamp(0.82rem, 2.5vw, 1.3rem)", fontFamily: "'Playfair Display', serif" }}>
+                          Rp {item.price.toLocaleString("id-ID")}
+                        </span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

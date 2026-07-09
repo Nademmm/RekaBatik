@@ -168,7 +168,7 @@ export function BatikDetailModal({
               
               <div className="min-w-0 sm:min-w-[120px]">
                 <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: "#A89B8F" }}>Total Harga</p>
-                <p className="text-lg sm:text-xl md:text-2xl font-bold" style={{ color: "#3D2B1F" }}>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold" style={{ color: "#B8935F", fontFamily: "'Playfair Display', serif" }}>
                   Rp {(item.price * qty).toLocaleString("id-ID")}
                 </p>
               </div>

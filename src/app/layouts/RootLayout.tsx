@@ -622,15 +622,6 @@ export function RootLayout() {
                             )}
                           </Link>
                           <Link
-                            to="/custom"
-                            onClick={() => setUserMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-[#8B6F47]/[0.04]"
-                            style={{ color: "#5A4A3E" }}
-                          >
-                            <Settings className="w-4 h-4" style={{ color: "#8B6F47" }} />
-                            Studio Kustom
-                          </Link>
-                          <Link
                             to="/pricing"
                             onClick={() => setUserMenuOpen(false)}
                             className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-[#8B6F47]/[0.04]"

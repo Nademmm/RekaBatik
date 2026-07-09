@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 const MotionLink = motion(Link);
 import {
   Palette, Sparkles, Clock, Award, Star, ChevronRight,
-  Users, Package, MapPin, TrendingUp, ShoppingBag, Heart, Grid3x3, BookOpen
+  Users, Package, MapPin, TrendingUp, ShoppingBag, Heart, Grid3x3
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { BatikBackground } from "../components/BatikBackground";
@@ -20,11 +20,34 @@ import { AnimatePresence } from "motion/react";
 import { fallbackCatalogItems, normalizeBatikName, resolveCatalogItems } from "../constants/batikCatalog";
 
 const learningPreviewOrder = ["Parang", "Kawung", "Mega Mendung", "Truntum"] as const;
-const artisanImg = "https://images.unsplash.com/photo-1527650003412-4c3a0a38fdf5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiYXRpayUyMGFydGlzYW4lMjBjcmFmdHNtYW4lMjBwYWludGluZyUyMHdheHxlbnwxfHx8fDE3Nzc1MjAyMjZ8MA&ixlib=rb-4.1.0&q=80&w=1080";
-const reviewImg1 = "https://images.unsplash.com/photo-1758600587815-b654d1405e83?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoYXBweSUyMGN1c3RvbWVyJTIwcmV2aWV3JTIwcG9ydHJhaXQlMjBBc2lhbiUyMHdvbWFufGVufDF8fHx8MTc3NzUyMDIzNnww&ixlib=rb-4.1.0&q=80&w=400";
-const reviewImg2 = "https://images.unsplash.com/photo-1545696968-1a5245650b36?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxBc2lhbiUyMG1hbiUyMHNtaWxpbmclMjBwb3J0cmFpdCUyMGN1c3RvbWVyfGVufDF8fHx8MTc3NzUyMDIzNnww&ixlib=rb-4.1.0&q=80&w=400";
 const womanBatikImg = "https://images.unsplash.com/photo-1516011362164-3095a82b0af9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxJbmRvbmVzaWFuJTIwd29tYW4lMjB3ZWFyaW5nJTIwYmF0aWslMjBwb3J0cmFpdHxlbnwxfHx8fDE3Nzc1MjAyMzN8MA&ixlib=rb-4.1.0&q=80&w=1080";
 const villageImg = "https://images.unsplash.com/photo-1661011612361-4e0704509a58?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmFkaXRpb25hbCUyMEphdmFuZXNlJTIwaG91c2UlMjB2aWxsYWdlJTIwc3RyZWV0fGVufDF8fHx8MTc3NzUyMDI0MHww&ixlib=rb-4.1.0&q=80&w=1080";
+
+// ─── Design tokens ──────────────────────────────────────────────────────────
+// One accent, one dark tone, one light tone — reused everywhere instead of a
+// different gradient per section.
+
+const T = {
+  paper: "#FAF8F5",
+  paperAlt: "#FFFFFF",
+  ink: "#2A1D14",
+  inkRaised: "#33251A",
+  charcoal: "#3D2B1F",
+  charcoalSoft: "rgba(61,43,31,0.62)",
+  charcoalFaint: "rgba(61,43,31,0.4)",
+  cream: "#FAF8F5",
+  creamSoft: "rgba(250,248,245,0.66)",
+  creamFaint: "rgba(250,248,245,0.4)",
+  gold: "#B8935F",
+  goldSoft: "rgba(184,147,95,0.14)",
+  goldLine: "rgba(184,147,95,0.45)",
+  border: "#E7DFD4",
+  borderDark: "rgba(250,248,245,0.1)",
+  green: "#5D9C59",
+};
+
+const display = "'Playfair Display', serif";
+const body = "'Inter', sans-serif";
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -33,15 +56,74 @@ function StarRating({ rating }: { rating: number }) {
         <Star
           key={s}
           className="w-4 h-4"
-          fill={s <= rating ? "#D4B88B" : "none"}
-          color={s <= rating ? "#D4B88B" : "#E8E1DA"}
+          fill={s <= rating ? T.gold : "none"}
+          color={s <= rating ? T.gold : T.border}
         />
       ))}
     </div>
   );
 }
 
-// Batik SVG pattern preview components
+// Section eyebrow — the one recurring structural device on the page.
+function Eyebrow({ children, tone = "light" }: { children: React.ReactNode; tone?: "light" | "dark" }) {
+  const color = tone === "dark" ? T.gold : T.charcoalSoft;
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <span className="h-px w-8" style={{ background: T.goldLine }} />
+      <span
+        className="text-xs font-semibold uppercase tracking-[0.2em]"
+        style={{ color: tone === "dark" ? T.gold : "#8B6F47", fontFamily: body }}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
+// Buttons — exactly two variants, reused across the whole page.
+function PrimaryButton({
+  to, children, tone = "light",
+}: { to: string; children: React.ReactNode; tone?: "light" | "dark" }) {
+  return (
+    <MotionLink
+      to={to}
+      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 sm:px-8 sm:py-4 rounded-full text-sm sm:text-base font-semibold w-full sm:w-auto"
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      style={
+        tone === "dark"
+          ? { background: T.gold, color: T.ink }
+          : { background: T.charcoal, color: T.cream }
+      }
+    >
+      {children}
+    </MotionLink>
+  );
+}
+
+function OutlineButton({
+  to, children, tone = "light",
+}: { to: string; children: React.ReactNode; tone?: "light" | "dark" }) {
+  return (
+    <MotionLink
+      to={to}
+      className="inline-flex items-center justify-center gap-2 px-6 py-3.5 sm:px-8 sm:py-4 rounded-full text-sm sm:text-base font-semibold border w-full sm:w-auto"
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      style={
+        tone === "dark"
+          ? { borderColor: "rgba(250,248,245,0.24)", color: T.cream }
+          : { borderColor: "rgba(61,43,31,0.22)", color: T.charcoal }
+      }
+    >
+      {children}
+    </MotionLink>
+  );
+}
+
+// Batik SVG pattern preview components — tied directly to catalog content.
 function BatikPatternPreview({ type, primary, secondary, bg }: { type: string; primary: string; secondary: string; bg: string }) {
   const id = `prev-${type}-${Math.random().toString(36).substr(2, 5)}`;
   const renderPat = () => {
@@ -91,7 +173,6 @@ function BatikPatternPreview({ type, primary, secondary, bg }: { type: string; p
         <circle cx="42" cy="42" r="4" fill={secondary} opacity="0.7"/>
       </pattern>
     );
-    // sido mukti geometric
     return (
       <pattern id={id} x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
         <rect fill={bg} width="40" height="40"/>
@@ -210,7 +291,7 @@ export function HomePage() {
             .select("*")
             .limit(4),
         ]);
-        
+
         let safePatterns: BatikItem[] = [];
         if (pError || !patternsData || patternsData.length === 0) {
           safePatterns = [...fallbackCatalogItems];
@@ -219,7 +300,7 @@ export function HomePage() {
         }
 
         setPopularPatterns(safePatterns);
-        
+
         if (rError) throw rError;
         const safeReviews = reviewsData || [];
         if (safeReviews.length > 0) {
@@ -271,7 +352,7 @@ export function HomePage() {
           .insert([{ user_id: user.id, batik_id: batik.id, quantity }]);
         if (error) throw error;
       }
-      
+
       toast.success(`${quantity}x ${batik.name} ditambahkan ke keranjang!`);
       setSelectedBatik(null);
     } catch (err) {
@@ -283,10 +364,10 @@ export function HomePage() {
   };
 
   const stats = [
-    { icon: Users, value: "12.500+", label: "Pelanggan Puas", color: "#D4B88B" },
-    { icon: Package, value: "48.200+", label: "Pesanan Selesai", color: "#8B6F47" },
-    { icon: Palette, value: "200+", label: "Motif Tersedia", color: "#D4B88B" },
-    { icon: MapPin, value: "35+", label: "Pengrajin Mitra", color: "#8B6F47" },
+    { icon: Users, value: "12.500+", label: "Pelanggan Puas" },
+    { icon: Package, value: "48.200+", label: "Pesanan Selesai" },
+    { icon: Palette, value: "200+", label: "Motif Tersedia" },
+    { icon: MapPin, value: "35+", label: "Pengrajin Mitra" },
   ];
 
   const features = [
@@ -294,25 +375,21 @@ export function HomePage() {
       icon: Palette,
       title: "Kustomisasi Penuh",
       description: "Pilih motif, warna, ukuran pola, dan gunakan kuas digital untuk sentuhan personal",
-      color: "#D4B88B",
     },
     {
       icon: Sparkles,
       title: "Motif Premium",
       description: "Koleksi motif batik tradisional dan kontemporer dari pengrajin berpengalaman",
-      color: "#8B6F47",
     },
     {
       icon: Clock,
       title: "Proses Cepat",
       description: "Desain digital instan, produksi dalam 3-7 hari kerja dengan pengiriman ke seluruh Indonesia",
-      color: "#D4B88B",
     },
     {
       icon: Award,
       title: "Kualitas Terjamin",
       description: "Material premium, pewarna alami ramah lingkungan, dan garansi kepuasan pelanggan",
-      color: "#8B6F47",
     },
   ];
 
@@ -361,9 +438,9 @@ export function HomePage() {
     .filter((column) => column.items.length > 0);
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* ======================== HERO SECTION ======================== */}
-      <section className="relative min-h-[26.5rem] sm:min-h-[76vh] lg:min-h-[90vh] flex items-center overflow-hidden bg-[#f5efe6]">
+    <div style={{ fontFamily: body }}>
+      {/* ======================== HERO ======================== */}
+      <section className="relative min-h-[26.5rem] sm:min-h-[76vh] lg:min-h-[90vh] flex items-center overflow-hidden" style={{ background: T.paper }}>
         <div className="absolute inset-0">
           <img
             src={heroImg}
@@ -371,95 +448,69 @@ export function HomePage() {
             className="w-full h-full object-cover object-[72%_center] sm:object-cover sm:object-center"
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-r from-[#f6f0e7]/94 via-[#f6f0e7]/72 to-white/10 sm:bg-transparent" />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(250,248,245,0.95) 0%, rgba(250,248,245,0.74) 55%, rgba(250,248,245,0.1) 100%)" }} />
 
         <div className="container mx-auto px-6 sm:px-6 md:px-12 lg:px-24 relative z-10 py-7 sm:py-14 md:py-20">
           <div className="max-w-[17rem] sm:max-w-3xl">
             <h1
-              className="mb-3 sm:mb-5 max-w-[16rem] sm:max-w-2xl lg:max-w-3xl"
+              className="mb-3 sm:mb-5 max-w-[16rem] sm:max-w-2xl lg:max-w-3xl font-bold"
               style={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: display,
                 fontSize: "clamp(1.6rem, 6vw, 4rem)",
                 lineHeight: "1.08",
-                color: "#000000ff",
-                fontWeight: "bold",
+                color: T.charcoal,
               }}
             >
               Wujudkan Ide Batik
               <br />
               Menjadi Karya Indah
               <br />
-              Bersama <span style={{ color: "#a4834dff" }}>RekaBatik</span>
+              Bersama <span style={{ color: T.gold }}>RekaBatik</span>
             </h1>
             <p
-              className="mb-5 max-w-[15.25rem] sm:mb-5 sm:max-w-xl"
-              style={{ color: "rgba(0, 0, 0, 0.8)", lineHeight: "1.55", fontSize: "clamp(0.88rem, 2.8vw, 1.1rem)" }}
+              className="mb-5 max-w-[15.25rem] sm:mb-8 sm:max-w-xl"
+              style={{ color: T.charcoalSoft, lineHeight: "1.55", fontSize: "clamp(0.88rem, 2.8vw, 1.1rem)" }}
             >
               Desain batik sendiri dengan mudah, pilih motif, warna, dan
-              wujudkan karya unilkmu sekarang!
+              wujudkan karya unikmu sekarang.
             </p>
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2.5 sm:gap-4 w-full sm:w-auto max-w-[15.25rem] sm:max-w-none">
-              <MotionLink
-                to="/custom"
-                className="flex items-center justify-center gap-2 px-4 py-3 text-[0.82rem] font-medium sm:text-base sm:px-8 sm:py-4 rounded-lg w-full sm:w-auto"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{
-                  background: "#3D2B1F",
-                  color: "#FFFFFF",
-                  boxShadow: "0 8px 30px rgba(139,111,71,0.3)",
-                }}
-              >
+              <PrimaryButton to="/custom">
                 <Palette className="w-4 h-4 sm:w-5 sm:h-5" />
                 Mulai Kustomisasi
-              </MotionLink>
-              <MotionLink
-                to="/catalog"
-                className="flex items-center justify-center gap-2 px-4 py-3 text-[0.82rem] font-medium sm:text-base sm:px-8 sm:py-4 rounded-lg w-full sm:w-auto"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{
-                  background: "rgba(255, 255, 255, 0)",
-                  color: "#000000ff",
-                  border: "2px solid rgba(87, 87, 87, 0.5)",
-                  backdropFilter: "blur(8px)",
-                }}
-              >
+              </PrimaryButton>
+              <OutlineButton to="/catalog">
                 <Grid3x3 className="w-4 h-4 sm:w-5 sm:h-5" />
                 Lihat Katalog
-              </MotionLink>
+              </OutlineButton>
             </div>
           </div>
         </div>
       </section>
 
       {/* ======================== STATS BAR ======================== */}
-      {/*
-        Mobile: 2×2 grid — lebih rapi dan proporsional
-        Tablet+: 4 kolom sejajar
-      */}
-      <section className="relative py-6 sm:py-8 overflow-hidden" style={{ background: "#FFFFFF" }}>
+      <section className="relative py-8 sm:py-10 overflow-hidden border-b" style={{ background: T.paperAlt, borderColor: T.border }}>
         <BatikBackground opacity={0.03} patternType="kawung" />
         <div className="container px-4 relative z-10 mx-auto">
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-8 lg:gap-30 max-w-6xl mx-auto">
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-8 max-w-5xl mx-auto">
             {stats.map((stat, i) => {
               const Icon = stat.icon;
               return (
                 <div
                   key={i}
-                  className="flex flex-col items-center text-center gap-2 p-2 sm:p-3 md:flex-row md:items-center md:text-left md:gap-4 md:p-4 rounded-2xl bg-white/80 backdrop-blur-sm md:bg-transparent md:backdrop-blur-none"
+                  className="flex flex-col items-center text-center gap-2 p-2 sm:p-3 md:flex-row md:items-center md:text-left md:gap-4"
                 >
                   <div
-                    className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: "rgba(212,184,139,0.15)" }}
+                    className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: T.goldSoft }}
                   >
-                    <Icon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" style={{ color: stat.color }} />
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: T.gold }} />
                   </div>
                   <div className="min-w-0">
-                    <div style={{ fontWeight: "bold", color: "#3D2B1F", fontSize: "clamp(0.82rem, 3vw, 1.7rem)", fontFamily: "'Playfair Display', serif", lineHeight: "1.1" }}>
+                    <div style={{ fontWeight: 700, color: T.charcoal, fontSize: "clamp(0.82rem, 3vw, 1.55rem)", fontFamily: display, lineHeight: "1.1" }}>
                       {stat.value}
                     </div>
-                    <div style={{ color: "#7A6B5E", fontSize: "clamp(0.5rem, 1.9vw, 0.8rem)", lineHeight: "1.2" }}>{stat.label}</div>
+                    <div style={{ color: T.charcoalFaint, fontSize: "clamp(0.5rem, 1.9vw, 0.8rem)", lineHeight: "1.2" }}>{stat.label}</div>
                   </div>
                 </div>
               );
@@ -471,76 +522,45 @@ export function HomePage() {
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
       {/* ======================== FEATURES ======================== */}
-      {/*
-        Mobile: 2×2 grid (card vertikal compact)
-        Desktop: 2×2 grid (card horizontal dengan icon di sisi kiri)
-      */}
-      <section className="py-10 sm:py-16 lg:py-24 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #3D2B1F 0%, #5A3E2A 50%, #3D2B1F 100%)" }}>
-        <BatikBackground opacity={0.08} patternType="parang" />
-        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10">
-          {/* Section Header */}
-          <div className="text-center mb-8 sm:mb-12 md:mb-16">
-            <h2 style={{ fontWeight: 700, fontFamily: "'Playfair Display', serif", color: "#FAF8F5", fontSize: "clamp(1.5rem, 5vw, 3rem)", marginBottom: "0.75rem" }}>
-              Pengalaman Batik Digital Terbaik
+      <section className="py-14 sm:py-20 lg:py-28 relative overflow-hidden" style={{ background: T.ink }}>
+        <BatikBackground opacity={0.06} patternType="parang" />
+        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-6xl">
+          <div className="max-w-xl mb-10 sm:mb-14">
+            <Eyebrow tone="dark">Kenapa RekaBatik</Eyebrow>
+            <h2 style={{ fontWeight: 700, fontFamily: display, color: T.cream, fontSize: "clamp(1.5rem, 5vw, 2.6rem)", lineHeight: 1.2 }}>
+              Warisan batik, dijahit dengan alat digital yang tepat
             </h2>
-            <p className="max-w-[18rem] sm:max-w-xl md:max-w-2xl mx-auto" style={{ color: "rgba(250,248,245,0.7)", fontSize: "clamp(0.82rem, 2.5vw, 1rem)", lineHeight: "1.7" }}>
-              Kami menggabungkan warisan budaya batik tradisional dengan inovasi teknologi digital modern untuk memberikan pengalaman terbaik
-            </p>
           </div>
 
-          {/* Features Grid — 2 kolom di mobile, 2 kolom di desktop */}
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-5 md:gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 sm:gap-8">
             {features.map((f, i) => {
               const Icon = f.icon;
               return (
                 <motion.div
                   key={i}
-                  className="group relative"
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  transition={{ duration: 0.5, delay: i * 0.06 }}
                   viewport={{ once: true }}
+                  className="group"
                 >
                   <div
-                    className="h-full p-3 sm:p-6 lg:p-8 rounded-xl sm:rounded-3xl transition-all duration-500"
-                    style={{
-                      background: "rgba(255,255,255,0.05)",
-                      backdropFilter: "blur(10px)",
-                    }}
+                    className="h-full p-3 sm:p-7 rounded-2xl border transition-colors duration-300"
+                    style={{ background: T.inkRaised, borderColor: T.borderDark }}
                   >
-                    {/* Mobile: vertikal stack. Desktop: horizontal row */}
-                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-5 lg:gap-6 items-start">
-                      {/* Icon */}
-                      <div className="flex-shrink-0">
-                        <div
-                          className="w-9 h-9 sm:w-14 sm:h-14 lg:w-16 lg:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center"
-                          style={{ 
-                            background: `linear-gradient(135deg, rgba(212,184,139,0.3), rgba(212,184,139,0.15))`,
-                            border: `1px solid rgba(212,184,139,0.4)`
-                          }}
-                        >
-                          <Icon className="w-4 h-4 sm:w-7 sm:h-7 lg:w-8 lg:h-8" style={{ color: "#D4B88B" }} />
-                        </div>
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 sm:gap-3 mb-1 sm:mb-3">
-                          <span className="text-sm sm:text-2xl font-bold hidden sm:block" style={{ color: "#D4B88B", fontFamily: "'Playfair Display', serif" }}>
-                            {String(i + 1).padStart(2, '0')}
-                          </span>
-                          <h3 className="text-xs sm:text-lg lg:text-xl font-semibold leading-tight" style={{ color: "#FAF8F5", fontFamily: "'Playfair Display', serif" }}>
-                            {f.title}
-                          </h3>
-                        </div>
-                        <p style={{ color: "rgba(250,248,245,0.65)", fontSize: "clamp(0.7rem, 2.2vw, 0.95rem)", lineHeight: "1.65" }}>
-                          {f.description}
-                        </p>
-                      </div>
+                    <div
+                      className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center mb-4 sm:mb-5"
+                      style={{ background: T.goldSoft }}
+                    >
+                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: T.gold }} />
                     </div>
-
-                    {/* Bottom Line */}
-                    <div className="mt-3 sm:mt-6 h-0.5 rounded-full w-0 group-hover:w-full transition-all duration-500" style={{ background: "#D4B88B" }} />
+                    <h3 className="text-base sm:text-lg font-semibold mb-2" style={{ color: T.cream, fontFamily: display }}>
+                      {f.title}
+                    </h3>
+                    <p style={{ color: T.creamSoft, fontSize: "0.9rem", lineHeight: "1.65" }}>
+                      {f.description}
+                    </p>
+                    <div className="mt-5 h-px w-8 group-hover:w-full transition-all duration-500" style={{ background: T.goldLine }} />
                   </div>
                 </motion.div>
               );
@@ -552,48 +572,40 @@ export function HomePage() {
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
       {/* ======================== BELAJAR BATIK ======================== */}
-      <section className="py-12 sm:py-20 lg:py-24 relative overflow-hidden" style={{ background: "#FAF8F5" }}>
+      <section className="py-14 sm:py-20 lg:py-28 relative overflow-hidden" style={{ background: T.paper }}>
         <BatikBackground opacity={0.03} patternType="floral" />
-        <div className="container mx-auto px-6 sm:px-6 relative z-10 max-w-7xl">
+        <div className="container mx-auto px-6 sm:px-6 relative z-10 max-w-6xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             <motion.div
-              initial={{ opacity: 0, x: -40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
               viewport={{ once: true }}
-              className="lg:col-span-6"
+              className="lg:col-span-5"
             >
-              <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(1.6rem, 4vw, 3rem)", fontWeight: 700, marginBottom: "1rem", lineHeight: "1.2" }}>
-                Pelajari Makna<br/>
-                <span style={{ color: "#8B6F47" }}>Motif Batik Indonesia</span>
+              <Eyebrow>Belajar Batik</Eyebrow>
+              <h2 style={{ fontFamily: display, color: T.charcoal, fontSize: "clamp(1.6rem, 4vw, 2.75rem)", fontWeight: 700, marginBottom: "1rem", lineHeight: "1.2" }}>
+                Pelajari makna
+                <br />
+                motif batik Indonesia
               </h2>
-              <p style={{ color: "#7A6B5E", fontSize: "clamp(0.88rem, 2.5vw, 1.05rem)", lineHeight: "1.8", marginBottom: "1.5rem" }}>
-                Setiap motif batik bukan hanya sekadar hiasan, melainkan simbol budaya yang sarat makna filosofis dan cerita nenek moyang.
+              <p style={{ color: T.charcoalSoft, fontSize: "clamp(0.88rem, 2.5vw, 1.02rem)", lineHeight: "1.8", marginBottom: "1.75rem" }}>
+                Setiap motif batik bukan hanya sekadar hiasan, melainkan simbol
+                budaya yang sarat makna filosofis dan cerita nenek moyang.
               </p>
-              <MotionLink
-                to="/belajar-batik"
-                className="inline-flex items-center gap-2 px-5 py-2.5 sm:px-7 sm:py-3 rounded-full text-sm sm:text-base whitespace-nowrap"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{ 
-                  background: "linear-gradient(135deg, #8B6F47, #A88967)", 
-                  color: "#FFFFFF",
-                  boxShadow: "0 4px 20px rgba(139,111,71,0.25)"
-                }}
-              >
-                <span>Mau Belajar</span>
-                <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" />
-              </MotionLink>
+              <OutlineButton to="/belajar-batik">
+                Pelajari lebih lanjut
+                <ChevronRight className="w-4 h-4" />
+              </OutlineButton>
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
               viewport={{ once: true }}
-              className="lg:col-span-6 relative"
+              className="lg:col-span-7 relative"
             >
-              {/* 2x2 katalog motif belajar */}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 {learningPreviewColumns.map((column, columnIndex) => (
                   <div
@@ -603,15 +615,15 @@ export function HomePage() {
                     {column.items.map(({ motif, aspectClass }) => (
                       <div
                         key={motif.id}
-                        className={`${aspectClass} w-full rounded-2xl sm:rounded-3xl overflow-hidden relative group`}
-                        style={{ background: "white", boxShadow: "0 4px 24px rgba(61,43,31,0.1)", border: "1px solid #E8E1DA" }}
+                        className={`${aspectClass} w-full rounded-2xl overflow-hidden relative group`}
+                        style={{ background: T.paperAlt, border: `1px solid ${T.border}` }}
                       >
                         <div className="absolute inset-0" style={{ background: motif.bg_color }}>
                           {motif.image_url ? (
                             <img
                               src={motif.image_url}
                               alt={motif.name}
-                              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             />
                           ) : (
                             <BatikPatternPreview
@@ -622,17 +634,17 @@ export function HomePage() {
                             />
                           )}
                         </div>
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#3D2B1F]/60 via-[#3D2B1F]/10 to-transparent" />
+                        <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(42,29,20,0.65), rgba(42,29,20,0.08) 55%, transparent)" }} />
                         <div className="absolute left-3 right-3 bottom-3 sm:left-4 sm:right-4 sm:bottom-4">
                           <div
                             className="inline-flex items-center rounded-full px-3 py-1 text-[0.68rem] sm:text-xs font-semibold"
-                            style={{ background: "rgba(255,255,255,0.92)", color: "#6F573E" }}
+                            style={{ background: "rgba(250,248,245,0.92)", color: T.charcoalSoft }}
                           >
                             {motif.origin}
                           </div>
                           <h3
                             className="mt-2 text-sm sm:text-base font-semibold leading-tight"
-                            style={{ color: "#FFFFFF", fontFamily: "'Playfair Display', serif" }}
+                            style={{ color: T.cream, fontFamily: display }}
                           >
                             {motif.name.replace(/^Batik\s+/i, "")}
                           </h3>
@@ -647,59 +659,31 @@ export function HomePage() {
         </div>
       </section>
 
-      <div className="h-1.5" style={{ background: "#95613eff" }} />
+      <div className="h-1.5" style={{ background: "#8d621dff" }} />
 
-      {/* ======================== POPULAR PATTERNS ======================== */}
-      {/*
-        Mobile: 2 kolom grid — card compact dengan gambar lebih pendek
-        Tablet: 2 kolom
-        Desktop: 3 kolom
-      */}
-      <section className="py-12 sm:py-20 lg:py-24 relative overflow-hidden" style={{ background: "#FFFFFF" }}>
+      {/* ======================== KATALOG PRODUCT ======================== */}
+      <section className="py-14 sm:py-20 lg:py-28 relative overflow-hidden border-t" style={{ background: T.paperAlt, borderColor: T.border }}>
         <BatikBackground opacity={0.02} patternType="mega" />
-        
-        <div className="absolute top-10 right-0 w-64 h-64 rounded-full opacity-5" style={{ background: "linear-gradient(135deg, #8B6F47, #D4B88B)" }} />
-        <div className="absolute bottom-10 left-0 w-48 h-48 rounded-full opacity-5" style={{ background: "#D4B88B" }} />
-        
-        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
-          {/* Section Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mb-8 sm:mb-12 lg:mb-16 gap-4">
+
+        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-6xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mb-10 sm:mb-14 gap-4">
             <div className="max-w-xl">
-              <h2 style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(1.4rem, 4vw, 2.8rem)", fontWeight: 700, marginBottom: "0.5rem", lineHeight: 1.2 }}>
-                Katalog Batik <span style={{ color: "#8B6F47" }}>Pilihan Rekabatik</span>
+              <Eyebrow>Katalog</Eyebrow>
+              <h2 style={{ fontFamily: display, color: T.charcoal, fontSize: "clamp(1.4rem, 4vw, 2.5rem)", fontWeight: 700, lineHeight: 1.2 }}>
+                Motif pilihan RekaBatik
               </h2>
-              <p style={{ color: "#7A6B5E", fontSize: "clamp(0.8rem, 2.3vw, 1rem)", lineHeight: 1.7 }}>
-                Jelajahi beragam motif batik eksklusif siap pakai dengan kualitas premium dari pengrajin terbaik
-              </p>
             </div>
-            <MotionLink
-              to="/catalog"
-              className="group flex items-center gap-2 px-5 py-2.5 sm:px-7 sm:py-3 rounded-full text-sm sm:text-base whitespace-nowrap"
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              style={{ 
-                background: "linear-gradient(135deg, #8B6F47, #A88967)", 
-                color: "#FFFFFF",
-                boxShadow: "0 4px 20px rgba(139,111,71,0.25)"
-              }}
-            >
-              Lihat Semua
-              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform" />
-            </MotionLink>
+            <OutlineButton to="/catalog">
+              Lihat semua
+              <ChevronRight className="w-4 h-4" />
+            </OutlineButton>
           </div>
 
-          {/* Patterns Grid — Scrollable horizontal di mobile, grid di desktop */}
-          <div className="flex overflow-x-auto overflow-y-hidden pb-6 -mx-6 px-6 gap-4 snap-x snap-mandatory sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-5 lg:gap-8 sm:overflow-x-visible sm:pb-0 scrollbar-hide">
+          <div className="flex overflow-x-auto overflow-y-hidden pb-6 -mx-6 px-6 gap-4 snap-x snap-mandatory sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-6 sm:overflow-x-visible sm:pb-0 scrollbar-hide">
             {loading ? (
               [...Array(6)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: i * 0.08 }}
-                  className="flex-shrink-0 w-[62vw] sm:w-auto snap-center"
-                >
-                  <div className="rounded-2xl sm:rounded-3xl overflow-hidden bg-white border border-gray-100" style={{ boxShadow: "0 4px 24px rgba(61,43,31,0.04)" }}>
+                <div key={i} className="flex-shrink-0 w-[62vw] sm:w-auto snap-center">
+                  <div className="rounded-2xl overflow-hidden bg-white border" style={{ borderColor: T.border }}>
                     <Skeleton className="h-30 sm:h-44 lg:h-52 w-full rounded-none" />
                     <div className="p-3 sm:p-5 space-y-2 sm:space-y-4">
                       <Skeleton className="h-5 w-3/5" />
@@ -710,96 +694,69 @@ export function HomePage() {
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ))
             ) : popularPatterns.map((p, index) => (
               <motion.div
                 key={p.id}
-                initial={{ opacity: 0, y: 40 }}
+                initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
+                transition={{ duration: 0.4, delay: index * 0.05 }}
                 viewport={{ once: true }}
-                whileHover={{ y: -6 }}
                 className="group flex-shrink-0 w-[62vw] sm:w-auto snap-center"
               >
                 <div
                   onClick={() => setSelectedBatik(p)}
-                  className="h-full rounded-2xl sm:rounded-3xl overflow-hidden cursor-pointer transition-all duration-400"
-                  style={{ 
-                    background: "#FFFFFF", 
-                    boxShadow: "0 4px 24px rgba(61,43,31,0.04)", 
-                    border: "1px solid #E8E1DA"
-                  }}
+                  className="h-full rounded-2xl overflow-hidden cursor-pointer transition-shadow duration-300 hover:shadow-lg"
+                  style={{ background: T.paperAlt, border: `1px solid ${T.border}` }}
                 >
-                  {/* Pattern Preview */}
                   <div className="relative h-28 sm:h-44 lg:h-52 overflow-hidden" style={{ background: p.bg_color }}>
                     {p.image_url ? (
-                      <motion.div 
-                        className="w-full h-full"
-                        whileHover={{ scale: 1.05 }}
-                        transition={{ duration: 0.6, ease: "easeOut" }}
-                      >
-                        <img 
-                          src={p.image_url} 
-                          alt={p.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      </motion.div>
+                      <img
+                        src={p.image_url}
+                        alt={p.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
                     ) : (
                       <BatikPatternPreview type={p.style_type || "parang"} primary={p.primary_color} secondary={p.secondary_color} bg={p.bg_color} />
                     )}
-                    
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
-                    
-                    {/* Like button — lebih kecil di mobile */}
-                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
-                      <motion.button
+
+                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
+                      <button
                         onClick={(e) => toggleLikePattern(p.id, e)}
-                        whileHover={{ scale: 1.15 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="w-7 h-7 sm:w-10 sm:h-10 rounded-full flex items-center justify-center"
-                        style={{ 
-                          background: "rgba(255,255,255,0.95)", 
-                          boxShadow: "0 4px 12px rgba(61,43,31,0.15)",
-                          backdropFilter: "blur(8px)"
-                        }}
+                        className="w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-transform duration-150 hover:scale-105"
+                        style={{ background: "rgba(255,255,255,0.94)" }}
                       >
                         <Heart
-                          className="w-3.5 h-3.5 sm:w-5 sm:h-5"
-                          fill={likedPatterns.includes(p.id) ? "#EF4444" : "none"}
-                          color={likedPatterns.includes(p.id) ? "#EF4444" : "#7A6B5E"}
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
+                          fill={likedPatterns.includes(p.id) ? "#D3453B" : "none"}
+                          color={likedPatterns.includes(p.id) ? "#D3453B" : T.charcoalFaint}
                         />
-                      </motion.button>
+                      </button>
                     </div>
                   </div>
-                  
-                  {/* Card Content */}
-                  <div className="p-3 sm:p-5 lg:p-6 flex flex-col">
-                    <h3 className="font-bold mb-1 leading-tight" style={{ color: "#3D2B1F", fontFamily: "'Playfair Display', serif", fontSize: "clamp(0.85rem, 2.5vw, 1.1rem)" }}>
+
+                  <div className="p-3 sm:p-5 flex flex-col">
+                    <h3 className="font-semibold mb-1 leading-tight" style={{ color: T.charcoal, fontFamily: display, fontSize: "clamp(0.85rem, 2.5vw, 1.05rem)" }}>
                       {p.name}
                     </h3>
-                    
-                    <div className="flex items-center gap-1 mb-3 sm:mb-5" style={{ color: "#A89B8F" }}>
-                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                      <span style={{ fontSize: "clamp(0.7rem, 2vw, 0.85rem)" }}>{p.origin}</span>
+
+                    <div className="flex items-center gap-1 mb-3 sm:mb-4" style={{ color: T.charcoalFaint }}>
+                      <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                      <span style={{ fontSize: "clamp(0.7rem, 2vw, 0.82rem)" }}>{p.origin}</span>
                     </div>
-                    
-                    <div className="mt-auto flex items-center justify-between pt-2 sm:pt-4 border-t" style={{ borderColor: "#E8E1DA" }}>
-                      <span style={{ color: "#8B6F47", fontWeight: 700, fontSize: "clamp(0.82rem, 2.5vw, 1.2rem)", fontFamily: "'Playfair Display', serif" }}>
-                        Rp {(p.price / 1000).toFixed(0)}rb
+
+                    <div className="mt-auto flex items-center justify-between pt-3 border-t" style={{ borderColor: T.border }}>
+                      <span style={{ color: T.gold, fontWeight: 700, fontSize: "clamp(0.82rem, 2.5vw, 1.3rem)", fontFamily: display }}>
+                        Rp {p.price.toLocaleString("id-ID")}
                       </span>
-                      <motion.button
+                      <button
                         onClick={(e) => { e.stopPropagation(); setSelectedBatik(p); }}
-                        whileHover={{ scale: 1.05 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
-                        className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 lg:w-auto lg:h-auto lg:px-5 lg:py-2.5 rounded-xl text-sm font-semibold shadow-md"
-                        style={{ 
-                          background: "linear-gradient(135deg, #3D2B1F, #5A3D2B)", 
-                          color: "#FFFFFF"
-                        }}
+                        className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg transition-transform duration-150 hover:scale-105"
+                        style={{ background: T.charcoal, color: T.cream }}
                       >
                         <ShoppingBag className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </motion.button>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -811,238 +768,163 @@ export function HomePage() {
 
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
-      {/* ======================== ARTISAN + DESA JETIS PROMO ======================== */}
-      <section className="py-12 sm:py-20 lg:py-24 relative overflow-hidden" style={{ background: "#3b2516ff" }}>
+      {/* ======================== DESA JETIS ======================== */}
+      <section className="py-14 sm:py-20 lg:py-28 relative overflow-hidden" style={{ background: T.ink }}>
         <BatikBackground opacity={0.06} patternType="parang" />
-        
-        <div className="absolute top-0 left-0 w-96 h-96 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)", transform: "translate(-50%, -50%)" }} />
-        <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-5" style={{ background: "radial-gradient(circle, #D4B88B 0%, transparent 70%)", transform: "translate(50%, 50%)" }} />
-        
-        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-            {/* Left - Content */}
+
+        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-6xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <motion.div
-              initial={{ opacity: 0, x: -40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
               viewport={{ once: true }}
-            > 
+            >
+              <Eyebrow tone="dark">Sejak 1920</Eyebrow>
               <h2
-                className="mb-5 sm:mb-8"
-                style={{ fontFamily: "'Playfair Display', serif", color: "#FAF8F5", fontSize: "clamp(1.6rem, 4vw, 3rem)", lineHeight: "1.25" }}
+                className="mb-5 sm:mb-7"
+                style={{ fontFamily: display, color: T.cream, fontSize: "clamp(1.6rem, 4vw, 2.75rem)", lineHeight: "1.25", fontWeight: 700 }}
               >
-                Kisah dari<br/>
-                <span style={{ color: "#D4B88B" }}>Desa Batik Jetis</span>
+                Kisah dari
+                <br />
+                Desa Batik Jetis
               </h2>
-              
-              <p className="mb-6 sm:mb-10" style={{ color: "rgba(250,248,245,0.75)", lineHeight: "1.9", fontSize: "clamp(0.85rem, 2.3vw, 1.05rem)" }}>
-                Desa Batik Jetis di Sidoarjo, Jawa Timur adalah salah satu sentra batik tulis tertua di Indonesia. 
-                Dikenal dengan motif khas "Beras Utah" dan flora fauna, para pengrajin di sini mewarisi 
+
+              <p className="mb-7 sm:mb-9" style={{ color: T.creamSoft, lineHeight: "1.85", fontSize: "clamp(0.85rem, 2.3vw, 1.02rem)" }}>
+                Desa Batik Jetis di Sidoarjo, Jawa Timur adalah salah satu sentra
+                batik tulis tertua di Indonesia. Dikenal dengan motif khas
+                "Beras Utah" dan flora fauna, para pengrajin di sini mewarisi
                 keahlian turun-temurun yang tak ternilai harganya.
               </p>
-              
-              {/* Stats Grid — selalu 3 kolom */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-5 mb-7 sm:mb-10">
+
+              <div className="grid grid-cols-3 gap-2.5 sm:gap-4 mb-8 sm:mb-10">
                 {[
                   { value: "100+", label: "Tahun Tradisi" },
                   { value: "350+", label: "Pengrajin Aktif" },
                   { value: "500+", label: "Motif Unik" },
                 ].map((s, i) => (
-                  <motion.div
+                  <div
                     key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 + i * 0.1 }}
-                    viewport={{ once: true }}
-                    className="text-center p-3 sm:p-5 rounded-xl sm:rounded-2xl" 
-                    style={{ 
-                      background: "rgba(255,255,255,0.03)", 
-                      border: "1px solid rgba(212,184,139,0.2)",
-                      backdropFilter: "blur(10px)"
-                    }}
+                    className="text-center p-3 sm:p-4 rounded-xl border"
+                    style={{ background: T.inkRaised, borderColor: T.borderDark }}
                   >
-                    <div className="mb-1" style={{ color: "#D4B88B", fontSize: "clamp(1.1rem, 3.5vw, 2rem)", fontFamily: "'Playfair Display', serif", fontWeight: 700 }}>{s.value}</div>
-                    <div style={{ color: "rgba(250,248,245,0.7)", fontSize: "clamp(0.6rem, 1.8vw, 0.85rem)", fontWeight: 500 }}>{s.label}</div>
-                  </motion.div>
+                    <div className="mb-1" style={{ color: T.gold, fontSize: "clamp(1.1rem, 3.5vw, 1.85rem)", fontFamily: display, fontWeight: 700 }}>{s.value}</div>
+                    <div style={{ color: T.creamFaint, fontSize: "clamp(0.6rem, 1.8vw, 0.8rem)", fontWeight: 500 }}>{s.label}</div>
+                  </div>
                 ))}
               </div>
-              
-              <MotionLink
-                to="/desa-jetis"
-                className="inline-flex items-center gap-2.5 px-6 sm:px-8 py-3 sm:py-4 rounded-full text-sm sm:text-base"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{ 
-                  background: "linear-gradient(135deg, #D4B88B, #E8DCC8)", 
-                  color: "#3D2B1F", 
-                  fontWeight: 600,
-                }}
-              >
+
+              <PrimaryButton to="/desa-jetis" tone="dark">
                 Jelajahi Desa Jetis
                 <ChevronRight className="w-4 h-4" />
-              </MotionLink>
+              </PrimaryButton>
             </motion.div>
 
-            {/* Right - Image Gallery */}
             <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
               viewport={{ once: true }}
               className="relative"
             >
-              <div className="relative z-10">
-                <div className="rounded-2xl sm:rounded-3xl overflow-hidden mb-4" style={{ boxShadow: "0 25px 60px rgba(0,0,0,0.3)" }}>
-                  <img src={villageImg} alt="Pengrajin batik" className="w-full h-56 sm:h-72 lg:h-80 object-cover" />
-                </div>
+              <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${T.borderDark}` }}>
+                <img src={villageImg} alt="Pengrajin batik" className="w-full h-56 sm:h-72 lg:h-80 object-cover" />
               </div>
-              
-              {/* Floating image — only on md+ */}
-              <div className="absolute -left-8 top-1/4 z-20 hidden md:block">
-                <motion.div
-                  animate={{ y: [0, -12, 0] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                  className="rounded-2xl overflow-hidden"
-                  style={{ boxShadow: "0 15px 40px rgba(0,0,0,0.25)" }}
-                >
-                  <img src={womanBatikImg} alt="Batik fashion" className="w-36 lg:w-44 h-48 lg:h-56 object-cover" />
-                </motion.div>
+
+              <div
+                className="hidden md:block absolute -left-8 -bottom-8 w-36 lg:w-44 rounded-2xl overflow-hidden"
+                style={{ border: `4px solid ${T.ink}`, boxShadow: "0 20px 40px rgba(0,0,0,0.35)" }}
+              >
+                <img src={womanBatikImg} alt="Batik fashion" className="w-full h-48 lg:h-56 object-cover" />
               </div>
-              
-              {/* Floating badge */}
-              <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30">
-                <div className="flex items-center gap-2 px-3 py-2 sm:px-5 sm:py-3 rounded-full" style={{ 
-                  background: "rgba(61,43,31,0.9)", 
-                  backdropFilter: "blur(12px)",
-                  border: "1px solid rgba(212,184,139,0.3)"
-                }}>
-                  <div className="w-2 h-2 rounded-full" style={{ background: "#D4B88B" }} />
-                  <span style={{ color: "#FAF8F5", fontSize: "clamp(0.6rem, 1.8vw, 0.75rem)", fontWeight: 600, letterSpacing: "0.08em" }}>SINCE 1920</span>
+
+              <div className="absolute top-4 right-4 sm:top-5 sm:right-5">
+                <div className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full" style={{ background: T.ink, border: `1px solid ${T.goldLine}` }}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: T.gold }} />
+                  <span style={{ color: T.cream, fontSize: "clamp(0.6rem, 1.8vw, 0.7rem)", fontWeight: 600, letterSpacing: "0.08em" }}>SEJAK 1920</span>
                 </div>
               </div>
             </motion.div>
           </div>
         </div>
       </section>
-      
+
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
       {/* ======================== TRENDING ======================== */}
-      {/*
-        Mobile: header di atas, list di bawah (stack vertikal)
-        Desktop: 2-col grid (5/12 + 7/12)
-        List items: kompak di mobile, full di desktop
-      */}
-      <section className="py-12 sm:py-20 lg:py-24 relative overflow-hidden" style={{ background: "linear-gradient(180deg, #FAF8F5 0%, #FFFFFF 100%)" }}>
-        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-[185vh]">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-            {/* Left Content */}
+      <section className="py-14 sm:py-20 lg:py-28 relative overflow-hidden" style={{ background: T.paper }}>
+        <div className="container mx-auto px-6 sm:px-6 lg:px-8 relative z-10 max-w-6xl">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
             <motion.div
-              initial={{ opacity: 0, x: -40 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
               viewport={{ once: true }}
               className="lg:col-span-5"
-            > 
-              <h2 className="mb-4 sm:mb-6" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F", fontSize: "clamp(1.4rem, 4vw, 2.8rem)", lineHeight: "1.2", fontWeight: "bold" }}>
-                Batik Paling Diminati Bulan Ini
+            >
+              <Eyebrow>Sedang Diminati</Eyebrow>
+              <h2 className="mb-4 sm:mb-6" style={{ fontFamily: display, color: T.charcoal, fontSize: "clamp(1.4rem, 4vw, 2.5rem)", lineHeight: "1.2", fontWeight: 700 }}>
+                Batik paling diminati bulan ini
               </h2>
-              
-              <p className="mb-6 sm:mb-8" style={{ color: "#7A6B5E", fontSize: "clamp(0.85rem, 2.3vw, 1.05rem)", lineHeight: "1.8" }}>
-                Temukan koleksi batik yang sedang trending dan diminati oleh ribuan pelanggan dari seluruh Indonesia.
+
+              <p className="mb-7 sm:mb-9" style={{ color: T.charcoalSoft, fontSize: "clamp(0.85rem, 2.3vw, 1.02rem)", lineHeight: "1.8" }}>
+                Temukan koleksi batik yang sedang trending dan diminati oleh
+                ribuan pelanggan dari seluruh Indonesia.
               </p>
-              
-              <MotionLink
-                to="/catalog"
-                className="inline-flex items-center gap-3 px-6 sm:px-8 py-3 sm:py-4 rounded-full text-sm sm:text-base"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{
-                  background: "linear-gradient(135deg, #8B6F47, #A88967)",
-                  color: "#FFFFFF",
-                  fontWeight: 600,
-                  boxShadow: "0 10px 30px rgba(139,111,71,0.3)"
-                }}
-              >
-                <span>Jelajahi Katalog</span>
-                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-              </MotionLink>
+
+              <OutlineButton to="/catalog">
+                Jelajahi katalog
+                <ChevronRight className="w-4 h-4" />
+              </OutlineButton>
             </motion.div>
 
-            {/* Right Trending List */}
             <div className="lg:col-span-7">
-              <div className="space-y-2.5 sm:space-y-4">
+              <div className="space-y-2.5 sm:space-y-3">
                 {loading ? (
-                  <div className="space-y-2.5 sm:space-y-4">
-                    {[...Array(5)].map((_, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <Skeleton className="h-16 sm:h-24 w-full rounded-xl sm:rounded-2xl" />
-                      </motion.div>
-                    ))}
-                  </div>
+                  [...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-16 sm:h-20 w-full rounded-xl" />
+                  ))
                 ) : trendingItems.map((item, i) => (
                   <motion.div
                     key={i}
-                    initial={{ opacity: 0, x: 40 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.2 }}
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35, delay: i * 0.04 }}
                     viewport={{ once: true }}
-                    whileHover={{ scale: 1.02 }}
-                    className="group"
                   >
                     <div
-                      className="flex items-center gap-3 sm:gap-5 p-3 sm:p-5 lg:p-6 rounded-xl sm:rounded-2xl transition-all duration-300 cursor-pointer"
+                      className="flex items-center gap-3 sm:gap-5 p-3 sm:p-4 lg:p-5 rounded-xl border transition-colors duration-200"
                       style={{
-                        background: i === 0 ? "linear-gradient(135deg, rgba(139,111,71,0.08), rgba(212,184,139,0.05))" : "#FFFFFF",
-                        border: i === 0 ? "2px solid rgba(139,111,71,0.2)" : "1px solid #E8E1DA",
+                        background: i === 0 ? T.goldSoft : T.paperAlt,
+                        borderColor: i === 0 ? T.goldLine : T.border,
                       }}
                     >
-                      {/* Rank */}
                       <div
-                        className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0"
+                        className="w-9 h-9 sm:w-11 sm:h-11 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{
-                          background: i === 0
-                            ? "linear-gradient(135deg, #D4B88B, #8B6F47)"
-                            : "rgba(212,184,139,0.15)",
-                          color: i === 0 ? "#FFFFFF" : "#8B6F47",
-                          fontFamily: "'Playfair Display', serif",
-                          fontSize: "clamp(1rem, 2.5vw, 1.5rem)",
-                          fontWeight: 700
+                          background: i === 0 ? T.gold : T.goldSoft,
+                          color: i === 0 ? T.ink : T.gold,
+                          fontFamily: display,
+                          fontSize: "clamp(0.95rem, 2.5vw, 1.3rem)",
+                          fontWeight: 700,
                         }}
                       >
                         {i + 1}
                       </div>
-                      
-                      {/* Content */}
+
                       <div className="flex-1 min-w-0">
-                        <div className="mb-0.5 sm:mb-1.5 truncate" style={{ color: "#3D2B1F", fontSize: "clamp(0.85rem, 2.3vw, 1.1rem)", fontWeight: 600, fontFamily: "'Playfair Display', serif" }}>
+                        <div className="mb-0.5 truncate" style={{ color: T.charcoal, fontSize: "clamp(0.85rem, 2.3vw, 1.05rem)", fontWeight: 600, fontFamily: display }}>
                           {item.name}
                         </div>
-                        <div style={{ color: "#A89B8F", fontSize: "clamp(0.7rem, 1.8vw, 0.9rem)" }}>{item.sold.toLocaleString('id-ID')} terjual</div>
+                        <div style={{ color: T.charcoalFaint, fontSize: "clamp(0.7rem, 1.8vw, 0.85rem)" }}>{item.sold.toLocaleString('id-ID')} terjual</div>
                       </div>
-                      
-                      {/* Growth Badge */}
+
                       <div
-                        className="flex items-center gap-1 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full flex-shrink-0"
-                        style={{
-                          background: i === 0 ? "rgba(93,156,89,0.12)" : "rgba(93,156,89,0.08)",
-                          color: "#5D9C59",
-                          fontWeight: 600,
-                          fontSize: "clamp(0.68rem, 1.8vw, 0.85rem)"
-                        }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-full flex-shrink-0"
+                        style={{ background: "rgba(93,156,89,0.1)", color: T.green, fontWeight: 600, fontSize: "clamp(0.68rem, 1.8vw, 0.8rem)" }}
                       >
-                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         {item.growth}
-                      </div>
-                      
-                      {/* Arrow — hidden on mobile */}
-                      <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 hidden sm:block">
-                        <ChevronRight className="w-5 h-5" style={{ color: "#8B6F47" }} />
                       </div>
                     </div>
                   </motion.div>
@@ -1056,184 +938,134 @@ export function HomePage() {
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
       {/* ======================== REVIEWS ======================== */}
-      {/*
-        Mobile: header + featured review + selector list stacked
-        Desktop: 7/12 + 5/12 grid
-      */}
-      <section className="py-16 sm:py-24 lg:py-32 relative overflow-hidden bg-[#1A110B]">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-[#D4B88B] rounded-full mix-blend-overlay filter blur-[150px] opacity-10 pointer-events-none" />
-        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-[#8B6F47] rounded-full mix-blend-overlay filter blur-[120px] opacity-10 pointer-events-none" />
-        
+      <section className="py-16 sm:py-24 lg:py-28 relative overflow-hidden" style={{ background: T.ink }}>
         <BatikBackground opacity={0.03} patternType="parang" />
 
-        <div className="container mx-auto px-6 sm:px-6 lg:px-12 xl:px-24 relative z-10">
-          {/* Section Header */}
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-12 sm:mb-16 lg:mb-20">
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              viewport={{ once: true }}
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-[1px] w-10 bg-[#D4B88B]" />
-                <span className="text-[#D4B88B] font-semibold uppercase tracking-[0.2em] text-xs sm:text-sm">Testimoni Klien</span>
-              </div>
-              <h2 className="font-['Playfair_Display'] text-3xl sm:text-4xl lg:text-5xl xl:text-6xl text-[#FAF8F5] leading-tight font-bold">
-                Karya Kami di Mata <br className="hidden sm:block" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4B88B] to-[#A88967]">Pelanggan Setia</span>
+        <div className="container mx-auto px-6 sm:px-6 lg:px-12 relative z-10 max-w-6xl">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-12 sm:mb-16">
+            <div>
+              <Eyebrow tone="dark">Testimoni Klien</Eyebrow>
+              <h2 style={{ fontFamily: display, color: T.cream, fontSize: "clamp(1.7rem, 4.5vw, 3rem)", lineHeight: "1.2", fontWeight: 700 }}>
+                Karya kami di mata
+                <br className="hidden sm:block" />
+                pelanggan setia
               </h2>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              viewport={{ once: true }}
-              className="flex flex-row sm:flex-col sm:items-end gap-2 sm:gap-0"
-            >
+            <div className="flex flex-row sm:flex-col sm:items-end gap-2 sm:gap-1">
               <div className="flex gap-0.5">
                 {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} className="w-4 h-4 sm:w-5 sm:h-5 fill-[#D4B88B] text-[#D4B88B]" />
+                  <Star key={star} className="w-4 h-4" fill={T.gold} color={T.gold} />
                 ))}
               </div>
-              <p className="text-white/60 text-sm sm:text-base sm:mt-1">
-                <span className="text-white font-bold">4.9/5</span> dari 1.240+ ulasan
+              <p style={{ color: T.creamSoft, fontSize: "0.9rem" }}>
+                <span style={{ color: T.cream, fontWeight: 700 }}>4.9/5</span> dari 1.240+ ulasan
               </p>
-            </motion.div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-24 items-start">
-            {/* Left - Main Featured Review */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-20 items-start">
             <div className="lg:col-span-7 relative">
               {loading ? (
-                <div className="p-8 rounded-3xl border border-white/10 bg-white/5">
+                <div className="p-8 rounded-2xl border" style={{ borderColor: T.borderDark }}>
                   <Skeleton className="w-16 h-16 rounded-full mb-5" />
                   <Skeleton className="h-5 w-3/4 mb-3" />
                   <Skeleton className="h-20 w-full mb-5" />
                   <Skeleton className="h-4 w-1/2" />
                 </div>
               ) : reviews.length > 0 && (
-                <div className="relative">
-                  <div className="absolute -top-10 -left-4 sm:-top-16 sm:-left-8 text-[100px] sm:text-[160px] leading-none font-serif text-[#D4B88B] opacity-10 pointer-events-none select-none">
-                    "
-                  </div>
-                  
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={activeReview}
-                      initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      exit={{ opacity: 0, y: -20, filter: "blur(8px)" }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                      className="relative z-10"
-                    >
-                      <p className="text-xl sm:text-2xl lg:text-3xl xl:text-[2.5rem] text-[#FAF8F5] font-['Playfair_Display'] leading-[1.6] mb-8 sm:mb-12 italic">
-                        "{reviews[activeReview]?.comment}"
-                      </p>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeReview}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                  >
+                    <p className="text-xl sm:text-2xl lg:text-3xl text-[#FAF8F5] leading-[1.6] mb-8 sm:mb-10" style={{ fontFamily: display, fontStyle: "italic" }}>
+                      "{reviews[activeReview]?.comment}"
+                    </p>
 
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-                        <div className="relative flex-shrink-0">
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-2 border-[#D4B88B]/30 p-1">
-                            <img 
-                              src={reviews[activeReview]?.image} 
-                              alt={reviews[activeReview]?.name}
-                              className="w-full h-full rounded-full object-cover"
-                            />
-                          </div>
-                          <div className="absolute bottom-0 right-0 bg-gradient-to-br from-[#D4B88B] to-[#8B6F47] w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-4 border-[#1A110B]">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="#1A110B" />
-                            </svg>
-                          </div>
-                        </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+                      <img
+                        src={reviews[activeReview]?.image}
+                        alt={reviews[activeReview]?.name}
+                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover flex-shrink-0"
+                        style={{ border: `1px solid ${T.goldLine}` }}
+                      />
 
-                        <div>
-                          <h4 className="text-[#FAF8F5] text-xl sm:text-2xl font-bold font-['Playfair_Display'] tracking-wide mb-1">
-                            {reviews[activeReview]?.name}
-                          </h4>
-                          <p className="text-[#D4B88B] text-xs uppercase tracking-widest font-semibold mb-2">
-                            {reviews[activeReview]?.role}
-                          </p>
-                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-white/80 text-xs font-medium">
-                            <ShoppingBag className="w-3.5 h-3.5 text-[#D4B88B]" />
-                            {reviews[activeReview]?.product}
-                          </div>
+                      <div>
+                        <h4 className="text-lg sm:text-xl font-semibold" style={{ color: T.cream, fontFamily: display }}>
+                          {reviews[activeReview]?.name}
+                        </h4>
+                        <p className="text-xs uppercase tracking-widest font-semibold mb-2" style={{ color: T.gold }}>
+                          {reviews[activeReview]?.role}
+                        </p>
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium" style={{ background: T.inkRaised, color: T.creamSoft, border: `1px solid ${T.borderDark}` }}>
+                          <ShoppingBag className="w-3.5 h-3.5" style={{ color: T.gold }} />
+                          {reviews[activeReview]?.product}
                         </div>
                       </div>
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
               )}
             </div>
 
-            {/* Right - Review Selectors & Stats */}
             <div className="lg:col-span-5 flex flex-col gap-8">
-              <div className="flex flex-col gap-2 sm:gap-3 relative">
-                <div className="absolute left-7 top-6 bottom-6 w-px bg-gradient-to-b from-transparent via-[#D4B88B]/20 to-transparent hidden sm:block" />
-
+              <div className="flex flex-col gap-2">
                 {reviews.map((r, i) => (
-                  <motion.button
+                  <button
                     key={r.id}
                     onClick={() => setActiveReview(i)}
-                    whileHover={{ x: 4 }}
-                    className={`relative flex items-center gap-3 sm:gap-5 p-3 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-500 text-left ${
-                      i === activeReview 
-                        ? "bg-gradient-to-r from-[#D4B88B]/10 to-transparent border border-[#D4B88B]/20" 
-                        : "hover:bg-white/5 border border-transparent opacity-50 hover:opacity-100"
-                    }`}
+                    className="relative flex items-center gap-3 sm:gap-4 p-3 rounded-xl text-left transition-colors duration-200 border"
+                    style={
+                      i === activeReview
+                        ? { background: T.inkRaised, borderColor: T.goldLine }
+                        : { background: "transparent", borderColor: "transparent", opacity: 0.55 }
+                    }
                   >
-                    <div className="relative z-10 flex-shrink-0">
-                      <img 
-                        src={r.image} 
-                        alt={r.name}
-                        className={`w-10 h-10 sm:w-14 sm:h-14 rounded-full object-cover transition-all duration-500 ${
-                          i === activeReview ? "border-2 border-[#D4B88B] scale-110" : "filter grayscale opacity-70 border border-white/10"
-                        }`}
-                      />
-                    </div>
-                    
+                    <img
+                      src={r.image}
+                      alt={r.name}
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0"
+                      style={{ border: i === activeReview ? `2px solid ${T.gold}` : `1px solid ${T.borderDark}` }}
+                    />
+
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center mb-1">
-                        <span className={`font-['Playfair_Display'] font-semibold truncate text-sm sm:text-base ${i === activeReview ? "text-[#D4B88B]" : "text-white"}`}>
+                        <span className="font-semibold truncate text-sm sm:text-base" style={{ color: i === activeReview ? T.gold : T.cream, fontFamily: display }}>
                           {r.name}
                         </span>
                         <div className="flex gap-0.5 flex-shrink-0 ml-2">
                           {[...Array(5)].map((_, idx) => (
-                            <Star key={idx} className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${idx < r.rating ? "fill-[#D4B88B] text-[#D4B88B]" : "text-white/20"}`} />
+                            <Star key={idx} className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill={idx < r.rating ? T.gold : "none"} color={idx < r.rating ? T.gold : "rgba(250,248,245,0.2)"} />
                           ))}
                         </div>
                       </div>
-                      <p className="text-white/60 text-xs line-clamp-1">
+                      <p className="text-xs line-clamp-1" style={{ color: T.creamFaint }}>
                         "{r.comment}"
                       </p>
                     </div>
-                  </motion.button>
+                  </button>
                 ))}
               </div>
 
-              {/* Stats — selalu 3 kolom */}
               {!loading && (
-                <div className="grid grid-cols-3 gap-3 sm:gap-6 pt-6 sm:pt-8 border-t border-white/10">
+                <div className="grid grid-cols-3 gap-3 sm:gap-6 pt-6 sm:pt-8 border-t" style={{ borderColor: T.borderDark }}>
                   {[
                     { value: "1.2K+", label: "Ulasan" },
                     { value: "98%", label: "Kepuasan" },
                     { value: "4.9", label: "Rating" }
                   ].map((stat, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: 0.3 + i * 0.1 }}
-                      className="text-left"
-                    >
-                      <div className="text-[#D4B88B] font-bold font-['Playfair_Display'] mb-1" style={{ fontSize: "clamp(1.2rem, 3vw, 1.75rem)" }}>
+                    <div key={i} className="text-left">
+                      <div className="font-bold mb-1" style={{ color: T.gold, fontFamily: display, fontSize: "clamp(1.2rem, 3vw, 1.6rem)" }}>
                         {stat.value}
                       </div>
-                      <div className="text-white/50 font-medium uppercase tracking-wider" style={{ fontSize: "clamp(0.55rem, 1.5vw, 0.7rem)" }}>
+                      <div className="font-medium uppercase tracking-wider" style={{ color: T.creamFaint, fontSize: "clamp(0.55rem, 1.5vw, 0.7rem)" }}>
                         {stat.label}
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1244,63 +1076,47 @@ export function HomePage() {
 
       <div className="h-1.5" style={{ background: "#e19d2eff" }} />
 
-      {/* ======================== CTA ======================== */}
-      <section className="py-12 sm:py-20 md:py-32 relative overflow-hidden bg-[#FAF8F5]">
+      {/* ======================== FINAL CTA ======================== */}
+      <section className="py-14 sm:py-20 md:py-28 relative overflow-hidden" style={{ background: T.paper }}>
         <div className="container mx-auto px-6 md:px-8 relative z-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 40 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
+            transition={{ duration: 0.6 }}
             viewport={{ once: true, margin: "-100px" }}
-            className="relative rounded-[2rem] md:rounded-[3.5rem] overflow-hidden bg-[#3D2B1F] p-7 sm:p-12 md:p-20 text-center shadow-2xl"
+            className="relative rounded-[2rem] overflow-hidden p-8 sm:p-12 md:p-16 text-center"
+            style={{ background: T.ink, border: `1px solid ${T.goldLine}` }}
           >
             <div className="absolute inset-0 z-0">
               <BatikBackground opacity={0.06} patternType="floral" />
             </div>
-            <div className="absolute top-0 right-0 w-[250px] md:w-[600px] h-[250px] md:h-[600px] bg-[#D4B88B] rounded-full mix-blend-overlay filter blur-[100px] md:blur-[150px] opacity-20 pointer-events-none transform translate-x-1/4 -translate-y-1/4" />
-            <div className="absolute bottom-0 left-0 w-[250px] md:w-[600px] h-[250px] md:h-[600px] bg-[#8B6F47] rounded-full mix-blend-overlay filter blur-[100px] md:blur-[150px] opacity-20 pointer-events-none transform -translate-x-1/4 translate-y-1/4" />
-            
-            <div className="relative z-10 max-w-4xl mx-auto">
-              <h2 className="font-['Playfair_Display'] text-[#FAF8F5] font-bold leading-[1.1] mb-5" style={{ fontSize: "clamp(1.8rem, 6vw, 4rem)" }}>
-                Siap Membuat Batik <br className="hidden sm:block" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4B88B] to-[#A88967] italic">Impian Anda?</span>
+
+            <div className="relative z-10 max-w-3xl mx-auto">
+              <h2 className="font-bold leading-[1.15] mb-5" style={{ fontFamily: display, color: T.cream, fontSize: "clamp(1.8rem, 6vw, 3.2rem)" }}>
+                Siap membuat batik
+                <br className="hidden sm:block" />
+                <span style={{ color: T.gold, fontStyle: "italic" }}>impian Anda?</span>
               </h2>
-              
-              <p className="text-white/80 leading-relaxed mb-8 sm:mb-12 max-w-2xl mx-auto font-light" style={{ fontSize: "clamp(0.88rem, 2.5vw, 1.15rem)" }}>
-                Bergabunglah dengan <span className="font-semibold text-[#D4B88B]">12.500+</span> pelanggan yang telah merasakan pengalaman kustomisasi batik digital terbaik di Indonesia.
+
+              <p className="leading-relaxed mb-8 sm:mb-10 max-w-xl mx-auto" style={{ color: T.creamSoft, fontSize: "clamp(0.88rem, 2.5vw, 1.05rem)" }}>
+                Bergabunglah dengan <span style={{ color: T.gold, fontWeight: 600 }}>12.500+</span> pelanggan yang telah merasakan pengalaman kustomisasi batik digital terbaik di Indonesia.
               </p>
-              
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-5 justify-center items-center">
-                <MotionLink
-                  to="/custom"
-                  whileHover={{ scale: 1.03, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center justify-center gap-3 px-7 py-3.5 sm:px-8 sm:py-4 rounded-full bg-gradient-to-r from-[#D4B88B] to-[#8B6F47] text-white font-bold shadow-[0_10px_30px_rgba(212,184,139,0.25)] w-full sm:w-auto"
-                  style={{ fontSize: "clamp(0.88rem, 2.5vw, 1.05rem)" }}
-                >
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+                <PrimaryButton to="/custom" tone="dark">
                   <Palette className="w-4 h-4 sm:w-5 sm:h-5" />
                   Mulai Kustomisasi Gratis
-                </MotionLink>
-                
-                <MotionLink
-                  to="/desa-jetis"
-                  whileHover={{ scale: 1.03, y: -2, backgroundColor: "rgba(255,255,255,0.05)" }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center justify-center gap-3 px-7 py-3.5 sm:px-8 sm:py-4 rounded-full border border-[#D4B88B]/40 text-[#D4B88B] font-bold w-full sm:w-auto transition-colors"
-                  style={{ fontSize: "clamp(0.88rem, 2.5vw, 1.05rem)" }}
-                >
+                </PrimaryButton>
+                <OutlineButton to="/desa-jetis" tone="dark">
                   <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
                   Kunjungi Desa Jetis
-                </MotionLink>
+                </OutlineButton>
               </div>
             </div>
           </motion.div>
         </div>
       </section>
 
-      
       <AnimatePresence>
         {selectedBatik && (
           <BatikDetailModal
