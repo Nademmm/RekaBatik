@@ -9,7 +9,76 @@ Dokumen ini menjelaskan cara men-deploy RekaBatik berdasarkan kondisi repository
 Komponen yang perlu tersedia:
 
 - hosting static/frontend untuk hasil build Vite
-- project Supabase aktif untuk Auth, Database, dan Realtime
+- project Supabase aktif untuk Auth, Database, Realtime, dan Storage
+
+## Status Pemenuhan Kebutuhan PaaS
+
+Untuk kebutuhan tugas yang meminta deploy `App`, `DB`, dan `Storage`, repository ini **sudah mendukung semuanya**.
+
+Arsitektur yang paling relevan untuk project saat ini:
+
+- `App`: frontend React + Vite di-deploy ke Vercel atau Netlify
+- `DB`: PostgreSQL yang disediakan Supabase
+- `Storage`: Supabase Storage untuk file upload
+
+Catatan penting:
+
+- `DB` dan `Storage` memang berada di **platform yang sama**, yaitu Supabase
+- hal ini tetap valid secara arsitektur karena keduanya adalah **layanan berbeda**
+- Supabase berperan sebagai backend platform yang menyediakan lebih dari satu komponen sekaligus
+- jadi, untuk tugas ini Anda tetap bisa menjelaskan bahwa project memakai 3 komponen: `App`, `Database`, dan `Storage`
+
+Ringkasnya:
+
+- Vercel = platform untuk aplikasi frontend
+- Supabase Database = layanan database
+- Supabase Storage = layanan object/file storage
+
+## Bukti Penggunaan Storage di Repository
+
+Storage pada project ini bukan sekadar rencana, tetapi **sudah dipakai langsung di kode aplikasi**.
+
+Bucket yang dipakai saat ini:
+
+- `store-images`
+
+Use case yang sudah berjalan di kode:
+
+- upload foto toko artisan
+- upload hero image toko
+- upload galeri toko
+- upload bukti transfer checkout
+- upload lampiran pembayaran premium
+
+Implementasi upload ke Supabase Storage saat ini ada di:
+
+- `src/app/pages/ArtisanStorePage.tsx`
+- `src/app/pages/CartPage.tsx`
+- `src/app/pages/CheckoutPage.tsx`
+
+Alur teknisnya:
+
+1. file di-upload ke bucket `store-images`
+2. aplikasi mengambil public URL dari file tersebut
+3. URL hasil upload disimpan ke tabel database, misalnya ke field gambar toko atau bukti pembayaran
+
+Dengan demikian, storage pada project ini **sudah termasuk bagian dari arsitektur production**, bukan fitur yang belum dibuat
+
+## Checklist Storage Production
+
+Agar deployment production benar-benar lengkap, pastikan item berikut sudah ada di project Supabase:
+
+- bucket `store-images`
+- bucket diset `public` jika file perlu diakses lewat URL publik
+- policy untuk read publik bila memang memakai public URL
+- policy upload untuk user yang sudah login
+
+Jika bucket belum dibuat, maka:
+
+- aplikasi tetap bisa build dan deploy
+- tetapi fitur upload file akan gagal saat dipakai
+
+Jika bucket `store-images` sudah ada dan policy-nya benar, maka bagian `Storage` dapat dianggap **sudah selesai terdeploy**
 
 Yang tidak ada saat ini di repository:
 
