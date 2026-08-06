@@ -81,7 +81,7 @@ src/imports/
 
 1. Di Supabase, klik **SQL Editor** (menu kiri)
 2. Klik **New query**
-3. Buka file **`supabase_full_schema.sql`** di project kamu (pakai VS Code / Cursor)
+3. Buka file **`supabase/migrations/supabase_full_schema.sql`** di project kamu (pakai VS Code / Cursor)
 4. **Select All** (Ctrl+A) → **Copy** (Ctrl+C) semua isinya
 5. **Paste** (Ctrl+V) ke SQL Editor Supabase
 6. Klik tombol **Run** (atau Ctrl+Enter)

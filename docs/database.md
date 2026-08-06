@@ -14,7 +14,7 @@ Database mendukung lima domain utama:
 
 ## Sumber Kebenaran Skema
 
-Repository ini memakai beberapa file SQL yang saling melengkapi:
+Repository ini memakai beberapa file SQL yang saling melengkapi di dalam folder `supabase/migrations/`:
 
 - `supabase_schema.sql`: skema dasar awal
 - `supabase_migration.sql`: upgrade aman untuk `orders` dan `cart_items`
@@ -29,14 +29,14 @@ Repository ini memakai beberapa file SQL yang saling melengkapi:
 
 Untuk database baru:
 
-1. Jalankan `supabase_schema.sql`
-2. Jalankan `supabase_migration.sql`
-3. Jalankan `create_chat_and_admin_tables.sql`
-4. Jalankan `create_user_addresses_table.sql`
-5. Jalankan `add_favorites_tables.sql`
-6. Jalankan `add_tracking_fields.sql`
-7. Jalankan `add_notes_to_cart_items.sql`
-8. Jalankan `fix_payment_status_constraint.sql` bila diperlukan
+1. Jalankan `supabase/migrations/supabase_schema.sql`
+2. Jalankan `supabase/migrations/supabase_migration.sql`
+3. Jalankan `supabase/migrations/create_chat_and_admin_tables.sql`
+4. Jalankan `supabase/migrations/create_user_addresses_table.sql`
+5. Jalankan `supabase/migrations/add_favorites_tables.sql`
+6. Jalankan `supabase/migrations/add_tracking_fields.sql`
+7. Jalankan `supabase/migrations/add_notes_to_cart_items.sql`
+8. Jalankan `supabase/migrations/fix_payment_status_constraint.sql` bila diperlukan
 
 Alasan urutan ini:
 

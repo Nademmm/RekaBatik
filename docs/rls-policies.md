@@ -36,7 +36,7 @@ RLS dipakai untuk memastikan:
 
 ### `orders`
 
-Sumber utama:
+Sumber utama di `supabase/migrations/`:
 
 - `supabase_schema.sql`
 - `create_chat_and_admin_tables.sql`

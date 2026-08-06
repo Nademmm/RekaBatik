@@ -143,13 +143,13 @@ Sebelum upload build:
 
 ### Project Supabase baru (disarankan)
 
-Jalankan **1 file** di SQL Editor:
+Jalankan **1 file** di SQL Editor dari folder `supabase/migrations/`:
 
 - `supabase_full_schema.sql` — schema final, RLS, Realtime, dan seed data
 
 ### Project yang sudah pernah di-setup (migrasi incremental)
 
-Jalankan file SQL yang **belum pernah** di-run, berurutan:
+Jalankan file SQL di `supabase/migrations/` yang **belum pernah** di-run, berurutan:
 
 1. `supabase_schema.sql`
 2. `supabase_migration.sql`

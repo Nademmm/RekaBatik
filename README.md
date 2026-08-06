@@ -253,14 +253,13 @@ Struktur folder inti:
 |   |-- styles/
 |   |-- types/
 |   `-- main.tsx
+|-- supabase/
+|   `-- migrations/
+|       |-- supabase_schema.sql
+|       |-- supabase_migration.sql
+|       `-- ... (file SQL lainnya)
 |-- .env.example
 |-- README.md
-|-- supabase_schema.sql
-|-- supabase_migration.sql
-|-- create_chat_and_admin_tables.sql
-|-- create_user_addresses_table.sql
-|-- add_favorites_tables.sql
-|-- add_tracking_fields.sql
 `-- package.json
 ```
 
@@ -271,7 +270,7 @@ Penjelasan singkat:
 - `src/types/database.ts`: interface TypeScript untuk entitas utama.
 - `src/assets/batik-svgs`: aset SVG motif untuk editor kustom.
 - `src/assets/catalog-images`: gambar katalog batik.
-- File SQL di root: skema awal dan migrasi tambahan Supabase.
+- `supabase/migrations`: kumpulan file SQL untuk skema dan migrasi database.
 
 ## Persiapan Lokal
 
@@ -328,20 +327,20 @@ Jika variabel ini kosong atau salah format, aplikasi tetap membuat client placeh
 
 ## Setup Supabase dan SQL
 
-Repository ini menyimpan beberapa file SQL. Tidak semua file wajib dijalankan sekaligus, dan beberapa di antaranya bersifat destruktif terhadap data.
+Repository ini menyimpan seluruh file SQL di dalam folder `supabase/migrations`. Tidak semua file wajib dijalankan sekaligus, dan beberapa di antaranya bersifat destruktif terhadap data.
 
 ### Jalur setup untuk project baru
 
 Jika Anda menyiapkan database dari awal, urutan aman yang direkomendasikan:
 
-1. Jalankan `supabase_schema.sql`
-2. Jalankan `supabase_migration.sql`
-3. Jalankan `create_chat_and_admin_tables.sql`
-4. Jalankan `create_user_addresses_table.sql`
-5. Jalankan `add_favorites_tables.sql`
-6. Jalankan `add_tracking_fields.sql`
-7. Jalankan `add_notes_to_cart_items.sql`
-8. Jalankan `fix_payment_status_constraint.sql` bila constraint pembayaran bermasalah
+1. Jalankan `supabase/migrations/supabase_schema.sql`
+2. Jalankan `supabase/migrations/supabase_migration.sql`
+3. Jalankan `supabase/migrations/create_chat_and_admin_tables.sql`
+4. Jalankan `supabase/migrations/create_user_addresses_table.sql`
+5. Jalankan `supabase/migrations/add_favorites_tables.sql`
+6. Jalankan `supabase/migrations/add_tracking_fields.sql`
+7. Jalankan `supabase/migrations/add_notes_to_cart_items.sql`
+8. Jalankan `supabase/migrations/fix_payment_status_constraint.sql` bila constraint pembayaran bermasalah
 
 ### File SQL dan fungsinya
 

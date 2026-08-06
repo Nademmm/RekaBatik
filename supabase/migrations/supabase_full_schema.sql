@@ -4,7 +4,7 @@
 -- Jalankan file ini 1x di Supabase SQL Editor pada project BARU.
 -- Jangan jalankan jika database sudah pernah di-setup dengan file SQL lama.
 --
--- Menggabungkan:
+-- Menggabungkan (dari folder supabase/migrations/):
 --   supabase_schema.sql
 --   supabase_migration.sql
 --   create_chat_and_admin_tables.sql
