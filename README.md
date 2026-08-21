@@ -62,9 +62,9 @@
 
 | Nama | Peran | GitHub |
 |------|-------|--------|
-| **Naadhim Fahly Mubaarok** | Project Lead & Full Stack Developer | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/Nademmm) |
-| **Ayska Eveline Ikbar** | Frontend & UI/UX Developer | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/[username2]) |
-| **Auraluthfia Annisa** | Backend & Database Architect | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/[username3]) |
+| **Auraluthfia Annisa** | Project Lead | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/auraluthfia) |
+| **Naadhim Fahly Mubaarok** | Full Stack Developer | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/Nademmm) |
+| **Ayska Eveline Ikbar** | Frontend & UI/UX Developer | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/AyskaEveline) |
 
 ---
 
@@ -414,9 +414,8 @@ cp .env.example .env
 Buka file `.env` dan masukkan kredensial proyek Supabase Anda:
 ```env
 # Supabase Project Credentials
-VITE_SUPABASE_URL=https://ayesnmtrpjocteorggqs.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5ZXNubXRycGpvY3Rlb3JnZ3FzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4ODk3NDAsImV4cCI6MjA5NjQ2NTc0MH0.CjX2E9RZCXYtHu7nn1MQJ0b5riLzEj75JgFcdtQOqc4
-
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key-here
 ```
 
 ---
