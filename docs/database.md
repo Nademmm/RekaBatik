@@ -24,6 +24,7 @@ Repository ini memakai beberapa file SQL yang saling melengkapi di dalam folder 
 - `add_tracking_fields.sql`: pelacakan pengiriman, review, dan relasi desain kustom di order
 - `add_notes_to_cart_items.sql`: metadata tambahan di keranjang
 - `fix_payment_status_constraint.sql`: perbaikan constraint pembayaran
+- `seed_demo_accounts.sql`: seeding akun demo evaluasi dewan juri (Super Admin, Artisan, Customer), toko, order kustom sampel, dan chat
 
 ## Urutan Setup yang Disarankan
 
@@ -37,6 +38,7 @@ Untuk database baru:
 6. Jalankan `supabase/migrations/add_tracking_fields.sql`
 7. Jalankan `supabase/migrations/add_notes_to_cart_items.sql`
 8. Jalankan `supabase/migrations/fix_payment_status_constraint.sql` bila diperlukan
+9. Jalankan `supabase/migrations/seed_demo_accounts.sql` untuk mengaktifkan akun demo juri
 
 Alasan urutan ini:
 
