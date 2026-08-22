@@ -1,6 +1,8 @@
 <div align="center">
   
-  # 🎨 RekaBatik
+  <img src="public/rekabatik-logo.png" alt="RekaBatik Logo" width="130" style="border-radius: 12px; margin-bottom: 8px;" />
+  
+  # RekaBatik
   ### Platform Digital Kustomisasi Batik Interaktif & Pemberdayaan Pengrajin Lokal
   
   **Subtema:** *Smart Sustainable Digital Solution for Inclusive Society*
@@ -64,7 +66,7 @@
 |------|-------|--------|
 | **Auraluthfia Annisa** | Project Lead | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/auraluthfia) |
 | **Naadhim Fahly Mubaarok** | Full Stack Developer | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/Nademmm) |
-| **Ayska Eveline Ikbar** | Frontend & UI/UX Developer | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/AyskaEveline) |
+| **Ayska Eveline Ikbar** | Frontend & UI/UX Developer | [![GitHub](https://img.shields.io/badge/GitHub-Profile-181717?style=flat&logo=github)](https://github.com/ayesyiyes) |
 
 ---
 
