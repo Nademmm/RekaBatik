@@ -73,7 +73,6 @@ const plans: Plan[] = [
     features: [
       { label: "2 desain aktif", included: "2 desain" },
       { label: "Edit desain tersimpan", included: false },
-
       { label: "Ekspor resolusi tinggi", included: false },
       { label: "Diskon pendaftaran HKI", included: false },
       { label: "Penyimpanan proyek", included: "Terbatas" },
@@ -91,7 +90,6 @@ const plans: Plan[] = [
     features: [
       { label: "12 desain aktif", included: "12 desain" },
       { label: "Edit desain tersimpan", included: true },
-
       { label: "Ekspor resolusi tinggi", included: true },
       { label: "Diskon pendaftaran HKI", included: "Diskon standar" },
       { label: "Penyimpanan proyek", included: "12 slot" },
@@ -109,7 +107,6 @@ const plans: Plan[] = [
     features: [
       { label: "Desain tanpa batas", included: "Unlimited" },
       { label: "Edit desain tersimpan", included: true },
-
       { label: "Ekspor resolusi tinggi", included: true },
       { label: "Diskon pendaftaran HKI", included: "Diskon eksklusif" },
       { label: "Penyimpanan proyek", included: "Unlimited" },
@@ -121,7 +118,6 @@ const plans: Plan[] = [
 const comparisonRows = [
   { label: "Jumlah desain", values: ["2 desain", "12 desain", "Unlimited"] },
   { label: "Edit desain tersimpan", values: [false, true, true] },
-
   { label: "Ekspor resolusi tinggi", values: [false, true, true] },
   { label: "Diskon pendaftaran HKI", values: [false, "Standar", "Eksklusif"] },
   { label: "Penyimpanan proyek", values: ["Terbatas", "12 slot", "Unlimited"] },

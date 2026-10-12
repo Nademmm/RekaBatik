@@ -64,7 +64,6 @@ const PLANS: Record<string, PlanMeta> = {
     features: [
       "12 slot desain aktif",
       "Edit desain tersimpan bebas",
-
       "Export resolusi HD (2000×1500 px)",
       "Diskon pendaftaran HKI standar",
     ],
@@ -80,7 +79,6 @@ const PLANS: Record<string, PlanMeta> = {
     features: [
       "Desain, revisi & penyimpanan tanpa batas",
       "Edit desain tersimpan bebas",
-
       "Export resolusi HD (2000×1500 px)",
       "Diskon pendaftaran HKI eksklusif",
     ],
