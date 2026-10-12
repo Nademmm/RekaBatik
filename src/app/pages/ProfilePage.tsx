@@ -395,7 +395,7 @@ function SubscriptionCard({ user }: { user: any }) {
 
         {!isPremium && (
           <p className="text-[12.5px] leading-relaxed" style={{ color: "#9B8C80" }}>
-            Anda sedang menggunakan <strong>Plan Gratis</strong> — maks. 2 desain, tanpa AI, dan tanpa edit desain tersimpan.
+            Anda sedang menggunakan <strong>Plan Gratis</strong> — maks. 2 desain dan tanpa edit desain tersimpan.
             Upgrade untuk membuka semua fitur.
           </p>
         )}
@@ -458,7 +458,7 @@ function SubscriptionCard({ user }: { user: any }) {
               Batalkan Premium?
             </AlertDialogTitle>
             <AlertDialogDescription style={{ color: "#7A6B5E" }}>
-              Apakah Anda yakin ingin membatalkan paket Premium? Anda akan kehilangan semua akses fitur eksklusif seperti rekomendasi AI Motif, penyimpanan desain tak terbatas, dan ekspor resolusi tinggi HD.
+              Apakah Anda yakin ingin membatalkan paket Premium? Anda akan kehilangan semua akses fitur eksklusif seperti penyimpanan desain tak terbatas dan ekspor resolusi tinggi HD.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 pt-2">

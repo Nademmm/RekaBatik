@@ -36,12 +36,24 @@ import {
   Minimize2,
   FlipHorizontal,
   FlipVertical,
-  Sparkles,
-  Wand2,
-  Clock,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  ChevronDown,
+  SlidersHorizontal,
+  Grid,
+  ChevronsUp,
+  ChevronsDown,
+  Triangle,
+  Diamond,
 } from "lucide-react";
 import { useNavigate, useSearchParams, useBlocker } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Popover, PopoverTrigger, PopoverContent } from "../components/ui/popover";
 import { BatikBackground } from "../components/BatikBackground";
 import { supabase, handleSupabaseError } from "../../lib/supabase";
 import { BatikItem } from "../../types/database";
@@ -268,7 +280,7 @@ const mergePatternsWithAssets = (items: BatikItem[] = []) => {
 };
 
 type Tool = "select" | "brush" | "eraser" | "fill" | "shape" | "text";
-type ShapeType = "rect" | "circle" | "line" | "star";
+type ShapeType = "rect" | "circle" | "line" | "star" | "triangle" | "diamond";
 
 interface CustomLayer {
   id: string;
@@ -406,6 +418,23 @@ function makeStarPoints(cx: number, cy: number, numPoints: number, outerR: numbe
     points.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
   }
   return points;
+}
+
+function makeTrianglePoints(cx: number, cy: number, w: number, h: number) {
+  return [
+    { x: cx, y: cy - h / 2 },
+    { x: cx + w / 2, y: cy + h / 2 },
+    { x: cx - w / 2, y: cy + h / 2 },
+  ];
+}
+
+function makeDiamondPoints(cx: number, cy: number, w: number, h: number) {
+  return [
+    { x: cx, y: cy - h / 2 },
+    { x: cx + w / 2, y: cy },
+    { x: cx, y: cy + h / 2 },
+    { x: cx - w / 2, y: cy },
+  ];
 }
 
 // [OPT-2] detectObjectType — centralized helper, defined once outside the component
@@ -911,6 +940,194 @@ const SidebarTabs = memo(({
 });
 SidebarTabs.displayName = "SidebarTabs";
 
+// Available typography options for Batik designs
+const AVAILABLE_FONTS = [
+  {
+    name: "Playfair Display",
+    value: "'Playfair Display', serif",
+    category: "Elegan",
+    description: "Serif klasik khas batik keraton",
+  },
+  {
+    name: "Cinzel",
+    value: "'Cinzel', serif",
+    category: "Keraton",
+    description: "Inskripsi megah warisan budaya",
+  },
+  {
+    name: "Cormorant Garamond",
+    value: "'Cormorant Garamond', serif",
+    category: "Tradisional",
+    description: "Serif sastra klasik bernuansa halus",
+  },
+  {
+    name: "Great Vibes",
+    value: "'Great Vibes', cursive",
+    category: "Kaligrafi",
+    description: "Gaya canting luwes mengalir",
+  },
+  {
+    name: "Plus Jakarta Sans",
+    value: "'Plus Jakarta Sans', sans-serif",
+    category: "Nusantara",
+    description: "Sans kontemporer asli Indonesia",
+  },
+  {
+    name: "Inter",
+    value: "'Inter', sans-serif",
+    category: "Modern",
+    description: "Minimalis bersih dan jelas",
+  },
+  {
+    name: "Courier Prime",
+    value: "'Courier Prime', monospace",
+    category: "Klasik",
+    description: "Monospace mesin ketik vintage",
+  },
+  {
+    name: "Serif Standar",
+    value: "serif",
+    category: "Serif",
+    description: "Font serif bawaan sistem",
+  },
+  {
+    name: "Sans Standar",
+    value: "sans-serif",
+    category: "Sans",
+    description: "Font sans-serif bawaan sistem",
+  },
+];
+
+const FontPicker = ({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: string;
+  onChange: (font: string) => void;
+  compact?: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const currentFont = AVAILABLE_FONTS.find(f => f.value === value) || {
+    name: value.replace(/['",]/g, "").split(" ")[0] || value,
+    value,
+    category: "Kustom",
+    description: ""
+  };
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            // Prevent blur from canvas/text editing
+            e.preventDefault();
+          }}
+          className={`${compact ? "h-7 px-2 text-[11px]" : "h-8 px-2.5 sm:px-3 text-xs"} rounded-lg font-semibold border flex items-center justify-between gap-1.5 transition-all hover:bg-white hover:shadow-xs cursor-pointer min-w-[125px] sm:min-w-[155px]`}
+          style={{
+            borderColor: isOpen ? "#8B6F47" : "rgba(212,184,139,0.35)",
+            background: "#FAF9F6",
+            color: "#3D2B1F",
+            boxShadow: isOpen ? "0 0 0 2px rgba(139,111,71,0.2)" : "none",
+          }}
+          title="Pilih Jenis Huruf"
+        >
+          <div className="flex items-center gap-1.5 overflow-hidden">
+            <Type style={{ width: compact ? "11px" : "12px", height: compact ? "11px" : "12px", color: "#8B6F47", flexShrink: 0 }} />
+            <span
+              className="truncate font-medium"
+              style={{ fontFamily: value }}
+            >
+              {currentFont.name}
+            </span>
+          </div>
+          <ChevronDown
+            style={{
+              width: "11px",
+              height: "11px",
+              color: "#8B6F47",
+              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.15s ease",
+              flexShrink: 0
+            }}
+          />
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={6}
+        className="w-64 sm:w-72 max-h-72 overflow-y-auto rounded-xl shadow-2xl z-[999] border p-1.5"
+        style={{
+          background: "rgba(255, 255, 255, 0.98)",
+          backdropFilter: "blur(12px)",
+          borderColor: "rgba(212,184,139,0.4)",
+          boxShadow: "0 12px 36px -4px rgba(61,43,31,0.25), 0 4px 16px rgba(0,0,0,0.08)",
+        }}
+      >
+        <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#A89B8F] border-b mb-1 flex items-center justify-between" style={{ borderColor: "rgba(212,184,139,0.2)" }}>
+          <span>Pilihan Tipografi</span>
+          <span className="text-[9px] font-normal text-[#A89B8F]">{AVAILABLE_FONTS.length} jenis</span>
+        </div>
+
+        <div className="space-y-0.5">
+          {AVAILABLE_FONTS.map((f) => {
+            const isSelected = value === f.value;
+            return (
+              <button
+                key={f.value}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(f.value);
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-all cursor-pointer group hover:bg-[#FAF6EE]"
+                style={{
+                  background: isSelected ? "rgba(139,111,71,0.12)" : "transparent",
+                }}
+              >
+                <div className="flex flex-col min-w-0 pr-2">
+                  <span
+                    className="text-[13px] font-semibold truncate transition-colors"
+                    style={{
+                      fontFamily: f.value,
+                      color: isSelected ? "#8B6F47" : "#3D2B1F"
+                    }}
+                  >
+                    {f.name}
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span
+                      className="text-[9px] px-1.5 py-0.2 rounded font-medium"
+                      style={{
+                        background: isSelected ? "rgba(139,111,71,0.2)" : "rgba(139,111,71,0.08)",
+                        color: isSelected ? "#6B5234" : "#8B6F47",
+                      }}
+                    >
+                      {f.category}
+                    </span>
+                    <span className="text-[10px] text-[#A89B8F] truncate hidden sm:inline">
+                      {f.description}
+                    </span>
+                  </div>
+                </div>
+
+                {isSelected && (
+                  <CheckCircle2 style={{ width: "13px", height: "13px", color: "#8B6F47", flexShrink: 0 }} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 // Main Component
 export function CustomBatikPage() {
   const navigate = useNavigate();
@@ -933,17 +1150,7 @@ export function CustomBatikPage() {
   const [showSuccessModal, setShowSuccessModal] = useState<"saved" | "cart" | "order" | null>(null);
   const [showProjectModal, setShowProjectModal] = useState<"save" | "cart" | "order" | null>(null);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
 
-  const handleAIEnhanceClick = () => {
-    const subscriptionPlan = user?.user_metadata?.subscription_plan || "gratis";
-    if (subscriptionPlan === "gratis") {
-      toast.error("Fitur AI Recommendation hanya tersedia untuk member Premium!");
-      navigate("/pricing");
-    } else {
-      setShowAIModal(true);
-    }
-  };
   const [projectInfo, setProjectInfo] = useState({ name: "", description: "", fabric: "Katun Primisima" });
   const [savedDesignId, setSavedDesignId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1032,11 +1239,17 @@ export function CustomBatikPage() {
   const [textColor, setTextColor] = useState("#3D2B1F");
   const [fontSize, setFontSize] = useState(32);
   const [fontFamily, setFontFamily] = useState("serif");
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
+  const [isLinethrough, setIsLinethrough] = useState(false);
+  const [textAlign, setTextAlign] = useState<"left" | "center" | "right">("center");
   const [selectedObject, setSelectedObject] = useState<fabric.Object | null>(null);
   const [selectedObjectType, setSelectedObjectType] = useState<"pattern" | "shape" | "text" | null>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
-  const [showFloatingSidebar, setShowFloatingSidebar] = useState(true);
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [charSpacing, setCharSpacing] = useState(0);
+  const [lineHeight, setLineHeight] = useState(1.2);
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false);
   const [showObjectMenu, setShowObjectMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -1044,28 +1257,6 @@ export function CustomBatikPage() {
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [toolbarUpdate, setToolbarUpdate] = useState(0);
 
-  useEffect(() => {
-    if (isFullMode) setShowFloatingSidebar(true);
-  }, [isFullMode]);
-
-  // [BOTTOMSHEET] Drag controls for the mobile floating-sidebar bottom sheet —
-  // started manually from the handle/header (dragListener=false on the panel),
-  // so swiping inside the tab content (pattern grid, layer list, etc.) keeps
-  // scrolling normally instead of being hijacked by the sheet drag gesture.
-  const sidebarDragControls = useDragControls();
-
-  const toggleFloatingSidebar = useCallback(() => {
-    setShowFloatingSidebar((prev) => {
-      const next = !prev;
-      if (!next) setIsSidebarExpanded(false);
-      return next;
-    });
-  }, []);
-
-  const closeFloatingSidebar = useCallback(() => {
-    setShowFloatingSidebar(false);
-    setIsSidebarExpanded(false);
-  }, []);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const historyRef = useRef<string[]>([]);
@@ -1118,6 +1309,13 @@ export function CustomBatikPage() {
   const textColorRef = useRef("#3D2B1F");
   const fontSizeRef = useRef(32);
   const fontFamilyRef = useRef("serif");
+  const isBoldRef = useRef(false);
+  const isItalicRef = useRef(false);
+  const isUnderlineRef = useRef(false);
+  const isLinethroughRef = useRef(false);
+  const textAlignRef = useRef<"left" | "center" | "right">("center");
+  const textSelectionRef = useRef<{ obj: fabric.IText; start: number; end: number; hasSelection: boolean } | null>(null);
+  const syncTextStyleRef = useRef<((textObj: fabric.IText) => void) | null>(null);
   const zoomLevelRef = useRef(100);
   const isPanningRef = useRef(false);
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -1165,6 +1363,11 @@ export function CustomBatikPage() {
   useEffect(() => { textColorRef.current = textColor; }, [textColor]);
   useEffect(() => { fontSizeRef.current = fontSize; }, [fontSize]);
   useEffect(() => { fontFamilyRef.current = fontFamily; }, [fontFamily]);
+  useEffect(() => { isBoldRef.current = isBold; }, [isBold]);
+  useEffect(() => { isItalicRef.current = isItalic; }, [isItalic]);
+  useEffect(() => { isUnderlineRef.current = isUnderline; }, [isUnderline]);
+  useEffect(() => { isLinethroughRef.current = isLinethrough; }, [isLinethrough]);
+  useEffect(() => { textAlignRef.current = textAlign; }, [textAlign]);
   useEffect(() => { isFullModeRef.current = isFullMode; }, [isFullMode]);
   useEffect(() => {
     return () => {
@@ -1175,27 +1378,55 @@ export function CustomBatikPage() {
   // before the resetZoom useCallback is declared (forward reference pattern).
   const resetZoomRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (isFullMode) {
-      // Save current scroll position, lock page scroll
-      const scrollY = window.scrollY;
-      document.documentElement.dataset.scrollY = String(scrollY);
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-      // Reset zoom to 100% so canvas fills full width — prevents the user seeing
-      // the outside-canvas white area that looks drawable but has an invisible wall
-      requestAnimationFrame(() => { requestAnimationFrame(() => { resetZoomRef.current?.(); }); });
-    } else {
-      // Restore page scroll
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-      const savedY = Number(document.documentElement.dataset.scrollY || 0);
-      window.scrollTo({ top: savedY, behavior: 'instant' as ScrollBehavior });
-    }
-    return () => {
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-    };
+    // Mode Perkakas Lengkap does not alter window scroll
   }, [isFullMode]);
+
+  // Synchronize text formatting state from active object or text selection
+  const syncTextStyleFromObject = useCallback((textObj: fabric.IText) => {
+    let bold = false;
+    let italic = false;
+    let underline = false;
+    let strike = false;
+    let align = (textObj.textAlign || "left") as "left" | "center" | "right";
+    let color = typeof textObj.fill === "string" ? textObj.fill : "#3D2B1F";
+    let font = textObj.fontFamily || "serif";
+    let size = textObj.fontSize || 32;
+
+    const start = Math.min(textObj.selectionStart ?? 0, textObj.selectionEnd ?? 0);
+    const end = Math.max(textObj.selectionStart ?? 0, textObj.selectionEnd ?? 0);
+
+    if (textObj.isEditing && start !== end && typeof (textObj as any).getSelectionStyles === "function") {
+      const selStyles = (textObj as any).getSelectionStyles(start, end, true) as any[];
+      if (selStyles && selStyles.length > 0) {
+        const first = selStyles[0];
+        bold = first.fontWeight === "bold" || first.fontWeight === "700" || first.fontWeight === 700;
+        italic = first.fontStyle === "italic";
+        underline = !!first.underline;
+        strike = !!first.linethrough;
+        if (first.fill && typeof first.fill === "string") color = first.fill;
+        if (first.fontFamily) font = first.fontFamily;
+        if (typeof first.fontSize === "number") size = first.fontSize;
+      }
+    } else {
+      bold = textObj.fontWeight === "bold" || textObj.fontWeight === "700" || (textObj.fontWeight as any) === 700;
+      italic = textObj.fontStyle === "italic";
+      underline = !!textObj.underline;
+      strike = !!textObj.linethrough;
+    }
+
+    setIsBold(bold);
+    setIsItalic(italic);
+    setIsUnderline(underline);
+    setIsLinethrough(strike);
+    setTextAlign(align);
+    setTextColor(color);
+    setFontFamily(font);
+    setFontSize(size);
+  }, []);
+
+  useEffect(() => {
+    syncTextStyleRef.current = syncTextStyleFromObject;
+  }, [syncTextStyleFromObject]);
 
   // Sync selected object state
   useEffect(() => {
@@ -1208,11 +1439,11 @@ export function CustomBatikPage() {
     }
     if (selectedObjectType === "text") {
       const textObj = selectedObject as fabric.IText;
-      if (typeof textObj.fill === 'string') setTextColor(textObj.fill);
-      if (typeof textObj.fontSize === 'number') setFontSize(textObj.fontSize);
-      if ((textObj as any).fontFamily) setFontFamily((textObj as any).fontFamily);
+      syncTextStyleFromObject(textObj);
+    } else {
+      textSelectionRef.current = null;
     }
-  }, [selectedObject, selectedObjectType]);
+  }, [selectedObject, selectedObjectType, syncTextStyleFromObject]);
 
   // Update selected shape when shape state changes
   useEffect(() => {
@@ -1226,17 +1457,6 @@ export function CustomBatikPage() {
     if (typeof obj.opacity === 'number' && Math.abs(obj.opacity - targetOpacity) > 0.001) { obj.set("opacity", targetOpacity); needsRender = true; }
     if (needsRender) { obj.setCoords(); fabricCanvasRef.current?.requestRenderAll(); }
   }, [shapeFill, shapeStroke, shapeStrokeWidth, shapeOpacity, selectedObject, selectedObjectType]);
-
-  // Update selected text when text state changes
-  useEffect(() => {
-    if (!selectedObject || selectedObjectType !== "text") return;
-    const textObj = selectedObject as fabric.IText;
-    let needsRender = false;
-    if (typeof textObj.fill === 'string' && textObj.fill !== textColor) { textObj.set("fill", textColor); needsRender = true; }
-    if (typeof textObj.fontSize === 'number' && textObj.fontSize !== fontSize) { textObj.set("fontSize", fontSize); needsRender = true; }
-    if ((textObj as any).fontFamily !== fontFamily) { textObj.set("fontFamily", fontFamily); needsRender = true; }
-    if (needsRender) { textObj.setCoords(); fabricCanvasRef.current?.requestRenderAll(); }
-  }, [textColor, fontSize, fontFamily, selectedObject, selectedObjectType]);
 
   // [OPT-1] Sync canvas background FROM undo/redo (canvasBackground state changes)
   // to the uncontrolled input and DOM elements
@@ -1254,10 +1474,6 @@ export function CustomBatikPage() {
 
     if (isApplyingBgUndoRef.current) {
       isApplyingBgUndoRef.current = false;
-      const fc = fabricCanvasRef.current;
-      if (fc) {
-        fc.setBackgroundColor(canvasBackground, () => { fc.requestRenderAll(); });
-      }
     }
   }, [canvasBackground]);
 
@@ -1464,10 +1680,23 @@ export function CustomBatikPage() {
     return vpt;
   }, []);
 
+  const exitTextEditingIfActive = useCallback(() => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+    const activeObj = fc.getActiveObject();
+    if (activeObj && (activeObj as any).isEditing) {
+      (activeObj as any).exitEditing();
+    }
+    fc.clearContext(fc.contextTop);
+    fc.requestRenderAll();
+  }, []);
+
   const onHorizontalScrollDrag = useCallback((e: any) => {
     const track = horizontalScrollTrackRef.current;
     const fc = fabricCanvasRef.current;
     if (!track || !fc) return;
+
+    exitTextEditingIfActive();
 
     const rect = track.getBoundingClientRect();
     const clientX = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
@@ -1485,14 +1714,17 @@ export function CustomBatikPage() {
     if (vpt) {
       vpt[4] = nextPanX;
       fc.setViewportTransform(clampViewport(vpt));
+      fc.clearContext(fc.contextTop);
       fc.requestRenderAll();
     }
-  }, [clampViewport]);
+  }, [clampViewport, exitTextEditingIfActive]);
 
   const onVerticalScrollDrag = useCallback((e: any) => {
     const track = verticalScrollTrackRef.current;
     const fc = fabricCanvasRef.current;
     if (!track || !fc) return;
+
+    exitTextEditingIfActive();
 
     const rect = track.getBoundingClientRect();
     const clientY = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
@@ -1510,9 +1742,10 @@ export function CustomBatikPage() {
     if (vpt) {
       vpt[5] = nextPanY;
       fc.setViewportTransform(clampViewport(vpt));
+      fc.clearContext(fc.contextTop);
       fc.requestRenderAll();
     }
-  }, [clampViewport]);
+  }, [clampViewport, exitTextEditingIfActive]);
 
   const syncDisplayTransform = useCallback(() => {
     const display = displayCanvasRef.current;
@@ -1544,7 +1777,9 @@ export function CustomBatikPage() {
   const saveSnapshot = useCallback(() => {
     const fc = fabricCanvasRef.current;
     if (!fc || isRestoringRef.current || isRecoloringRef.current) return;
-    const json = JSON.stringify(fc.toJSON(["data"]));
+    const serialized = fc.toJSON(["data"]);
+    delete serialized.background;
+    const json = JSON.stringify(serialized);
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
     historyRef.current.push(json);
     historyIndexRef.current = historyRef.current.length - 1;
@@ -1562,6 +1797,92 @@ export function CustomBatikPage() {
       setHasUnsavedChanges(true);
     }
   }, []);
+
+  // Smart text styling: applies to highlighted selection range if active,
+  // or applies across the entire text object uniformly when no range is selected.
+  const applyTextStyle = useCallback((style: {
+    fill?: string;
+    fontFamily?: string;
+    fontSize?: number;
+    fontWeight?: string;
+    fontStyle?: string;
+    underline?: boolean;
+    linethrough?: boolean;
+    textAlign?: "left" | "center" | "right";
+    charSpacing?: number;
+    lineHeight?: number;
+  }) => {
+    const fc = fabricCanvasRef.current;
+    if (!fc) return;
+
+    const activeObj = fc.getActiveObject();
+    const textObj = (activeObj instanceof fabric.IText ? activeObj : null) ||
+      (selectedObject instanceof fabric.IText ? selectedObject : null) ||
+      textSelectionRef.current?.obj;
+
+    if (!textObj) return;
+
+    const liveStart = textObj.isEditing ? Math.min(textObj.selectionStart ?? 0, textObj.selectionEnd ?? 0) : 0;
+    const liveEnd = textObj.isEditing ? Math.max(textObj.selectionStart ?? 0, textObj.selectionEnd ?? 0) : 0;
+    const isLiveSelection = textObj.isEditing && liveStart !== liveEnd;
+
+    const saved = textSelectionRef.current;
+    const hasSavedSelection = !!(saved && saved.obj === textObj && saved.hasSelection && saved.start !== saved.end);
+
+    const hasSelection = isLiveSelection || hasSavedSelection;
+    const start = isLiveSelection ? liveStart : (saved?.start ?? 0);
+    const end = isLiveSelection ? liveEnd : (saved?.end ?? 0);
+
+    if (style.textAlign && style.textAlign !== textObj.textAlign) {
+      textObj.set("textAlign", style.textAlign);
+    }
+
+    const charStyle: any = { ...style };
+    delete charStyle.textAlign;
+
+    if (Object.keys(charStyle).length > 0) {
+      if (hasSelection && start !== end) {
+        if (typeof (textObj as any).setSelectionStyles === "function") {
+          (textObj as any).setSelectionStyles(charStyle, start, end);
+        }
+        if (textObj.isEditing) {
+          textObj.selectionStart = start;
+          textObj.selectionEnd = end;
+        }
+        textSelectionRef.current = { obj: textObj, start, end, hasSelection: true };
+      } else {
+        Object.entries(charStyle).forEach(([key, val]) => {
+          textObj.set(key as any, val);
+          if (textObj.styles) {
+            for (const lineIdx in textObj.styles) {
+              for (const charIdx in textObj.styles[lineIdx]) {
+                if (textObj.styles[lineIdx] && textObj.styles[lineIdx][charIdx]) {
+                  delete (textObj.styles[lineIdx][charIdx] as any)[key];
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    textObj.dirty = true;
+    if (typeof (textObj as any).initDimensions === "function") {
+      (textObj as any).initDimensions();
+    }
+    textObj.setCoords();
+    fc.requestRenderAll();
+    saveSnapshot();
+
+    if (style.fontFamily && (document as any).fonts) {
+      (document as any).fonts.load(`16px ${style.fontFamily}`).then(() => {
+        textObj.dirty = true;
+        (textObj as any).initDimensions?.();
+        textObj.setCoords();
+        fc.requestRenderAll();
+      }).catch(() => {});
+    }
+  }, [selectedObject, saveSnapshot]);
 
   const saveOffscreenSnapshot = useCallback(() => {
     const offscreen = offscreenRef.current;
@@ -1596,6 +1917,8 @@ export function CustomBatikPage() {
     const vStartX = Math.floor(startX + 1600);
     const vStartY = Math.floor(startY + 1200);
 
+    if (vStartX < 0 || vStartX >= W || vStartY < 0 || vStartY >= H) return;
+
     const imageData = ctx.getImageData(0, 0, W, H);
     const data = imageData.data;
     const idx = (x: number, y: number) => (y * W + x) * 4;
@@ -1614,21 +1937,46 @@ export function CustomBatikPage() {
         Math.abs(data[i + 2] - sb) <= tolerance && Math.abs(data[i + 3] - sa) <= tolerance;
     };
     const filled = new Uint8Array(W * H);
-    const queue: number[] = [];
-    const enqueue = (x: number, y: number) => {
-      if (x < 0 || x >= W || y < 0 || y >= H) return;
-      const pos = y * W + x;
-      if (filled[pos] || !colorMatch(x, y)) return;
-      filled[pos] = 1;
-      queue.push(x, y);
-    };
-    enqueue(vStartX, vStartY);
-    while (queue.length > 0) {
-      const x = queue.shift()!;
-      const y = queue.shift()!;
+    const stack: number[] = [vStartX, vStartY];
+    filled[vStartY * W + vStartX] = 1;
+
+    while (stack.length > 0) {
+      const y = stack.pop()!;
+      const x = stack.pop()!;
       const i = idx(x, y);
-      data[i] = fr; data[i + 1] = fg; data[i + 2] = fb; data[i + 3] = fa;
-      enqueue(x + 1, y); enqueue(x - 1, y); enqueue(x, y + 1); enqueue(x, y - 1);
+      data[i] = fr;
+      data[i + 1] = fg;
+      data[i + 2] = fb;
+      data[i + 3] = fa;
+
+      if (x > 0) {
+        const p = y * W + (x - 1);
+        if (!filled[p] && colorMatch(x - 1, y)) {
+          filled[p] = 1;
+          stack.push(x - 1, y);
+        }
+      }
+      if (x < W - 1) {
+        const p = y * W + (x + 1);
+        if (!filled[p] && colorMatch(x + 1, y)) {
+          filled[p] = 1;
+          stack.push(x + 1, y);
+        }
+      }
+      if (y > 0) {
+        const p = (y - 1) * W + x;
+        if (!filled[p] && colorMatch(x, y - 1)) {
+          filled[p] = 1;
+          stack.push(x, y - 1);
+        }
+      }
+      if (y < H - 1) {
+        const p = (y + 1) * W + x;
+        if (!filled[p] && colorMatch(x, y + 1)) {
+          filled[p] = 1;
+          stack.push(x, y + 1);
+        }
+      }
     }
     ctx.putImageData(imageData, 0, 0);
     syncDisplay();
@@ -1643,6 +1991,7 @@ export function CustomBatikPage() {
     const fc = fabricCanvasRef.current;
     const container = containerRef.current;
     if (!fc || !container) return;
+    exitTextEditingIfActive();
     const clamped = Math.max(50, Math.min(300, Math.round(newZoom / 25) * 25));
     zoomLevelRef.current = clamped;
     setZoomLevel(clamped);
@@ -1656,20 +2005,23 @@ export function CustomBatikPage() {
     if (fc.viewportTransform) {
       fc.setViewportTransform(clampViewport(fc.viewportTransform));
     }
+    fc.clearContext(fc.contextTop);
     fc.requestRenderAll();
-  }, [getEffectiveZoom, clampViewport]);
+  }, [getEffectiveZoom, clampViewport, exitTextEditingIfActive]);
 
   const zoomIn = useCallback(() => applyZoom(zoomLevelRef.current + 25), [applyZoom]);
   const zoomOut = useCallback(() => applyZoom(zoomLevelRef.current - 25), [applyZoom]);
   const resetZoom = useCallback(() => {
     const fc = fabricCanvasRef.current;
     if (!fc) return;
+    exitTextEditingIfActive();
     const scale = getEffectiveZoom(100);
     fc.setViewportTransform(clampViewport([scale, 0, 0, scale, 0, 0]));
     zoomLevelRef.current = 100;
     setZoomLevel(100);
+    fc.clearContext(fc.contextTop);
     fc.requestRenderAll();
-  }, [getEffectiveZoom, clampViewport]);
+  }, [getEffectiveZoom, clampViewport, exitTextEditingIfActive]);
   // Keep resetZoomRef in sync so the isFullMode useEffect can call it
   resetZoomRef.current = resetZoom;
 
@@ -1678,14 +2030,11 @@ export function CustomBatikPage() {
     if (!fc) return;
     isRestoringRef.current = true;
     const json = historyRef.current[index];
-    fc.loadFromJSON(JSON.parse(json), () => {
+    const parsed = JSON.parse(json);
+    parsed.background = "";
+    fc.loadFromJSON(parsed, () => {
       fc.renderAll();
       isRestoringRef.current = false;
-      const currentBg = fc.backgroundColor;
-      if (typeof currentBg === "string" && currentBg !== canvasBackground) {
-        isApplyingBgUndoRef.current = true;
-        setCanvasBackground(currentBg);
-      }
       const objects = fc.getObjects();
       const restoredLayers: CustomLayer[] = objects.map((obj) => ({
         id: (obj as any).data?.layerId ?? Date.now().toString(),
@@ -1698,7 +2047,63 @@ export function CustomBatikPage() {
       setLayers(restoredLayers);
       setSelectedLayerId(null);
     });
-  }, [canvasBackground]);
+  }, []);
+
+  const alignSelectedObject = useCallback((alignment: "left" | "centerH" | "right" | "top" | "centerV" | "bottom") => {
+    const fc = fabricCanvasRef.current;
+    const obj = selectedObject;
+    if (!fc || !obj) return;
+    const canvasWidth = 800;
+    const canvasHeight = 600;
+    const bound = obj.getBoundingRect(true, true);
+
+    if (alignment === "left") {
+      obj.set("left", obj.left! - bound.left);
+    } else if (alignment === "centerH") {
+      obj.set("left", obj.left! + (canvasWidth / 2 - (bound.left + bound.width / 2)));
+    } else if (alignment === "right") {
+      obj.set("left", obj.left! + (canvasWidth - (bound.left + bound.width)));
+    } else if (alignment === "top") {
+      obj.set("top", obj.top! - bound.top);
+    } else if (alignment === "centerV") {
+      obj.set("top", obj.top! + (canvasHeight / 2 - (bound.top + bound.height / 2)));
+    } else if (alignment === "bottom") {
+      obj.set("top", obj.top! + (canvasHeight - (bound.top + bound.height)));
+    }
+    obj.setCoords();
+    fc.requestRenderAll();
+    saveSnapshot();
+  }, [selectedObject, saveSnapshot]);
+
+  const rotateSelectedObject = useCallback((deltaDegrees: number) => {
+    const fc = fabricCanvasRef.current;
+    const obj = selectedObject;
+    if (!fc || !obj) return;
+    const currentAngle = obj.angle || 0;
+    const nextAngle = (currentAngle + deltaDegrees + 360) % 360;
+    obj.set("angle", nextAngle);
+    obj.setCoords();
+    fc.requestRenderAll();
+    saveSnapshot();
+  }, [selectedObject, saveSnapshot]);
+
+  const sendSelectedObjectToFront = useCallback(() => {
+    const fc = fabricCanvasRef.current;
+    const obj = selectedObject;
+    if (!fc || !obj) return;
+    obj.bringToFront();
+    fc.requestRenderAll();
+    saveSnapshot();
+  }, [selectedObject, saveSnapshot]);
+
+  const sendSelectedObjectToBack = useCallback(() => {
+    const fc = fabricCanvasRef.current;
+    const obj = selectedObject;
+    if (!fc || !obj) return;
+    obj.sendToBack();
+    fc.requestRenderAll();
+    saveSnapshot();
+  }, [selectedObject, saveSnapshot]);
 
   const applyBrushSnapshot = useCallback((dataUrl: string) => {
     const offscreen = offscreenRef.current;
@@ -1759,9 +2164,12 @@ export function CustomBatikPage() {
     } else if (actionType === "bgcolor") {
       isApplyingBgUndoRef.current = true;
       bgColorHistoryIndexRef.current--;
-      const prevColor = bgColorHistoryRef.current[bgColorHistoryIndexRef.current];
+      const prevColor = bgColorHistoryRef.current[bgColorHistoryIndexRef.current] || "#ffffff";
       setCommittedBg(prevColor);
       setCanvasBackground(prevColor);
+      if (containerRef.current) containerRef.current.style.background = prevColor;
+      if (bgColorSwatchRef.current) bgColorSwatchRef.current.style.background = prevColor;
+      if (bgColorInputRef.current) bgColorInputRef.current.value = prevColor;
     } else {
       offscreenHistoryIndexRef.current--;
       applyBrushSnapshot(offscreenHistoryRef.current[offscreenHistoryIndexRef.current]);
@@ -1786,9 +2194,12 @@ export function CustomBatikPage() {
       if (bgColorHistoryIndexRef.current < bgColorHistoryRef.current.length - 1) {
         isApplyingBgUndoRef.current = true;
         bgColorHistoryIndexRef.current++;
-        const nextColor = bgColorHistoryRef.current[bgColorHistoryIndexRef.current];
+        const nextColor = bgColorHistoryRef.current[bgColorHistoryIndexRef.current] || "#ffffff";
         setCommittedBg(nextColor);
         setCanvasBackground(nextColor);
+        if (containerRef.current) containerRef.current.style.background = nextColor;
+        if (bgColorSwatchRef.current) bgColorSwatchRef.current.style.background = nextColor;
+        if (bgColorInputRef.current) bgColorInputRef.current.value = nextColor;
       }
     } else {
       if (offscreenHistoryIndexRef.current < offscreenHistoryRef.current.length - 1) {
@@ -1800,7 +2211,7 @@ export function CustomBatikPage() {
     }
     setCanUndo(actionStackRef.current.length > 0);
     setCanRedo(redoStackRef.current.length > 0);
-  }, [restoreSnapshot, syncDisplay]);
+  }, [restoreSnapshot, applyBrushSnapshot]);
 
   useEffect(() => { undoBrushRef.current = undoBrush; }, [undoBrush]);
   useEffect(() => { redoBrushRef.current = redoBrush; }, [redoBrush]);
@@ -2163,7 +2574,7 @@ export function CustomBatikPage() {
     const canvas = new fabric.Canvas(canvasRef.current, {
       width: 800,
       height: 600,
-      backgroundColor: canvasBackground,
+      backgroundColor: "",
       selection: true,
       preserveObjectStacking: true,
       targetFindTolerance: 10,
@@ -2205,25 +2616,32 @@ export function CustomBatikPage() {
 
     canvas.on("object:selected", (e) => {
       const target = (e as any).target;
-      if (!target) { setSelectedObject(null); setSelectedObjectType(null); return; }
+      if (!target) { setSelectedObject(null); setSelectedObjectType(null); textSelectionRef.current = null; return; }
       setSelectedObject(target);
       const objType = detectObjectType(target);
       setSelectedObjectType(objType); // [OPT-2]
       syncSelectionColor(target);
+      if (target instanceof fabric.IText) {
+        syncTextStyleRef.current?.(target);
+      }
     });
 
     canvas.on("selection:updated", (e) => {
       const target = (e as any).target;
-      if (!target) { setSelectedObject(null); setSelectedObjectType(null); return; }
+      if (!target) { setSelectedObject(null); setSelectedObjectType(null); textSelectionRef.current = null; return; }
       setSelectedObject(target);
       const objType = detectObjectType(target);
       setSelectedObjectType(objType); // [OPT-2]
       syncSelectionColor(target);
+      if (target instanceof fabric.IText) {
+        syncTextStyleRef.current?.(target);
+      }
     });
 
     canvas.on("selection:cleared", () => {
       setSelectedObject(null);
       setSelectedObjectType(null);
+      textSelectionRef.current = null;
       if (lastMousedownInCanvasRef.current) setSelectedLayerId(null);
     });
 
@@ -2234,10 +2652,14 @@ export function CustomBatikPage() {
         const objType = detectObjectType(e.target);
         setSelectedObjectType(objType);
         syncSelectionColor(e.target);
+        if (e.target instanceof fabric.IText) {
+          syncTextStyleRef.current?.(e.target);
+        }
       } else {
         setSelectedObject(null);
         setSelectedObjectType(null);
         setSelectedLayerId(null);
+        textSelectionRef.current = null;
       }
     });
 
@@ -2369,7 +2791,33 @@ export function CustomBatikPage() {
     };
 
     canvas.on("text:editing:entered", (e: any) => {
-      if (e.target) startTextEditing(e.target as fabric.IText);
+      if (e.target) {
+        const textObj = e.target as fabric.IText;
+        startTextEditing(textObj);
+        syncTextStyleRef.current?.(textObj);
+      }
+    });
+
+    canvas.on("text:selection:changed", (e: any) => {
+      const target = e.target as fabric.IText | undefined;
+      if (target) {
+        const start = Math.min(target.selectionStart ?? 0, target.selectionEnd ?? 0);
+        const end = Math.max(target.selectionStart ?? 0, target.selectionEnd ?? 0);
+        textSelectionRef.current = {
+          obj: target,
+          start,
+          end,
+          hasSelection: target.isEditing && start !== end,
+        };
+        syncTextStyleRef.current?.(target);
+      }
+    });
+
+    canvas.on("text:changed", (e: any) => {
+      const target = e.target as fabric.IText | undefined;
+      if (target) {
+        syncTextStyleRef.current?.(target);
+      }
     });
 
     canvas.on("text:editing:exited", (e: any) => {
@@ -2381,6 +2829,15 @@ export function CustomBatikPage() {
         const lid = (textObj as any).data?.layerId;
         if (lid) setLayers(prev => prev.filter(l => l.id !== lid));
         setSelectedLayerId(null);
+        textSelectionRef.current = null;
+      } else {
+        textSelectionRef.current = {
+          obj: textObj,
+          start: 0,
+          end: 0,
+          hasSelection: false,
+        };
+        syncTextStyleRef.current?.(textObj);
       }
       // Commit final text state to main canvas history 
       saveSnapshot();
@@ -2758,6 +3215,14 @@ export function CustomBatikPage() {
       let preview: fabric.Object;
       if (shapeTypeRef.current === "rect") { preview = new fabric.Rect({ ...common, width: 1, height: 1 }); }
       else if (shapeTypeRef.current === "circle") { preview = new fabric.Ellipse({ ...common, rx: 1, ry: 1 }); }
+      else if (shapeTypeRef.current === "triangle") {
+        const triPoints = makeTrianglePoints(pos.x, pos.y, 2, 2);
+        preview = new fabric.Polygon(triPoints, { ...common, left: pos.x - 1, top: pos.y - 1 });
+      }
+      else if (shapeTypeRef.current === "diamond") {
+        const diamondPoints = makeDiamondPoints(pos.x, pos.y, 2, 2);
+        preview = new fabric.Polygon(diamondPoints, { ...common, left: pos.x - 1, top: pos.y - 1 });
+      }
       else if (shapeTypeRef.current === "star") {
         const starPoints = makeStarPoints(pos.x, pos.y, 5, 20, 10);
         preview = new fabric.Polygon(starPoints, { ...common, left: pos.x - 20, top: pos.y - 20 });
@@ -2773,6 +3238,20 @@ export function CustomBatikPage() {
       const preview = shapePreviewRef.current;
       if (shapeTypeRef.current === "rect") { preview.set({ left: Math.min(start.x, pos.x), top: Math.min(start.y, pos.y), width: Math.abs(pos.x - start.x), height: Math.abs(pos.y - start.y) }); }
       else if (shapeTypeRef.current === "circle") { const rx = Math.abs(pos.x - start.x) / 2; const ry = Math.abs(pos.y - start.y) / 2; (preview as fabric.Ellipse).set({ left: Math.min(start.x, pos.x), top: Math.min(start.y, pos.y), rx, ry, width: rx * 2, height: ry * 2 } as any); }
+      else if (shapeTypeRef.current === "triangle") {
+        const w = Math.max(Math.abs(pos.x - start.x), 2);
+        const h = Math.max(Math.abs(pos.y - start.y), 2);
+        const cx = Math.min(start.x, pos.x) + w / 2;
+        const cy = Math.min(start.y, pos.y) + h / 2;
+        (preview as fabric.Polygon).set({ points: makeTrianglePoints(cx, cy, w, h), left: Math.min(start.x, pos.x), top: Math.min(start.y, pos.y), width: w, height: h } as any);
+      }
+      else if (shapeTypeRef.current === "diamond") {
+        const w = Math.max(Math.abs(pos.x - start.x), 2);
+        const h = Math.max(Math.abs(pos.y - start.y), 2);
+        const cx = Math.min(start.x, pos.x) + w / 2;
+        const cy = Math.min(start.y, pos.y) + h / 2;
+        (preview as fabric.Polygon).set({ points: makeDiamondPoints(cx, cy, w, h), left: Math.min(start.x, pos.x), top: Math.min(start.y, pos.y), width: w, height: h } as any);
+      }
       else if (shapeTypeRef.current === "star") { const cx = (start.x + pos.x) / 2; const cy = (start.y + pos.y) / 2; const r = Math.max(Math.abs(pos.x - start.x), Math.abs(pos.y - start.y)) / 2; (preview as fabric.Polygon).set({ points: makeStarPoints(cx, cy, 5, r, r * 0.45), left: cx - r, top: cy - r, width: r * 2, height: r * 2 } as any); }
       else { (preview as fabric.Line).set({ x2: pos.x, y2: pos.y }); }
       preview.setCoords();
@@ -2790,10 +3269,24 @@ export function CustomBatikPage() {
       let finalShape: fabric.Object;
       if (shapeTypeRef.current === "rect") { finalShape = new fabric.Rect({ ...common, left: Math.min(start.x, pos.x), top: Math.min(start.y, pos.y), width: Math.max(Math.abs(pos.x - start.x), 5), height: Math.max(Math.abs(pos.y - start.y), 5) }); }
       else if (shapeTypeRef.current === "circle") { const rx = Math.max(Math.abs(pos.x - start.x) / 2, 3); const ry = Math.max(Math.abs(pos.y - start.y) / 2, 3); finalShape = new fabric.Ellipse({ ...common, left: Math.min(start.x, pos.x), top: Math.min(start.y, pos.y), rx, ry }); }
+      else if (shapeTypeRef.current === "triangle") {
+        const w = Math.max(Math.abs(pos.x - start.x), 8);
+        const h = Math.max(Math.abs(pos.y - start.y), 8);
+        const cx = Math.min(start.x, pos.x) + w / 2;
+        const cy = Math.min(start.y, pos.y) + h / 2;
+        finalShape = new fabric.Polygon(makeTrianglePoints(cx, cy, w, h), { ...common, left: Math.min(start.x, pos.x), top: Math.min(start.y, pos.y) });
+      }
+      else if (shapeTypeRef.current === "diamond") {
+        const w = Math.max(Math.abs(pos.x - start.x), 8);
+        const h = Math.max(Math.abs(pos.y - start.y), 8);
+        const cx = Math.min(start.x, pos.x) + w / 2;
+        const cy = Math.min(start.y, pos.y) + h / 2;
+        finalShape = new fabric.Polygon(makeDiamondPoints(cx, cy, w, h), { ...common, left: Math.min(start.x, pos.x), top: Math.min(start.y, pos.y) });
+      }
       else if (shapeTypeRef.current === "star") { const cx = (start.x + pos.x) / 2; const cy = (start.y + pos.y) / 2; const r = Math.max(Math.max(Math.abs(pos.x - start.x), Math.abs(pos.y - start.y)) / 2, 15); finalShape = new fabric.Polygon(makeStarPoints(cx, cy, 5, r, r * 0.45), { ...common, left: cx - r, top: cy - r }); }
       else { finalShape = new fabric.Line([start.x, start.y, pos.x, pos.y], { stroke: shapeStrokeRef.current, strokeWidth: Math.max(shapeStrokeWidthRef.current, 2), selectable: true, evented: true, fill: "", opacity: shapeOpacityRef.current / 100, objectCaching: false, hasControls: true }); }
       const newLayerId = Date.now().toString();
-      const shapeLabel = shapeTypeRef.current === "rect" ? "Kotak" : shapeTypeRef.current === "circle" ? "Lingkaran" : shapeTypeRef.current === "star" ? "Bintang" : "Garis";
+      const shapeLabel = shapeTypeRef.current === "rect" ? "Kotak" : shapeTypeRef.current === "circle" ? "Lingkaran" : shapeTypeRef.current === "triangle" ? "Segitiga" : shapeTypeRef.current === "diamond" ? "Belah Ketupat" : shapeTypeRef.current === "star" ? "Bintang" : "Garis";
       (finalShape as any).data = { layerId: newLayerId, layerName: shapeLabel };
       fc.add(finalShape); fc.setActiveObject(finalShape); fc.requestRenderAll();
       setLayers((prev) => [...prev, { id: newLayerId, type: "drawing" as const, name: shapeLabel, visible: true, locked: false, fabricObject: finalShape }]);
@@ -2804,6 +3297,7 @@ export function CustomBatikPage() {
     };
 
     const handleWheel = (opt: any) => {
+      exitTextEditingIfActive();
       const e = opt.e;
       if (e.ctrlKey) {
         // Ctrl + wheel = zoom (existing behavior)
@@ -2822,6 +3316,7 @@ export function CustomBatikPage() {
       vpt[4] += dx;
       vpt[5] += dy;
       fc.setViewportTransform(clampViewport(vpt));
+      fc.clearContext(fc.contextTop);
       fc.requestRenderAll();
     };
 
@@ -2838,6 +3333,7 @@ export function CustomBatikPage() {
       const isSpaceDrag = e.button === 0 && spaceHeld;
       if (!isMiddleClick && !isSpaceDrag) return;
       e.preventDefault();
+      exitTextEditingIfActive();
       isPanningRef.current = true;
       panStartRef.current = { x: e.clientX, y: e.clientY };
       fc.selection = false;
@@ -2845,6 +3341,7 @@ export function CustomBatikPage() {
     };
     const onPanMouseMove = (opt: any) => {
       if (!isPanningRef.current || !panStartRef.current) return;
+      exitTextEditingIfActive();
       const e = opt.e as MouseEvent;
       const vpt = fc.viewportTransform;
       if (!vpt) return;
@@ -2852,6 +3349,7 @@ export function CustomBatikPage() {
       vpt[5] += e.clientY - panStartRef.current.y;
       panStartRef.current = { x: e.clientX, y: e.clientY };
       fc.setViewportTransform(clampViewport(vpt));
+      fc.clearContext(fc.contextTop);
       fc.requestRenderAll();
     };
     const onPanMouseUp = () => {
@@ -2915,6 +3413,7 @@ export function CustomBatikPage() {
       // --- Pinch-to-zoom (2 Jari) ---
       if (e.touches.length === 2) {
         if (!isPinching) {
+          exitTextEditingIfActive();
           pinchSavedActiveObject = fc.getActiveObject() ?? null;
         }
         isPinching = true;
@@ -2942,6 +3441,7 @@ export function CustomBatikPage() {
         const target = fc.findTarget(e as any, false);
         // Jika menyentuh area kosong (tidak mengenai object apapun)
         if (!target) {
+          exitTextEditingIfActive();
           touchPanActive = true;
           touchMoved = false;
           pinchSavedActiveObject = fc.getActiveObject() ?? null;
@@ -2990,6 +3490,7 @@ export function CustomBatikPage() {
           fc.setViewportTransform(clampViewport(vpt));
         }
         lastPinchMid = mid;
+        fc.clearContext(fc.contextTop);
         fc.requestRenderAll();
 
         if (pinchSavedActiveObject && !fc.getActiveObject()) {
@@ -3019,6 +3520,7 @@ export function CustomBatikPage() {
           vpt[4] += dx;
           vpt[5] += dy;
           fc.setViewportTransform(clampViewport(vpt));
+          fc.clearContext(fc.contextTop);
           fc.requestRenderAll();
         }
 
@@ -3130,18 +3632,18 @@ export function CustomBatikPage() {
       canvas.defaultCursor = "default"; canvas.hoverCursor = "move";
       canvas.forEachObject((obj) => { const layerId = (obj as any).data?.layerId; if (!layerId) return; obj.evented = true; obj.selectable = true; });
       canvas.renderAll();
-      display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
-      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = `${canvasOffsetRef.current.y}px`; fabricWrapper.style.left = `${canvasOffsetRef.current.x}px`; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
+      display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "none"; display.style.zIndex = "1"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
+      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = `${canvasOffsetRef.current.y}px`; fabricWrapper.style.left = `${canvasOffsetRef.current.x}px`; fabricWrapper.style.pointerEvents = "auto"; fabricWrapper.style.zIndex = "2"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
     } else if (activeTool === "text") {
       canvas.isDrawingMode = false; canvas.selection = true; canvas.defaultCursor = "text"; canvas.hoverCursor = "text";
       canvas.forEachObject((obj) => { obj.evented = true; obj.selectable = true; }); canvas.renderAll();
-      display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
-      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = `${canvasOffsetRef.current.y}px`; fabricWrapper.style.left = `${canvasOffsetRef.current.x}px`; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
+      display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "none"; display.style.zIndex = "1"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
+      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = `${canvasOffsetRef.current.y}px`; fabricWrapper.style.left = `${canvasOffsetRef.current.x}px`; fabricWrapper.style.pointerEvents = "auto"; fabricWrapper.style.zIndex = "2"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
     } else if (activeTool === "shape") {
       canvas.isDrawingMode = false; canvas.selection = false; canvas.defaultCursor = "crosshair"; canvas.hoverCursor = "crosshair";
       canvas.forEachObject((obj) => { obj.evented = false; obj.selectable = false; }); canvas.renderAll();
-      display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "none"; display.style.zIndex = "2"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
-      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = `${canvasOffsetRef.current.y}px`; fabricWrapper.style.left = `${canvasOffsetRef.current.x}px`; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
+      display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "none"; display.style.zIndex = "1"; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
+      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = `${canvasOffsetRef.current.y}px`; fabricWrapper.style.left = `${canvasOffsetRef.current.x}px`; fabricWrapper.style.pointerEvents = "auto"; fabricWrapper.style.zIndex = "2"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
     } else {
       canvas.isDrawingMode = false; canvas.selection = false; canvas.discardActiveObject();
       canvas.forEachObject((obj) => { obj.evented = false; obj.selectable = false; }); canvas.renderAll();
@@ -3154,8 +3656,8 @@ export function CustomBatikPage() {
           : `<svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><circle cx='${size / 2}' cy='${size / 2}' r='${size / 2 - 1}' fill='${brushColorRef.current.replace("#", "%23")}' opacity='0.7'/></svg>`;
         cursor = `url("data:image/svg+xml,${cursorSvg}") ${size / 2} ${size / 2}, crosshair`;
       }
-      display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "auto"; display.style.zIndex = "2"; display.style.cursor = cursor; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
-      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = `${canvasOffsetRef.current.y}px`; fabricWrapper.style.left = `${canvasOffsetRef.current.x}px`; fabricWrapper.style.zIndex = "1"; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
+      display.style.position = "absolute"; display.style.top = `${canvasOffsetRef.current.y}px`; display.style.left = `${canvasOffsetRef.current.x}px`; display.style.pointerEvents = "auto"; display.style.zIndex = "1"; display.style.cursor = cursor; display.style.width = sizeStyle.width; display.style.height = sizeStyle.height;
+      fabricWrapper.style.position = "absolute"; fabricWrapper.style.top = `${canvasOffsetRef.current.y}px`; fabricWrapper.style.left = `${canvasOffsetRef.current.x}px`; fabricWrapper.style.pointerEvents = "none"; fabricWrapper.style.zIndex = "2"; fabricWrapper.style.cursor = cursor; fabricWrapper.style.width = sizeStyle.width; fabricWrapper.style.height = sizeStyle.height;
     }
   }, [activeTool, brushSize, brushColor, syncDisplay]);
 
@@ -3914,6 +4416,11 @@ export function CustomBatikPage() {
       fontFamily: fontFamilyRef.current,
       fontSize: fontSizeRef.current,
       fill: textColorRef.current,
+      fontWeight: isBoldRef.current ? "bold" : "normal",
+      fontStyle: isItalicRef.current ? "italic" : "normal",
+      underline: isUnderlineRef.current,
+      linethrough: isLinethroughRef.current,
+      textAlign: textAlignRef.current,
       selectable: true,
       evented: true,
       hasControls: true,
@@ -3939,12 +4446,42 @@ export function CustomBatikPage() {
 
     text.enterEditing();
     text.selectAll();
+    textSelectionRef.current = {
+      obj: text,
+      start: 0,
+      end: text.text?.length ?? 18,
+      hasSelection: true,
+    };
+    syncTextStyleRef.current?.(text);
     fc.requestRenderAll();
 
     // editing:exited: handled by canvas-level listener above 
     text.on("editing:exited", () => {
     });
   }, [saveSnapshot, getSpawnPoint]);
+
+  const handleSelectTool = useCallback((tool: Tool) => {
+    if (tool === "text") {
+      spawnTextObject();
+      return;
+    }
+    const fc = fabricCanvasRef.current;
+    if (fc) {
+      const activeObj = fc.getActiveObject();
+      if (activeObj && (activeObj as any).isEditing) {
+        (activeObj as any).exitEditing();
+      }
+      if (tool !== "select") {
+        fc.discardActiveObject();
+        fc.clearContext(fc.contextTop);
+        fc.requestRenderAll();
+        setSelectedObject(null);
+        setSelectedObjectType(null);
+        setSelectedLayerId(null);
+      }
+    }
+    setActiveTool(tool);
+  }, [spawnTextObject]);
 
   // Build final canvas for download/save
   // Smart export: auto-frames all content so off-center designs look correct.
@@ -3965,21 +4502,19 @@ export function CustomBatikPage() {
     ctx.fillStyle = canvasBackground || "#ffffff";
     ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
 
-    // ── Step 1: compute tight bounding box of ALL fabric objects ──────────────
-    const objects = fc.getObjects();
+    // ── Step 1: calculate bounds of all Fabric objects ────────────────────────
+    const objs = fc.getObjects();
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     let hasFabricContent = false;
 
-    objects.forEach((obj) => {
+    objs.forEach((obj) => {
       if (!obj.visible) return;
-      const br = obj.getBoundingRect(true, true);
-      if (br.width > 0 && br.height > 0) {
-        minX = Math.min(minX, br.left);
-        minY = Math.min(minY, br.top);
-        maxX = Math.max(maxX, br.left + br.width);
-        maxY = Math.max(maxY, br.top + br.height);
-        hasFabricContent = true;
-      }
+      hasFabricContent = true;
+      const b = obj.getBoundingRect(true, true);
+      minX = Math.min(minX, b.left);
+      minY = Math.min(minY, b.top);
+      maxX = Math.max(maxX, b.left + b.width);
+      maxY = Math.max(maxY, b.top + b.height);
     });
 
     // ── Step 2: check if offscreen (brush) layer has any content ──────────────
@@ -4032,7 +4567,14 @@ export function CustomBatikPage() {
       exportHeight = EXPORT_H / scale;
     }
 
-    // ── Step 4: render Fabric objects into export canvas ──────────────────────
+    // ── Step 4: composite brush & fill layer using same framing ───────────────
+    const offSrcX = (exportLeft + 1600);
+    const offSrcY = (exportTop + 1200);
+    const offSrcW = exportWidth;
+    const offSrcH = exportHeight;
+    ctx.drawImage(offscreen, offSrcX, offSrcY, offSrcW, offSrcH, 0, 0, EXPORT_W, EXPORT_H);
+
+    // ── Step 5: render Fabric objects into export canvas (ON TOP of brush/fill) ──
     const savedVpt = fc.viewportTransform ? [...fc.viewportTransform] as number[] : null;
     const savedW = fc.getWidth();
     const savedH = fc.getHeight();
@@ -4059,13 +4601,6 @@ export function CustomBatikPage() {
       img.onerror = rej;
       img.src = fabricDataUrl;
     });
-
-    // ── Step 5: composite brush layer using same framing ──────────────────────
-    const offSrcX = (exportLeft + 1600);
-    const offSrcY = (exportTop + 1200);
-    const offSrcW = exportWidth;
-    const offSrcH = exportHeight;
-    ctx.drawImage(offscreen, offSrcX, offSrcY, offSrcW, offSrcH, 0, 0, EXPORT_W, EXPORT_H);
 
     // ── Step 6: watermarks ────────────────────────────────────────────────────
     // Watermark besar (Hanya untuk pengguna GRATIS)
@@ -4295,385 +4830,804 @@ export function CustomBatikPage() {
           {/* Canvas Section */}
           <div className="lg:col-span-8 space-y-6 min-w-0">
             <div className="rounded-[32px] overflow-hidden shadow-[0_20px_50px_rgba(61,43,31,0.06)] border bg-white" style={{ borderColor: "rgba(212,184,139,0.3)" }}>
-
-              {/* Toolbar — hidden in fullmode */}
-              {!isFullMode && (
-                <div style={{ background: "linear-gradient(to bottom, #FDFCFA 0%, #FFFFFF 100%)", borderBottom: "1px solid rgba(212,184,139,0.2)" }}>
-                  {/* Row 1: Tool selector + global actions */}
-                  <div
-                    className="px-3 py-2 flex items-center gap-2 overflow-x-auto flex-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-                    style={{ borderBottom: "1px solid rgba(212,184,139,0.12)" }}
-                  >
-                    <div className="flex items-center p-0.5 rounded-xl gap-0.5 flex-shrink-0" style={{ background: "rgba(139,111,71,0.06)", border: "1px solid rgba(212,184,139,0.2)" }}>
-                      {([
-                        { tool: "select" as Tool, icon: MousePointer2, label: "Pilih" },
-                        { tool: "brush" as Tool, icon: Brush, label: "Kuas" },
-                        { tool: "eraser" as Tool, icon: Eraser, label: "Hapus" },
-                        { tool: "fill" as Tool, icon: PaintBucket, label: "Isi" },
-                        { tool: "shape" as Tool, icon: Square, label: "Bentuk" },
-                        { tool: "text" as Tool, icon: Type, label: "Teks" },
-                      ] as const).map(({ tool, icon: Icon, label }) => {
-                        const isActive = activeTool === tool;
-                        return (
-                          <button key={tool} onClick={() => tool === "text" ? spawnTextObject() : setActiveTool(tool)} title={label}
-                            className="flex items-center justify-center gap-1.5 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 px-2.5 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-xs font-semibold select-none flex-shrink-0"
-                            style={{ background: isActive ? "linear-gradient(135deg, #8B6F47 0%, #A0845E 100%)" : "transparent", color: isActive ? "#FFFFFF" : "#7A6B5E", boxShadow: isActive ? "0 2px 8px rgba(139,111,71,0.25), inset 0 1px 0 rgba(255,255,255,0.15)" : "none" }}>
-                            <Icon style={{ width: "13px", height: "13px", flexShrink: 0 }} />
-                            <span className="hidden lg:inline whitespace-nowrap">{label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex items-center ml-auto gap-2 flex-shrink-0">
-                      <div className="flex items-center gap-0.5 p-1 rounded-xl flex-shrink-0" style={{ background: "#F8F6F2", border: "1px solid rgba(212,184,139,0.2)" }}>
-                        <button onClick={zoomOut} disabled={zoomLevel <= 50} title="Perkecil" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
-                          <ZoomOut style={{ width: "13px", height: "13px" }} />
+              {/* Toolbar */}
+              <div style={{ background: "linear-gradient(to bottom, #FDFCFA 0%, #FFFFFF 100%)", borderBottom: "1px solid rgba(212,184,139,0.2)" }}>
+                {/* Row 1: Tool selector + global actions */}
+                <div
+                  className="px-3 py-2 flex items-center gap-2 overflow-x-auto flex-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                  style={{ borderBottom: "1px solid rgba(212,184,139,0.12)" }}
+                >
+                  <div className="flex items-center p-0.5 rounded-xl gap-0.5 flex-shrink-0" style={{ background: "rgba(139,111,71,0.06)", border: "1px solid rgba(212,184,139,0.2)" }}>
+                    {([
+                      { tool: "select" as Tool, icon: MousePointer2, label: "Pilih" },
+                      { tool: "brush" as Tool, icon: Brush, label: "Kuas & Canting" },
+                      { tool: "eraser" as Tool, icon: Eraser, label: "Hapus" },
+                      { tool: "fill" as Tool, icon: PaintBucket, label: "Isi Warna" },
+                      { tool: "shape" as Tool, icon: Square, label: "Bentuk" },
+                      { tool: "text" as Tool, icon: Type, label: "Teks" },
+                    ] as const).map(({ tool, icon: Icon, label }) => {
+                      const isActive = activeTool === tool;
+                      return (
+                        <button key={tool} onClick={() => handleSelectTool(tool)} title={label}
+                          className="flex items-center justify-center gap-1.5 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 px-2.5 py-1.5 rounded-lg transition-all duration-200 cursor-pointer text-xs font-semibold select-none flex-shrink-0"
+                          style={{ background: isActive ? "linear-gradient(135deg, #8B6F47 0%, #A0845E 100%)" : "transparent", color: isActive ? "#FFFFFF" : "#7A6B5E", boxShadow: isActive ? "0 2px 8px rgba(139,111,71,0.25), inset 0 1px 0 rgba(255,255,255,0.15)" : "none" }}>
+                          <Icon style={{ width: "13px", height: "13px", flexShrink: 0 }} />
+                          <span className="hidden lg:inline whitespace-nowrap">{label}</span>
                         </button>
-                        <button onClick={resetZoom} title="Reset Zoom" className="h-7 px-1 rounded-lg text-[9px] sm:text-[10px] font-bold font-mono transition-all duration-150 hover:bg-white hover:shadow-sm cursor-pointer" style={{ color: zoomLevel !== 100 ? "#8B6F47" : "#A89B8F", minWidth: "28px" }}>
-                          {zoomLevel}%
-                        </button>
-                        <button onClick={zoomIn} disabled={zoomLevel >= 300} title="Perbesar" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
-                          <ZoomIn style={{ width: "13px", height: "13px" }} />
-                        </button>
-
-                        <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
-
-                        <button onClick={() => setIsFullMode(true)} title="Mode Layar Penuh" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
-                          <Maximize2 style={{ width: "13px", height: "13px" }} />
-                        </button>
-
-                        <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
-
-
-                        {/* [OPT-1] Uncontrolled color picker — no setState on drag, only DOM updates */}
-                        <div className="relative flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer hover:bg-white transition-all" title="Warna latar kanvas">
-                          {/* Swatch updated directly via ref */}
-                          <div
-                            ref={bgColorSwatchRef}
-                            className="w-8 h-8 sm:w-3.5 sm:h-3.5 rounded border"
-                            style={{ background: canvasBackground, borderColor: "rgba(0,0,0,0.1)" }}
-                          />
-                          <span className="text-[10px] font-bold text-[#A89B8F] uppercase select-none hidden sm:inline">Latar</span>
-                          <input
-                            type="color"
-                            ref={bgColorInputRef}
-                            defaultValue={canvasBackground}
-                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                            title="Ubah warna latar kanvas"
-                            onInput={(e) => {
-                              const color = (e.target as HTMLInputElement).value;
-                              bgColorRef.current = color;
-                              if (containerRef.current) containerRef.current.style.background = color;
-                              if (bgColorSwatchRef.current) bgColorSwatchRef.current.style.background = color;
-                            }}
-
-                            onChange={(e) => {
-                              const color = e.target.value;
-                              bgColorRef.current = color;
-                              const fc = fabricCanvasRef.current;
-                              if (fc) {
-                                fc.setBackgroundColor(color, () => { fc.requestRenderAll(); });
-                              }
-                              setCanvasBackground(color);
-                              setCommittedBg(color);
-                            }}
-                          />
-                        </div>
-
-                        <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
-
-                        <button onClick={undoAll} disabled={!canUndo} title="Undo (Ctrl+Z)" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
-                          <RotateCcw style={{ width: "13px", height: "13px" }} />
-                        </button>
-                        <button onClick={redoAll} disabled={!canRedo} title="Redo (Ctrl+Y)" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
-                          <RotateCw style={{ width: "13px", height: "13px" }} />
-                        </button>
-
-                        <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
-
-                        <button onClick={clearAll} title="Bersihkan kanvas" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 cursor-pointer hover:bg-red-50" style={{ color: "#C0614A" }}>
-                          <Trash2 style={{ width: "13px", height: "13px" }} />
-                        </button>
-                        <button onClick={handleSaveAndShowModal} disabled={isSaving} title="Simpan desain" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
-                          {isSaving ? <Loader2 style={{ width: "13px", height: "13px" }} className="animate-spin" /> : <Save style={{ width: "13px", height: "13px" }} />}
-                        </button>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
 
-                  {/* Row 2: Contextual tool options */}
-                  <div
-                    className="px-4 flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 min-h-[52px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-                    style={{ background: "#FAF9F6" }}
-                  >
+                  <div className="flex items-center ml-auto gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-0.5 p-1 rounded-xl flex-shrink-0" style={{ background: "#F8F6F2", border: "1px solid rgba(212,184,139,0.2)" }}>
+                      <button onClick={zoomOut} disabled={zoomLevel <= 50} title="Perkecil" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
+                        <ZoomOut style={{ width: "13px", height: "13px" }} />
+                      </button>
+                      <button onClick={resetZoom} title="Reset Zoom" className="h-7 px-1 rounded-lg text-[9px] sm:text-[10px] font-bold font-mono transition-all duration-150 hover:bg-white hover:shadow-sm cursor-pointer" style={{ color: zoomLevel !== 100 ? "#8B6F47" : "#A89B8F", minWidth: "28px" }}>
+                        {zoomLevel}%
+                      </button>
+                      <button onClick={zoomIn} disabled={zoomLevel >= 300} title="Perbesar" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
+                        <ZoomIn style={{ width: "13px", height: "13px" }} />
+                      </button>
 
-                    {/* Object-type controls: show whenever something is selected, and NOT in multi-select mode */}
-                    {selectedObject && selectedObjectType && !isCanvasMultiSelectMode && (
-                      <div className="flex items-center gap-2 py-2.5">
-                        {selectedObjectType === "shape" ? (
-                          <div className="flex items-center gap-3">
-                            {/* badge removed */}
-                            {!(selectedObject instanceof fabric.Line) && (
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Isi</span>
-                                <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: shapeFill, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", width: "24px", height: "24px" }}>
-                                  <input type="color" value={shapeFill} onChange={(e) => setShapeFill(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                      <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      {/* Canvas Grid Toggle */}
+                      <button
+                        onClick={() => setShowGrid(!showGrid)}
+                        title={showGrid ? "Sembunyikan Kisi Panduan" : "Tampilkan Kisi Panduan Kanvas"}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 cursor-pointer hover:bg-white hover:shadow-sm"
+                        style={{
+                          background: showGrid ? "rgba(139,111,71,0.18)" : "transparent",
+                          color: showGrid ? "#3D2B1F" : "#8B6F47",
+                        }}
+                      >
+                        <Grid style={{ width: "13px", height: "13px" }} />
+                      </button>
+
+                      <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      {/* Mode Lengkap Toggle */}
+                      <button
+                        onClick={() => setIsFullMode(!isFullMode)}
+                        title={isFullMode ? "Mode Perkakas Lengkap (Aktif) — Klik untuk mode ringkas" : "Beralih ke Mode Perkakas Lengkap (Peralatan Tambahan & Lanjutan)"}
+                        className="flex items-center gap-1.5 px-2.5 h-7 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex-shrink-0"
+                        style={{
+                          background: isFullMode ? "linear-gradient(135deg, #8B6F47 0%, #6B4F2F 100%)" : "transparent",
+                          color: isFullMode ? "#FFFFFF" : "#8B6F47",
+                          border: isFullMode ? "1px solid #6B4F2F" : "1px solid transparent",
+                          boxShadow: isFullMode ? "0 2px 6px rgba(139,111,71,0.3)" : "none",
+                        }}
+                      >
+                        <SlidersHorizontal style={{ width: "12px", height: "12px" }} />
+                        <span className="text-[11px] whitespace-nowrap">Mode Lengkap</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isFullMode ? "bg-emerald-300 animate-pulse" : "bg-amber-500/50"}`} />
+                      </button>
+
+                      <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      {/* Uncontrolled color picker for canvas background */}
+                      <div className="relative flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer hover:bg-white transition-all" title="Warna latar kanvas">
+                        <div
+                          ref={bgColorSwatchRef}
+                          className="w-8 h-8 sm:w-3.5 sm:h-3.5 rounded border"
+                          style={{ background: canvasBackground, borderColor: "rgba(0,0,0,0.1)" }}
+                        />
+                        <span className="text-[10px] font-bold text-[#A89B8F] uppercase select-none hidden sm:inline">Latar</span>
+                        <input
+                          type="color"
+                          ref={bgColorInputRef}
+                          defaultValue={canvasBackground}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          title="Ubah warna latar kanvas"
+                          onInput={(e) => {
+                            const color = (e.target as HTMLInputElement).value;
+                            bgColorRef.current = color;
+                            if (containerRef.current) containerRef.current.style.background = color;
+                            if (bgColorSwatchRef.current) bgColorSwatchRef.current.style.background = color;
+                          }}
+                          onChange={(e) => {
+                            const color = e.target.value;
+                            bgColorRef.current = color;
+                            setCanvasBackground(color);
+                            setCommittedBg(color);
+                          }}
+                        />
+                      </div>
+
+                      <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      <button onClick={undoAll} disabled={!canUndo} title="Undo (Ctrl+Z)" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
+                        <RotateCcw style={{ width: "13px", height: "13px" }} />
+                      </button>
+                      <button onClick={redoAll} disabled={!canRedo} title="Redo (Ctrl+Y)" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
+                        <RotateCw style={{ width: "13px", height: "13px" }} />
+                      </button>
+
+                      <div className="h-4 w-px mx-0.5" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                      <button onClick={clearAll} title="Bersihkan kanvas" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 cursor-pointer hover:bg-red-50" style={{ color: "#C0614A" }}>
+                        <Trash2 style={{ width: "13px", height: "13px" }} />
+                      </button>
+                      <button onClick={handleSaveAndShowModal} disabled={isSaving} title="Simpan desain" className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white hover:shadow-sm" style={{ color: "#8B6F47" }}>
+                        {isSaving ? <Loader2 style={{ width: "13px", height: "13px" }} className="animate-spin" /> : <Save style={{ width: "13px", height: "13px" }} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Contextual tool options */}
+                <div
+                  className="px-4 flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 min-h-[52px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                  style={{ background: "#FAF9F6" }}
+                >
+
+                  {/* Object-type controls: show whenever something is selected in select mode */}
+                  {activeTool === "select" && selectedObject && selectedObjectType && !isCanvasMultiSelectMode && (
+                    <div className="flex items-center gap-2 py-2.5">
+                      {/* Full Mode Object Manipulation Suite */}
+                      {isFullMode && (
+                        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                          {/* Flip H & V */}
+                          <div className="flex items-center p-0.5 rounded-lg border gap-0.5" style={{ background: "#FFFFFF", borderColor: "rgba(212,184,139,0.25)" }}>
+                            <button
+                              onClick={() => flipLayer(null, "x")}
+                              title="Cermin Horizontal"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <FlipHorizontal style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              onClick={() => flipLayer(null, "y")}
+                              title="Cermin Vertikal"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <FlipVertical style={{ width: "12px", height: "12px" }} />
+                            </button>
+                          </div>
+
+                          {/* Rotate -90 / +90 */}
+                          <div className="flex items-center p-0.5 rounded-lg border gap-0.5" style={{ background: "#FFFFFF", borderColor: "rgba(212,184,139,0.25)" }}>
+                            <button
+                              onClick={() => rotateSelectedObject(-90)}
+                              title="Putar Kiri 90°"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <RotateCcw style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              onClick={() => rotateSelectedObject(90)}
+                              title="Putar Kanan 90°"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <RotateCw style={{ width: "12px", height: "12px" }} />
+                            </button>
+                          </div>
+
+                          {/* Layer Order: Front, Up, Down, Back */}
+                          <div className="flex items-center p-0.5 rounded-lg border gap-0.5" style={{ background: "#FFFFFF", borderColor: "rgba(212,184,139,0.25)" }}>
+                            <button
+                              onClick={sendSelectedObjectToFront}
+                              title="Paling Depan"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <ChevronsUp style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              onClick={() => moveLayer(selectedLayerId, "up")}
+                              title="Maju Satu Tingkat"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <ArrowUp style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              onClick={() => moveLayer(selectedLayerId, "down")}
+                              title="Mundur Satu Tingkat"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <ArrowDown style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              onClick={sendSelectedObjectToBack}
+                              title="Paling Belakang"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <ChevronsDown style={{ width: "12px", height: "12px" }} />
+                            </button>
+                          </div>
+
+                          {/* Align to Canvas */}
+                          <div className="hidden md:flex items-center p-0.5 rounded-lg border gap-0.5" style={{ background: "#FFFFFF", borderColor: "rgba(212,184,139,0.25)" }}>
+                            <button
+                              onClick={() => alignSelectedObject("left")}
+                              title="Rata Kiri Kanvas"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer text-[10px] font-bold"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              L
+                            </button>
+                            <button
+                              onClick={() => alignSelectedObject("centerH")}
+                              title="Rata Tengah Kanvas"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer text-[10px] font-bold"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              C
+                            </button>
+                            <button
+                              onClick={() => alignSelectedObject("right")}
+                              title="Rata Kanan Kanvas"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer text-[10px] font-bold"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              R
+                            </button>
+                          </div>
+
+                          {/* Duplicate, Lock, Delete */}
+                          <div className="flex items-center p-0.5 rounded-lg border gap-0.5" style={{ background: "#FFFFFF", borderColor: "rgba(212,184,139,0.25)" }}>
+                            <button
+                              onClick={() => duplicateLayer(selectedLayerId)}
+                              title="Duplikat Objek (Ctrl+D)"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              <Copy style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              onClick={() => toggleLayerLock(selectedLayerId)}
+                              title="Kunci / Buka Kunci Objek"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-stone-100 cursor-pointer"
+                              style={{ color: "#8B6F47" }}
+                            >
+                              {layers.find(l => l.id === selectedLayerId)?.locked ? <Lock style={{ width: "12px", height: "12px", color: "#C0614A" }} /> : <Unlock style={{ width: "12px", height: "12px" }} />}
+                            </button>
+                            <button
+                              onClick={() => deleteSelectedLayer(selectedLayerId)}
+                              title="Hapus Objek"
+                              className="w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 cursor-pointer"
+                              style={{ color: "#C0614A" }}
+                            >
+                              <Trash2 style={{ width: "12px", height: "12px" }} />
+                            </button>
+                          </div>
+
+                          <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                        </div>
+                      )}
+
+                      {selectedObjectType === "shape" ? (
+                        <div className="flex items-center gap-3">
+                          {!(selectedObject instanceof fabric.Line) && (
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Isi</span>
+                              <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: shapeFill, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", width: "24px", height: "24px" }}>
+                                <input type="color" value={shapeFill} onChange={(e) => setShapeFill(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Garis</span>
+                            <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: shapeStroke, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", width: "24px", height: "24px" }}>
+                              <input type="color" value={shapeStroke} onChange={(e) => setShapeStroke(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                            </div>
+                            <input type="range" min="1" max="20" step="1" value={shapeStrokeWidth} onChange={(e) => setShapeStrokeWidth(Number(e.target.value))} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-16" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${(shapeStrokeWidth / 20) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
+                            <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "26px" }}>{shapeStrokeWidth}px</span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Opasitas</span>
+                            <input type="range" min="10" max="100" step="10" value={shapeOpacity} onChange={(e) => setShapeOpacity(Number(e.target.value))} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-16" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${shapeOpacity}%, rgba(139,111,71,0.15) 0%)` }} />
+                            <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "32px" }}>{shapeOpacity}%</span>
+                          </div>
+                        </div>
+                      ) : selectedObjectType === "text" ? (
+                        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap py-1">
+                          {/* Font Family Dropdown */}
+                          <FontPicker
+                            value={fontFamily}
+                            onChange={(newFont) => {
+                              setFontFamily(newFont);
+                              applyTextStyle({ fontFamily: newFont });
+                            }}
+                          />
+
+                          {/* Font Size */}
+                          <div className="flex items-center gap-1">
+                            <span className="hidden lg:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Ukuran</span>
+                            <button
+                              type="button"
+                              title="Perkecil Ukuran Huruf"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                const next = Math.max(8, fontSize - 4);
+                                setFontSize(next);
+                                applyTextStyle({ fontSize: next });
+                              }}
+                              className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white transition-all"
+                              style={{ borderColor: "rgba(212,184,139,0.3)", color: "#8B6F47", background: "#FAF9F6" }}
+                            >
+                              <Minus style={{ width: "10px", height: "10px" }} />
+                            </button>
+                            <span className="text-xs font-bold font-mono w-7 text-center" style={{ color: "#3D2B1F" }}>{fontSize}</span>
+                            <button
+                              type="button"
+                              title="Perbesar Ukuran Huruf"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                const next = Math.min(160, fontSize + 4);
+                                setFontSize(next);
+                                applyTextStyle({ fontSize: next });
+                              }}
+                              className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white transition-all"
+                              style={{ borderColor: "rgba(212,184,139,0.3)", color: "#8B6F47", background: "#FAF9F6" }}
+                            >
+                              <Plus style={{ width: "10px", height: "10px" }} />
+                            </button>
+                          </div>
+
+                          <div className="h-5 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                          {/* Text Formatting: Bold, Italic, Underline, Strikethrough */}
+                          <div className="flex items-center p-0.5 rounded-lg border gap-0.5" style={{ background: "#FAF9F6", borderColor: "rgba(212,184,139,0.3)" }}>
+                            <button
+                              type="button"
+                              title="Tebal (Bold)"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                const next = !isBold;
+                                setIsBold(next);
+                                applyTextStyle({ fontWeight: next ? "bold" : "normal" });
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-md transition-all cursor-pointer"
+                              style={{
+                                background: isBold ? "#8B6F47" : "transparent",
+                                color: isBold ? "#ffffff" : "#3D2B1F",
+                                boxShadow: isBold ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
+                              }}
+                            >
+                              <Bold style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Miring (Italic)"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                const next = !isItalic;
+                                setIsItalic(next);
+                                applyTextStyle({ fontStyle: next ? "italic" : "normal" });
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-md transition-all cursor-pointer"
+                              style={{
+                                background: isItalic ? "#8B6F47" : "transparent",
+                                color: isItalic ? "#ffffff" : "#3D2B1F",
+                                boxShadow: isItalic ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
+                              }}
+                            >
+                              <Italic style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Garis Bawah (Underline)"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                const next = !isUnderline;
+                                setIsUnderline(next);
+                                applyTextStyle({ underline: next });
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-md transition-all cursor-pointer"
+                              style={{
+                                background: isUnderline ? "#8B6F47" : "transparent",
+                                color: isUnderline ? "#ffffff" : "#3D2B1F",
+                                boxShadow: isUnderline ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
+                              }}
+                            >
+                              <Underline style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Coret (Strikethrough)"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                const next = !isLinethrough;
+                                setIsLinethrough(next);
+                                applyTextStyle({ linethrough: next });
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-md transition-all cursor-pointer"
+                              style={{
+                                background: isLinethrough ? "#8B6F47" : "transparent",
+                                color: isLinethrough ? "#ffffff" : "#3D2B1F",
+                                boxShadow: isLinethrough ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
+                              }}
+                            >
+                              <Strikethrough style={{ width: "12px", height: "12px" }} />
+                            </button>
+                          </div>
+
+                          <div className="h-5 w-px hidden sm:block" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                          {/* Text Alignment */}
+                          <div className="hidden sm:flex items-center p-0.5 rounded-lg border gap-0.5" style={{ background: "#FAF9F6", borderColor: "rgba(212,184,139,0.3)" }}>
+                            <button
+                              type="button"
+                              title="Rata Kiri"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setTextAlign("left");
+                                applyTextStyle({ textAlign: "left" });
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-md transition-all cursor-pointer"
+                              style={{
+                                background: textAlign === "left" ? "#8B6F47" : "transparent",
+                                color: textAlign === "left" ? "#ffffff" : "#3D2B1F",
+                              }}
+                            >
+                              <AlignLeft style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Rata Tengah"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setTextAlign("center");
+                                applyTextStyle({ textAlign: "center" });
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-md transition-all cursor-pointer"
+                              style={{
+                                background: textAlign === "center" ? "#8B6F47" : "transparent",
+                                color: textAlign === "center" ? "#ffffff" : "#3D2B1F",
+                              }}
+                            >
+                              <AlignCenter style={{ width: "12px", height: "12px" }} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Rata Kanan"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setTextAlign("right");
+                                applyTextStyle({ textAlign: "right" });
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-md transition-all cursor-pointer"
+                              style={{
+                                background: textAlign === "right" ? "#8B6F47" : "transparent",
+                                color: textAlign === "right" ? "#ffffff" : "#3D2B1F",
+                              }}
+                            >
+                              <AlignRight style={{ width: "12px", height: "12px" }} />
+                            </button>
+                          </div>
+
+                          {/* Extra Text Controls in Full Mode: Letter Spacing */}
+                          {isFullMode && (
+                            <>
+                              <div className="h-5 w-px hidden sm:block" style={{ background: "rgba(212,184,139,0.35)" }} />
+                              <div className="hidden lg:flex items-center gap-1.5 flex-shrink-0">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Spasi Huruf</span>
+                                <div className="flex items-center p-0.5 rounded-lg border gap-0.5" style={{ background: "#FAF9F6", borderColor: "rgba(212,184,139,0.3)" }}>
+                                  {[
+                                    { label: "Normal", val: 0 },
+                                    { label: "+", val: 40 },
+                                    { label: "++", val: 100 },
+                                  ].map(({ label, val }) => (
+                                    <button
+                                      key={label}
+                                      type="button"
+                                      title={`Spasi Huruf: ${label}`}
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        setCharSpacing(val);
+                                        applyTextStyle({ charSpacing: val });
+                                      }}
+                                      className="px-2 h-6 text-[10px] font-bold rounded cursor-pointer transition-all"
+                                      style={{
+                                        background: charSpacing === val ? "#8B6F47" : "transparent",
+                                        color: charSpacing === val ? "#ffffff" : "#3D2B1F",
+                                      }}
+                                    >
+                                      {label}
+                                    </button>
+                                  ))}
                                 </div>
                               </div>
-                            )}
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Garis</span>
-                              <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: shapeStroke, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", width: "24px", height: "24px" }}>
-                                <input type="color" value={shapeStroke} onChange={(e) => setShapeStroke(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                              </div>
-                              <input type="range" min="1" max="20" step="1" value={shapeStrokeWidth} onChange={(e) => setShapeStrokeWidth(Number(e.target.value))} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-16" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${(shapeStrokeWidth / 20) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
-                              <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "26px" }}>{shapeStrokeWidth}px</span>
+                            </>
+                          )}
+
+                          <div className="h-5 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
+
+                          {/* Text Color */}
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <span className="hidden lg:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Warna</span>
+                            <div
+                              className="relative rounded-lg cursor-pointer hover:scale-105 transition-all flex-shrink-0"
+                              title="Pilih Warna Kustom"
+                              style={{
+                                background: textColor,
+                                width: "26px",
+                                height: "26px",
+                                border: "2px solid rgba(255,255,255,0.85)",
+                                boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 4px rgba(0,0,0,0.1)",
+                              }}
+                            >
+                              <input
+                                type="color"
+                                value={textColor}
+                                onChange={(e) => {
+                                  const c = e.target.value;
+                                  setTextColor(c);
+                                  applyTextStyle({ fill: c });
+                                }}
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                              />
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Opasitas</span>
-                              <input type="range" min="10" max="100" step="10" value={shapeOpacity} onChange={(e) => setShapeOpacity(Number(e.target.value))} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-16" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${shapeOpacity}%, rgba(139,111,71,0.15) 0%)` }} />
-                              <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "32px" }}>{shapeOpacity}%</span>
-                            </div>
-                          </div>
-                        ) : selectedObjectType === "text" ? (
-                          <div className="flex items-center gap-3">
-                            {/* badge removed */}
-                            <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="h-8 px-2 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}>
-                              <option value="serif">Serif</option>
-                              <option value="sans-serif">Sans-serif</option>
-                              <option value="'Playfair Display', serif">Playfair Display</option>
-                              <option value="monospace">Monospace</option>
-                            </select>
-                            <div className="flex items-center gap-1.5">
-                              <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Ukuran</span>
-                              <button onClick={() => setFontSize(s => Math.max(8, s - 4))} className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white" style={{ borderColor: "rgba(212,184,139,0.25)", color: "#8B6F47" }}><Minus style={{ width: "10px", height: "10px" }} /></button>
-                              <span className="text-xs font-bold font-mono w-8 text-center" style={{ color: "#3D2B1F" }}>{fontSize}</span>
-                              <button onClick={() => setFontSize(s => Math.min(120, s + 4))} className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white" style={{ borderColor: "rgba(212,184,139,0.25)", color: "#8B6F47" }}><Plus style={{ width: "10px", height: "10px" }} /></button>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Warna</span>
-                              <div className="relative rounded-lg cursor-pointer hover:scale-105 transition-all" style={{ background: textColor, width: "26px", height: "26px", border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)" }}>
-                                <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                              </div>
-                              <div className="flex gap-1.5">
-                                {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#ffffff"].map((c) => (
-                                  <button key={c} onClick={() => setTextColor(c)} className="rounded-md transition-all hover:scale-110 cursor-pointer" style={{ width: textColor === c ? "20px" : "16px", height: textColor === c ? "20px" : "16px", background: c, border: `${textColor === c ? "2.5" : "1.5"}px solid ${textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)"}` }} />
-                                ))}
-                              </div>
-                            </div>
-                            <span className="hidden sm:inline text-[10px] text-[#A89B8F] italic flex-shrink-0">Klik 2x untuk edit teks</span>
-                          </div>
-                        ) : selectedObjectType === "pattern" ? (
-                          <div className="flex items-center gap-2">
-                            <Palette style={{ width: "12px", height: "12px", color: "#8B6F47", flexShrink: 0 }} />
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none hidden sm:inline">Warna</span>
-                            <div className="flex items-center gap-1.5">
-                              {colorPresets.map((preset) => (
+                            <div className="flex gap-1 items-center flex-wrap">
+                              {[
+                                { color: "#3D2B1F", label: "Cokelat Sogan" },
+                                { color: "#8B6F47", label: "Emas Batik" },
+                                { color: "#D4B88B", label: "Krem Parang" },
+                                { color: "#2A4B7C", label: "Biru Indigo" },
+                                { color: "#2D5A2D", label: "Hijau Lumut" },
+                                { color: "#8B2A2A", label: "Merah Mengkudu" },
+                                { color: "#ffffff", label: "Putih Mori" },
+                                { color: "#1A1A1A", label: "Hitam Pekat" },
+                              ].map(({ color: c, label }) => (
                                 <button
-                                  key={preset.name}
-                                  title={preset.name}
-                                  onClick={() => setSelectedPreset(preset)}
-                                  className="rounded-full transition-all hover:scale-110 cursor-pointer flex-shrink-0"
+                                  key={c}
+                                  type="button"
+                                  title={label}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    setTextColor(c);
+                                    applyTextStyle({ fill: c });
+                                  }}
+                                  className="rounded-md transition-all hover:scale-115 cursor-pointer flex-shrink-0"
                                   style={{
-                                    width: selectedPreset.name === preset.name ? "20px" : "16px",
-                                    height: selectedPreset.name === preset.name ? "20px" : "16px",
-                                    background: preset.colors.primary,
-                                    border: `${selectedPreset.name === preset.name ? "2.5" : "1.5"}px solid ${selectedPreset.name === preset.name ? "#3D2B1F" : "rgba(0,0,0,0.12)"}`,
-                                    boxShadow: selectedPreset.name === preset.name ? "0 2px 6px rgba(0,0,0,0.15)" : "none",
+                                    width: textColor === c ? "20px" : "16px",
+                                    height: textColor === c ? "20px" : "16px",
+                                    background: c,
+                                    border: textColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.15)",
+                                    boxShadow: textColor === c ? "0 2px 6px rgba(0,0,0,0.2)" : "none",
                                   }}
                                 />
                               ))}
                             </div>
-                            <div className="h-4 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                            <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: "24px", height: "24px", border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", borderRadius: "8px" }}>
-                              <input type="color" defaultValue={customColor}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  if (canvasColorCommitTimerRef.current) clearTimeout(canvasColorCommitTimerRef.current);
-                                  canvasColorCommitTimerRef.current = setTimeout(() => {
-                                    setCustomColor(v);
-                                    setSelectedPreset({ name: "Custom", colors: { primary: v, secondary: v, accent: v, background: "transparent" }, batik: { background: "#f3f3f3", light: v, mid: v, dark: v } });
-                                    canvasColorCommitTimerRef.current = null;
-                                  }, 150);
-                                }}
-                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                            </div>
                           </div>
-                        ) : null}
-                      </div>
-                    )}
-
-                    {/* No selection hint — only in select mode with nothing selected */}
-                    {activeTool === "select" && !selectedObject && (
-                      <div className="flex items-center gap-2 py-2.5">
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium" style={{ background: "rgba(139,111,71,0.07)", border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}>
-                          <MousePointer2 style={{ width: "12px", height: "12px", flexShrink: 0 }} />
-                          <span>Klik objek di kanvas untuk memilih, lalu geser, putar, atau ubah ukurannya</span>
                         </div>
-                      </div>
-                    )}
-
-                    {activeTool === "brush" && (
-                      <div className="flex items-center gap-2 sm:gap-3 py-2">
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Warna</span>
-                          <div className="relative p-0.5 rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: brushColor, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 6px rgba(0,0,0,0.12)", width: "26px", height: "26px", borderRadius: "8px" }}>
-                            <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                          </div>
+                      ) : selectedObjectType === "pattern" ? (
+                        <div className="flex items-center gap-2">
+                          <Palette style={{ width: "12px", height: "12px", color: "#8B6F47", flexShrink: 0 }} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none hidden sm:inline">Warna Motif</span>
                           <div className="flex items-center gap-1.5">
-                            {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#6B3A1F", "#ffffff"].map((c, idx) => (
-                              <button key={c} onClick={() => setBrushColor(c)} title={c} className={`${idx >= 6 ? "hidden sm:inline-flex" : ""} transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0`} style={{ width: brushColor === c ? "20px" : "16px", height: brushColor === c ? "20px" : "16px", borderRadius: "6px", background: c, border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)", boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none" }} />
+                            {colorPresets.map((preset) => (
+                              <button
+                                key={preset.name}
+                                title={preset.name}
+                                onClick={() => setSelectedPreset(preset)}
+                                className="rounded-full transition-all hover:scale-110 cursor-pointer flex-shrink-0"
+                                style={{
+                                  width: selectedPreset.name === preset.name ? "20px" : "16px",
+                                  height: selectedPreset.name === preset.name ? "20px" : "16px",
+                                  background: preset.colors.primary,
+                                  border: `${selectedPreset.name === preset.name ? "2.5" : "1.5"}px solid ${selectedPreset.name === preset.name ? "#3D2B1F" : "rgba(0,0,0,0.12)"}`,
+                                  boxShadow: selectedPreset.name === preset.name ? "0 2px 6px rgba(0,0,0,0.15)" : "none",
+                                }}
+                              />
                             ))}
                           </div>
+                          <div className="h-4 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                          <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: "24px", height: "24px", border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)", borderRadius: "8px" }}>
+                            <input type="color" defaultValue={customColor}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (canvasColorCommitTimerRef.current) clearTimeout(canvasColorCommitTimerRef.current);
+                                canvasColorCommitTimerRef.current = setTimeout(() => {
+                                  setCustomColor(v);
+                                  setSelectedPreset({ name: "Custom", colors: { primary: v, secondary: v, accent: v, background: "transparent" }, batik: { background: "#f3f3f3", light: v, mid: v, dark: v } });
+                                  canvasColorCommitTimerRef.current = null;
+                                }, 150);
+                              }}
+                              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                          </div>
                         </div>
-                        <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Ukuran</span>
-                          <button onClick={() => setBrushSize([Math.max(2, brushSize[0] - 2)])} className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer" style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}><Minus style={{ width: "10px", height: "10px" }} /></button>
-                          <input type="range" min="2" max="80" step="2" value={brushSize[0]} onChange={(e) => setBrushSize([Number(e.target.value)])} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-[90px]" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${((brushSize[0] - 2) / 78) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
-                          <button onClick={() => setBrushSize([Math.min(80, brushSize[0] + 2)])} className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer" style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}><Plus style={{ width: "10px", height: "10px" }} /></button>
-                          <span className="text-xs font-bold font-mono text-right flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "24px" }}>{brushSize[0]}</span>
-                        </div>
-                        <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Opasitas</span>
-                          <input type="range" min="5" max="100" step="5" value={brushOpacity[0]} onChange={(e) => setBrushOpacity([Number(e.target.value)])} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-[72px]" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${brushOpacity[0]}%, rgba(139,111,71,0.15) 0%)` }} />
-                          <span className="text-xs font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "32px" }}>{brushOpacity[0]}%</span>
-                        </div>
-                      </div>
-                    )}
+                      ) : null}
+                    </div>
+                  )}
 
-                    {activeTool === "eraser" && (
-                      <div className="flex items-center gap-3 py-2">
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Ukuran Hapus</span>
-                          <button onClick={() => setBrushSize([Math.max(2, brushSize[0] - 2)])} className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer" style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}><Minus style={{ width: "10px", height: "10px" }} /></button>
-                          <input type="range" min="2" max="80" step="2" value={brushSize[0]} onChange={(e) => setBrushSize([Number(e.target.value)])} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-[100px]" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${((brushSize[0] - 2) / 78) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
-                          <button onClick={() => setBrushSize([Math.min(80, brushSize[0] + 2)])} className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer" style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}><Plus style={{ width: "10px", height: "10px" }} /></button>
-                          <span className="text-xs font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "24px" }}>{brushSize[0]}</span>
-                        </div>
+                  {/* No selection hint — only in select mode with nothing selected */}
+                  {activeTool === "select" && !selectedObject && (
+                    <div className="flex items-center gap-2 py-2.5 flex-wrap">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium" style={{ background: "rgba(139,111,71,0.07)", border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}>
+                        <MousePointer2 style={{ width: "12px", height: "12px", flexShrink: 0 }} />
+                        <span>Klik objek di kanvas untuk memilih, lalu geser, putar, atau ubah ukurannya</span>
                       </div>
-                    )}
+                      {isFullMode && (
+                        <div className="hidden sm:flex items-center gap-2 text-[11px] text-[#A89B8F]">
+                          <span>Tips Pintasan:</span>
+                          <kbd className="px-1.5 py-0.5 rounded bg-stone-100 font-mono text-[10px] text-stone-700">Ctrl+Z</kbd>
+                          <span>Undo</span>
+                          <kbd className="px-1.5 py-0.5 rounded bg-stone-100 font-mono text-[10px] text-stone-700">Ctrl+D</kbd>
+                          <span>Duplikat</span>
+                          <kbd className="px-1.5 py-0.5 rounded bg-stone-100 font-mono text-[10px] text-stone-700">Del</kbd>
+                          <span>Hapus</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                    {activeTool === "fill" && (
-                      <div className="flex items-center gap-3 py-2">
-                        <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Warna Isi</span>
+                  {activeTool === "brush" && (
+                    <div className="flex items-center gap-2 sm:gap-3 py-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Warna</span>
                         <div className="relative p-0.5 rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: brushColor, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 6px rgba(0,0,0,0.12)", width: "26px", height: "26px", borderRadius: "8px" }}>
                           <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#6B3A1F", "#ffffff"].map((c, idx) => (
-                            <button key={c} onClick={() => setBrushColor(c)} title={c} className={`${idx >= 6 ? "hidden sm:inline-flex" : ""} transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0`} style={{ width: brushColor === c ? "20px" : "16px", height: brushColor === c ? "20px" : "16px", borderRadius: "6px", background: c, border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)", boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none" }} />
+                          {[
+                            { c: "#3D2B1F", name: "Cokelat Sogan" },
+                            { c: "#8B6F47", name: "Emas Batik" },
+                            { c: "#D4B88B", name: "Krem Mori" },
+                            { c: "#2A4B7C", name: "Biru Indigo" },
+                            { c: "#2D5A2D", name: "Hijau Lumut" },
+                            { c: "#8B2A2A", name: "Merah Mengkudu" },
+                            { c: "#D97706", name: "Kuning Kunyit" },
+                            { c: "#6B3A1F", name: "Kayu Tingi" },
+                            { c: "#000000", name: "Malam Hitam" },
+                            { c: "#ffffff", name: "Putih Mori" },
+                          ].map(({ c, name }, idx) => (
+                            <button key={c} onClick={() => setBrushColor(c)} title={`${name} (${c})`} className={`${idx >= 8 ? "hidden md:inline-flex" : ""} transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0`} style={{ width: brushColor === c ? "20px" : "16px", height: brushColor === c ? "20px" : "16px", borderRadius: "6px", background: c, border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)", boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none" }} />
                           ))}
                         </div>
                       </div>
-                    )}
 
-                    {activeTool === "shape" && (
-                      <div className="flex items-center gap-2 sm:gap-3 py-2">
-                        <div className="flex-shrink-0">
-                          <div className="flex items-center p-0.5 rounded-xl gap-0.5" style={{ background: "rgba(139,111,71,0.08)", border: "1px solid rgba(212,184,139,0.2)" }}>
-                            {(["rect", "circle", "line", "star"] as ShapeType[]).map((t) => {
-                              const IconMap = { rect: Square, circle: Circle, line: Slash, star: Star };
-                              const LabelMap = { rect: "Kotak", circle: "Lingkaran", line: "Garis", star: "Bintang" };
-                              const Icon = IconMap[t];
-                              const isActive = shapeType === t;
-                              return (
-                                <button key={t} onClick={() => setShapeType(t)} title={LabelMap[t]}
-                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 cursor-pointer"
-                                  style={{ background: isActive ? "white" : "transparent", color: isActive ? "#8B6F47" : "#7A6B5E", boxShadow: isActive ? "0 1px 6px rgba(0,0,0,0.1)" : "none" }}>
-                                  <Icon style={{ width: "12px", height: "12px" }} />
-                                  <span className="hidden sm:inline">{LabelMap[t]}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                        {shapeType !== "line" && (
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Isi</span>
-                            <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: shapeFill, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 4px rgba(0,0,0,0.1)", width: "24px", height: "24px" }}>
-                              <input type="color" value={shapeFill} onChange={(e) => setShapeFill(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Garis</span>
-                          <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: shapeStroke, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 4px rgba(0,0,0,0.1)", width: "24px", height: "24px" }}>
-                            <input type="color" value={shapeStroke} onChange={(e) => setShapeStroke(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                          </div>
-                          <input type="range" min="1" max="20" step="1" value={shapeStrokeWidth} onChange={(e) => setShapeStrokeWidth(Number(e.target.value))} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-16" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${(shapeStrokeWidth / 20) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
-                          <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "26px" }}>{shapeStrokeWidth}px</span>
-                        </div>
-                        <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Opasitas</span>
-                          <input type="range" min="10" max="100" step="10" value={shapeOpacity} onChange={(e) => setShapeOpacity(Number(e.target.value))} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-16" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${shapeOpacity}%, rgba(139,111,71,0.15) 0%)` }} />
-                          <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "32px" }}>{shapeOpacity}%</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {activeTool === "text" && (
-                      <div className="flex items-center gap-3 py-2">
-                        <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="h-8 px-2 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}>
-                          <option value="serif">Serif</option>
-                          <option value="sans-serif">Sans-serif</option>
-                          <option value="'Playfair Display', serif">Playfair Display</option>
-                          <option value="monospace">Monospace</option>
-                        </select>
-                        <div className="flex items-center gap-1.5">
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Ukuran</span>
-                          <button onClick={() => setFontSize(s => Math.max(8, s - 4))} className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white" style={{ borderColor: "rgba(212,184,139,0.25)", color: "#8B6F47" }}><Minus style={{ width: "10px", height: "10px" }} /></button>
-                          <span className="text-xs font-bold font-mono w-8 text-center" style={{ color: "#3D2B1F" }}>{fontSize}</span>
-                          <button onClick={() => setFontSize(s => Math.min(120, s + 4))} className="w-6 h-6 flex items-center justify-center rounded-lg border cursor-pointer hover:bg-white" style={{ borderColor: "rgba(212,184,139,0.25)", color: "#8B6F47" }}><Plus style={{ width: "10px", height: "10px" }} /></button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F]">Warna</span>
-                          <div className="relative rounded-lg cursor-pointer hover:scale-105 transition-all" style={{ background: textColor, width: "26px", height: "26px", border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4)" }}>
-                            <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                          </div>
-                          <div className="flex gap-1.5">
-                            {["#3D2B1F", "#8B6F47", "#D4B88B", "#2A4B7C", "#2D5A2D", "#8B2A2A", "#ffffff"].map((c) => (
-                              <button key={c} onClick={() => setTextColor(c)} className="rounded-md border transition-all hover:scale-110 cursor-pointer" style={{ width: textColor === c ? "20px" : "16px", height: textColor === c ? "20px" : "16px", background: c, border: `${textColor === c ? "2.5" : "1.5"}px solid ${textColor === c ? "#3D2B1F" : "rgba(0,0,0,0.12)"}` }} />
+                      {/* Canting & Brush presets in Full Mode */}
+                      {isFullMode && (
+                        <>
+                          <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                          <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
+                            {[
+                              { size: 2, label: "Cecek (2px)" },
+                              { size: 4, label: "Isen (4px)" },
+                              { size: 8, label: "Garis (8px)" },
+                              { size: 16, label: "Sedang (16px)" },
+                              { size: 32, label: "Blok (32px)" },
+                            ].map(({ size, label }) => (
+                              <button
+                                key={size}
+                                onClick={() => setBrushSize([size])}
+                                title={label}
+                                className="px-2 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer flex-shrink-0"
+                                style={{
+                                  background: brushSize[0] === size ? "#8B6F47" : "rgba(139,111,71,0.08)",
+                                  color: brushSize[0] === size ? "#ffffff" : "#6B4F2F",
+                                }}
+                              >
+                                {label.split(" ")[0]}
+                              </button>
                             ))}
                           </div>
-                        </div>
-                        <div className="h-6 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-                        <span className="hidden sm:inline text-[10px] text-[#A89B8F] italic">Teks baru langsung muncul saat tombol Teks diklik</span>
-                      </div>
-                    )}
+                        </>
+                      )}
 
-                    {activeTool === "select" && (
-                      <div className="ml-auto flex-shrink-0">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={handleAIEnhanceClick}
-                          className="flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl font-bold text-white shadow-sm transition-all hover:shadow-md group overflow-hidden relative cursor-pointer"
-                          style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}
-                        >
-                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.2)_0%,_transparent_70%)]" />
-                          <Sparkles className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
-                          <span className="text-[10px] uppercase tracking-wider hidden sm:inline">AI Enhance</span>
-                          <div className="absolute -right-0.5 -top-0.5 w-2 h-2 bg-[#D4B88B] rounded-full animate-ping opacity-75" />
-                        </motion.button>
+                      <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Ukuran</span>
+                        <button onClick={() => setBrushSize([Math.max(2, brushSize[0] - 2)])} className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer" style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}><Minus style={{ width: "10px", height: "10px" }} /></button>
+                        <input type="range" min="2" max="80" step="2" value={brushSize[0]} onChange={(e) => setBrushSize([Number(e.target.value)])} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-[90px]" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${((brushSize[0] - 2) / 78) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
+                        <button onClick={() => setBrushSize([Math.min(80, brushSize[0] + 2)])} className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer" style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}><Plus style={{ width: "10px", height: "10px" }} /></button>
+                        <span className="text-xs font-bold font-mono text-right flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "24px" }}>{brushSize[0]}</span>
                       </div>
-                    )}
-                  </div>
+                      <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Opasitas</span>
+                        <input type="range" min="5" max="100" step="5" value={brushOpacity[0]} onChange={(e) => setBrushOpacity([Number(e.target.value)])} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-[72px]" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${brushOpacity[0]}%, rgba(139,111,71,0.15) 0%)` }} />
+                        <span className="text-xs font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "32px" }}>{brushOpacity[0]}%</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTool === "eraser" && (
+                    <div className="flex items-center gap-3 py-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Ukuran Hapus</span>
+                        <button onClick={() => setBrushSize([Math.max(2, brushSize[0] - 2)])} className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer" style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}><Minus style={{ width: "10px", height: "10px" }} /></button>
+                        <input type="range" min="2" max="80" step="2" value={brushSize[0]} onChange={(e) => setBrushSize([Number(e.target.value)])} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-[100px]" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${((brushSize[0] - 2) / 78) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
+                        <button onClick={() => setBrushSize([Math.min(80, brushSize[0] + 2)])} className="w-6 h-6 flex items-center justify-center rounded-lg transition-all hover:bg-white hover:shadow-sm cursor-pointer" style={{ border: "1px solid rgba(212,184,139,0.25)", color: "#8B6F47" }}><Plus style={{ width: "10px", height: "10px" }} /></button>
+                        <span className="text-xs font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "24px" }}>{brushSize[0]}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTool === "fill" && (
+                    <div className="flex items-center gap-3 py-2">
+                      <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none whitespace-nowrap">Warna Isi</span>
+                      <div className="relative p-0.5 rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: brushColor, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 6px rgba(0,0,0,0.12)", width: "26px", height: "26px", borderRadius: "8px" }}>
+                        <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {[
+                          { c: "#3D2B1F", name: "Cokelat Sogan" },
+                          { c: "#8B6F47", name: "Emas Batik" },
+                          { c: "#D4B88B", name: "Krem Mori" },
+                          { c: "#2A4B7C", name: "Biru Indigo" },
+                          { c: "#2D5A2D", name: "Hijau Lumut" },
+                          { c: "#8B2A2A", name: "Merah Mengkudu" },
+                          { c: "#D97706", name: "Kuning Kunyit" },
+                          { c: "#6B3A1F", name: "Kayu Tingi" },
+                          { c: "#000000", name: "Malam Hitam" },
+                          { c: "#ffffff", name: "Putih Mori" },
+                        ].map(({ c, name }, idx) => (
+                          <button key={c} onClick={() => setBrushColor(c)} title={`${name} (${c})`} className={`${idx >= 8 ? "hidden sm:inline-flex" : ""} transition-all duration-150 hover:scale-115 active:scale-90 cursor-pointer flex-shrink-0`} style={{ width: brushColor === c ? "20px" : "16px", height: brushColor === c ? "20px" : "16px", borderRadius: "6px", background: c, border: brushColor === c ? "2.5px solid #3D2B1F" : "1.5px solid rgba(0,0,0,0.12)", boxShadow: brushColor === c ? "0 2px 6px rgba(0,0,0,0.15)" : "none" }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTool === "shape" && (
+                    <div className="flex items-center gap-2 sm:gap-3 py-2 flex-wrap">
+                      <div className="flex-shrink-0">
+                        <div className="flex items-center p-0.5 rounded-xl gap-0.5" style={{ background: "rgba(139,111,71,0.08)", border: "1px solid rgba(212,184,139,0.2)" }}>
+                          {(([
+                            { t: "rect" as ShapeType, icon: Square, label: "Kotak" },
+                            { t: "circle" as ShapeType, icon: Circle, label: "Lingkaran" },
+                            { t: "triangle" as ShapeType, icon: Triangle, label: "Segitiga" },
+                            { t: "diamond" as ShapeType, icon: Diamond, label: "Belah Ketupat" },
+                            { t: "star" as ShapeType, icon: Star, label: "Bintang" },
+                            { t: "line" as ShapeType, icon: Slash, label: "Garis" },
+                          ])).map(({ t, icon: Icon, label }) => {
+                            const isActive = shapeType === t;
+                            return (
+                              <button key={t} onClick={() => setShapeType(t)} title={label}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 cursor-pointer"
+                                style={{ background: isActive ? "white" : "transparent", color: isActive ? "#8B6F47" : "#7A6B5E", boxShadow: isActive ? "0 1px 6px rgba(0,0,0,0.1)" : "none" }}>
+                                <Icon style={{ width: "12px", height: "12px" }} />
+                                <span className="hidden sm:inline">{label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                      {shapeType !== "line" && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Isi</span>
+                          <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: shapeFill, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 4px rgba(0,0,0,0.1)", width: "24px", height: "24px" }}>
+                            <input type="color" value={shapeFill} onChange={(e) => setShapeFill(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Garis</span>
+                        <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105" style={{ background: shapeStroke, border: "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1.5px rgba(139,111,71,0.4), 0 2px 4px rgba(0,0,0,0.1)", width: "24px", height: "24px" }}>
+                          <input type="color" value={shapeStroke} onChange={(e) => setShapeStroke(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
+                        </div>
+                        <input type="range" min="1" max="20" step="1" value={shapeStrokeWidth} onChange={(e) => setShapeStrokeWidth(Number(e.target.value))} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-16" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${(shapeStrokeWidth / 20) * 100}%, rgba(139,111,71,0.15) 0%)` }} />
+                        <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "26px" }}>{shapeStrokeWidth}px</span>
+                      </div>
+                      <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-[#A89B8F] select-none">Opasitas</span>
+                        <input type="range" min="10" max="100" step="10" value={shapeOpacity} onChange={(e) => setShapeOpacity(Number(e.target.value))} className="h-1.5 rounded-full appearance-none cursor-pointer w-[60px] sm:w-16" style={{ accentColor: "#8B6F47", background: `linear-gradient(to right, #8B6F47 ${shapeOpacity}%, rgba(139,111,71,0.15) 0%)` }} />
+                        <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: "32px" }}>{shapeOpacity}%</span>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
-              )}
+              </div>
 
               {/* Canvas Area */}
               <div className="p-2 sm:p-4 lg:p-6 bg-[#F8F6F2]" style={{ borderTop: "1px solid rgba(212,184,139,0.12)" }}>
                 <div className="relative rounded-2xl overflow-hidden shadow-inner border border-stone-200/50" style={{ boxShadow: "inset 0 4px 20px rgba(61,43,31,0.05)" }}>
                   <div
                     ref={containerRef}
-                    className={isFullMode
-                      ? "fixed inset-0 z-[100] overflow-hidden select-none touch-manipulation"
-                      : "aspect-[4/3] relative overflow-hidden select-none touch-manipulation"}
+                    className="aspect-[4/3] relative overflow-hidden select-none touch-manipulation"
                     style={{
                       background: canvasBackground,
                       boxShadow: isDragOverCanvas ? "inset 0 0 0 3px #8B6F47" : undefined,
@@ -4692,31 +5646,27 @@ export function CustomBatikPage() {
                     }}
                     onDrop={handleCanvasDrop}
                   >
-                    {isFullMode && (
+                    {/* Grid Guide Overlay */}
+                    {showGrid && (
                       <div
-                        className="fixed top-0 left-0 right-0 z-[99] flex items-center justify-between px-8 py-3 pointer-events-none"
-                        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 100%)" }}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#8B6F47" }} />
-                            <span className="text-xs font-semibold tracking-wide" style={{ color: "#3D2B1F" }}>Kanvas Karya</span>
-                          </div>
-                        </div>
-
-                        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 text-[11px]" style={{ color: "rgba(61,43,31,0.45)" }}>
-                          <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: "rgba(139,111,71,0.12)", color: "#8B6F47" }}>Scroll</kbd> geser kanvas</span>
-                          <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: "rgba(139,111,71,0.12)", color: "#8B6F47" }}>Ctrl+Scroll</kbd> perbesar/perkecil</span>
-                          <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: "rgba(139,111,71,0.12)", color: "#8B6F47" }}>Space+Drag</kbd> geser kanvas</span>
-                          <span className="flex items-center gap-1.5"><kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: "rgba(139,111,71,0.12)", color: "#8B6F47" }}>Esc</kbd> keluar</span>
-                        </div>
-                      </div>
+                        className="absolute inset-0 pointer-events-none z-[5]"
+                        style={{
+                          backgroundImage: "linear-gradient(to right, rgba(139,111,71,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(139,111,71,0.12) 1px, transparent 1px)",
+                          backgroundSize: "40px 40px",
+                        }}
+                      />
                     )}
 
                     <canvas
                       ref={displayCanvasRef}
                       width={800}
                       height={600}
+                      style={{ position: 'absolute', top: 0, left: 0, zIndex: 1, pointerEvents: 'none', touchAction: 'manipulation' }}
+                    />
+                    <div
+                      ref={(el) => {
+                        (fabricCanvasRef as any).wrapper = el;
+                      }}
                       style={{ position: 'absolute', top: 0, left: 0, zIndex: 2, pointerEvents: 'auto', touchAction: 'manipulation' }}
                       onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
@@ -4726,12 +5676,6 @@ export function CustomBatikPage() {
                         const rect = container.getBoundingClientRect();
                         setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
                       }}
-                    />
-                    <div
-                      ref={(el) => {
-                        (fabricCanvasRef as any).wrapper = el;
-                      }}
-                      style={{ position: 'absolute', top: 0, left: 0, zIndex: 1, touchAction: 'manipulation' }}
                     >
                       <canvas ref={canvasRef} />
                     </div>
@@ -4750,7 +5694,7 @@ export function CustomBatikPage() {
                       <div
                         style={{
                           position: "absolute",
-                          bottom: isFullMode ? 90 : 20,
+                          bottom: 20,
                           left: "50%",
                           transform: "translateX(-50%)",
                           zIndex: 110,
@@ -5071,12 +6015,12 @@ export function CustomBatikPage() {
                     {/* Horizontal scrollbar */}
                     <div
                       ref={horizontalScrollTrackRef}
-                      className="hidden sm:block absolute bottom-2 left-2 right-10 h-2.5 rounded-full cursor-pointer bg-stone-500/10 hover:bg-stone-500/20 transition-all z-[110]"
+                      className="hidden sm:block absolute bottom-2 left-2 right-10 h-2.5 rounded-full cursor-pointer bg-neutral-400/20 hover:bg-neutral-400/30 transition-all z-[110]"
                       style={{ backdropFilter: "blur(4px)" }}
                     >
                       <div
                         ref={horizontalScrollThumbRef}
-                        className="absolute top-0 bottom-0 rounded-full bg-[#8B6F47]/50 hover:bg-[#8B6F47]/80 transition-colors border border-white/20"
+                        className="absolute top-0 bottom-0 rounded-full bg-neutral-400/70 hover:bg-neutral-500/90 active:bg-neutral-600 transition-colors border border-black/5"
                         style={{ left: "0%", width: "100%" }}
                       />
                     </div>
@@ -5084,12 +6028,12 @@ export function CustomBatikPage() {
                     {/* Vertical scrollbar */}
                     <div
                       ref={verticalScrollTrackRef}
-                      className="hidden sm:block absolute top-2 bottom-10 right-2 w-2.5 rounded-full cursor-pointer bg-stone-500/10 hover:bg-stone-500/20 transition-all z-[110]"
+                      className="hidden sm:block absolute top-2 bottom-10 right-2 w-2.5 rounded-full cursor-pointer bg-neutral-400/20 hover:bg-neutral-400/30 transition-all z-[110]"
                       style={{ backdropFilter: "blur(4px)" }}
                     >
                       <div
                         ref={verticalScrollThumbRef}
-                        className="absolute left-0 right-0 rounded-full bg-[#8B6F47]/50 hover:bg-[#8B6F47]/80 transition-colors border border-white/20"
+                        className="absolute left-0 right-0 rounded-full bg-neutral-400/70 hover:bg-neutral-500/90 active:bg-neutral-600 transition-colors border border-black/5"
                         style={{ top: "0%", height: "100%" }}
                       />
                     </div>
@@ -5097,423 +6041,69 @@ export function CustomBatikPage() {
                 </div>
               </div>
 
-              {/* CTA Bar — hidden in fullmode */}
-              {!isFullMode && (
-                <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4" style={{ background: "linear-gradient(to right, #FAF8F5, #FFFFFF)", borderTop: "1px solid rgba(212,184,139,0.18)" }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-[#A89B8F] mb-0.5">Simpan atau Unduh</p>
-                    <p className="text-xs sm:text-sm font-semibold text-[#3D2B1F] leading-snug">Simpan desain ke histori untuk dipesan nanti, atau unduh sebagai gambar.</p>
-                  </div>
-                  <div className="flex items-center gap-2.5 flex-shrink-0">
-                    <button onClick={downloadDesign} disabled={isDownloading || (layers.length === 0 && !hasOffscreenContent)}
-                      className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 h-10 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-50 cursor-pointer border hover:shadow-sm active:scale-95"
-                      style={{ color: "#5A3D2B", background: "#FFFFFF", borderColor: "rgba(139,111,71,0.3)" }}>
-                      {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      <span>Unduh</span>
-                    </button>
-                    <button onClick={handleSaveAndShowModal} disabled={isSaving || (layers.length === 0 && !hasOffscreenContent)}
-                      className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 h-10 rounded-2xl font-bold text-sm text-white transition-all duration-200 disabled:opacity-50 cursor-pointer hover:brightness-110 active:scale-95"
-                      style={{ background: "linear-gradient(135deg, #8B6F47 0%, #6B4F2F 100%)", boxShadow: "0 4px 16px rgba(139,111,71,0.35), inset 0 1px 0 rgba(255,255,255,0.12)" }}>
-                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      <span>Simpan</span>
-                    </button>
-                  </div>
+              {/* CTA Bar */}
+              <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4" style={{ background: "linear-gradient(to right, #FAF8F5, #FFFFFF)", borderTop: "1px solid rgba(212,184,139,0.18)" }}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-[#A89B8F] mb-0.5">Simpan atau Unduh</p>
+                  <p className="text-xs sm:text-sm font-semibold text-[#3D2B1F] leading-snug">Simpan desain ke histori untuk dipesan nanti, atau unduh sebagai gambar.</p>
                 </div>
-              )}
+                <div className="flex items-center gap-2.5 flex-shrink-0">
+                  <button onClick={downloadDesign} disabled={isDownloading || (layers.length === 0 && !hasOffscreenContent)}
+                    className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 h-10 rounded-2xl font-semibold text-sm transition-all duration-200 disabled:opacity-50 cursor-pointer border hover:shadow-sm active:scale-95"
+                    style={{ color: "#5A3D2B", background: "#FFFFFF", borderColor: "rgba(139,111,71,0.3)" }}>
+                    {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span>Unduh</span>
+                  </button>
+                  <button onClick={handleSaveAndShowModal} disabled={isSaving || (layers.length === 0 && !hasOffscreenContent)}
+                    className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 h-10 rounded-2xl font-bold text-sm text-white transition-all duration-200 disabled:opacity-50 cursor-pointer hover:brightness-110 active:scale-95"
+                    style={{ background: "linear-gradient(135deg, #8B6F47 0%, #6B4F2F 100%)", boxShadow: "0 4px 16px rgba(139,111,71,0.35), inset 0 1px 0 rgba(255,255,255,0.12)" }}>
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    <span>Simpan</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Sidebar — hidden in fullmode */}
-          {!isFullMode && (
-            <div className="lg:col-span-4 h-full min-w-0">
-              <div className="rounded-[32px] shadow-[0_20px_50px_rgba(61,43,31,0.06)] overflow-hidden border bg-white flex flex-col h-full max-h-[45vh] lg:max-h-none" style={{ borderColor: "rgba(212,184,139,0.3)" }}>
-                {/* [OPT-6] SidebarTabs component */}
-                <SidebarTabs
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  patterns={patterns}
-                  loading={loading}
-                  selectedPreset={sidebarPreset}
-                  setSelectedPreset={setSidebarPreset}
-                  customColor={sidebarCustomColor}
-                  onCustomColorCommit={handleSidebarCustomColorCommit}
-                  addItemToCanvas={addItemToCanvas}
-                  renderMiniPattern={renderMiniPattern}
-                  layers={layers}
-                  selectedLayerId={selectedLayerId}
-                  setSelectedLayerId={setSelectedLayerId}
-                  setSelectedObject={setSelectedObject}
-                  setSelectedObjectType={setSelectedObjectType}
-                  fabricCanvasRef={fabricCanvasRef}
-                  moveLayer={moveLayer}
-                  toggleLayerVisibility={toggleLayerVisibility}
-                  toggleLayerLock={toggleLayerLock}
-                  duplicateLayer={duplicateLayer}
-                  deleteSelectedLayer={deleteSelectedLayer}
-                  layerItemRefs={layerItemRefs}
-                  addUploadedImageToCanvas={addUploadedImageToCanvas}
-                  flipLayer={flipLayer}
-                  isMultiSelectMode={isMultiSelectMode}
-                  toggleMultiSelectMode={toggleMultiSelectMode}
-                  selectedPatternIds={selectedPatternIds}
-                  togglePatternSelection={togglePatternSelection}
-                  onAddSelectedPatterns={addSelectedPatternsToCanvas}
-                />
-              </div>
+          {/* Sidebar */}
+          <div className="lg:col-span-4 h-full min-w-0">
+            <div className="rounded-[32px] shadow-[0_20px_50px_rgba(61,43,31,0.06)] overflow-hidden border bg-white flex flex-col h-full max-h-[45vh] lg:max-h-none" style={{ borderColor: "rgba(212,184,139,0.3)" }}>
+              {/* [OPT-6] SidebarTabs component */}
+              <SidebarTabs
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                patterns={patterns}
+                loading={loading}
+                selectedPreset={sidebarPreset}
+                setSelectedPreset={setSidebarPreset}
+                customColor={sidebarCustomColor}
+                onCustomColorCommit={handleSidebarCustomColorCommit}
+                addItemToCanvas={addItemToCanvas}
+                renderMiniPattern={renderMiniPattern}
+                layers={layers}
+                selectedLayerId={selectedLayerId}
+                setSelectedLayerId={setSelectedLayerId}
+                setSelectedObject={setSelectedObject}
+                setSelectedObjectType={setSelectedObjectType}
+                fabricCanvasRef={fabricCanvasRef}
+                moveLayer={moveLayer}
+                toggleLayerVisibility={toggleLayerVisibility}
+                toggleLayerLock={toggleLayerLock}
+                duplicateLayer={duplicateLayer}
+                deleteSelectedLayer={deleteSelectedLayer}
+                layerItemRefs={layerItemRefs}
+                addUploadedImageToCanvas={addUploadedImageToCanvas}
+                flipLayer={flipLayer}
+                isMultiSelectMode={isMultiSelectMode}
+                toggleMultiSelectMode={toggleMultiSelectMode}
+                selectedPatternIds={selectedPatternIds}
+                togglePatternSelection={togglePatternSelection}
+                onAddSelectedPatterns={addSelectedPatternsToCanvas}
+              />
             </div>
-          )}
+          </div>
         </div>
       </div>
-
-      {/* Fullmode floating toolbar */}
-      <AnimatePresence>
-        {isFullMode && (
-          <>
-            {((activeTool !== "select" && !selectedObject) || (selectedObject && !isCanvasMultiSelectMode)) && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                className="fixed bottom-23 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 transform-none sm:transform z-[101] flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-full shadow-2xl backdrop-blur-md overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-                style={{ background: "rgba(255,255,255,0.92)", border: "1px solid rgba(212,184,139,0.25)" }}
-              >
-                {/* Selected object controls — visible in any tool mode when object is selected */}
-                {selectedObject && !isCanvasMultiSelectMode && selectedObjectType === "pattern" && (
-                  <>
-                    <Palette style={{ width: 13, height: 13, color: "#8B6F47", flexShrink: 0 }} />
-                    <div className="flex items-center gap-1.5">
-                      {colorPresets.map((preset) => (
-                        <button
-                          key={preset.name}
-                          title={preset.name}
-                          onClick={() => setSelectedPreset(preset)}
-                          className="rounded-full transition-all hover:scale-110 cursor-pointer flex-shrink-0"
-                          style={{
-                            width: selectedPreset.name === preset.name ? 18 : 14,
-                            height: selectedPreset.name === preset.name ? 18 : 14,
-                            background: preset.colors.primary,
-                            border: `${selectedPreset.name === preset.name ? "2.5" : "1.5"}px solid ${selectedPreset.name === preset.name ? "#3D2B1F" : "rgba(0,0,0,0.12)"}`,
-                            boxShadow: selectedPreset.name === preset.name ? "0 2px 6px rgba(0,0,0,0.2)" : "none",
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <div className="h-4 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                    <div className="relative rounded-lg cursor-pointer transition-all hover:scale-105 flex-shrink-0" title="Warna kustom" style={{ background: customColor, width: 22, height: 22, border: selectedPreset.name === "Custom" ? "2.5px solid #3D2B1F" : "2px solid rgba(255,255,255,0.8)", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)", borderRadius: "6px" }}>
-                      <input type="color" defaultValue={customColor}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (canvasColorCommitTimerRef.current) clearTimeout(canvasColorCommitTimerRef.current);
-                          canvasColorCommitTimerRef.current = setTimeout(() => {
-                            setCustomColor(v);
-                            setSelectedPreset({ name: "Custom", colors: { primary: v, secondary: v, accent: v, background: "transparent" }, batik: { background: "#f3f3f3", light: v, mid: v, dark: v } });
-                            canvasColorCommitTimerRef.current = null;
-                          }, 150);
-                        }}
-                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                    </div>
-                  </>
-                )}
-                {selectedObject && !isCanvasMultiSelectMode && selectedObjectType === "shape" && (
-                  <>
-                    {/* badge removed */}
-                    {!(selectedObject instanceof fabric.Line) && (
-                      <div className="relative rounded-lg" style={{ background: shapeFill, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                        <input type="color" value={shapeFill} onChange={(e) => setShapeFill(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                      </div>
-                    )}
-                    <div className="relative rounded-lg" style={{ background: shapeStroke, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                      <input type="color" value={shapeStroke} onChange={(e) => setShapeStroke(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                    </div>
-                    <input type="range" min="1" max="20" step="1" value={shapeStrokeWidth} onChange={(e) => setShapeStrokeWidth(Number(e.target.value))} style={{ width: 60, accentColor: "#8B6F47" }} />
-                    <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: 22 }}>{shapeStrokeWidth}px</span>
-                    <div className="h-4 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-                    <input type="range" min="10" max="100" step="10" value={shapeOpacity} onChange={(e) => setShapeOpacity(Number(e.target.value))} style={{ width: 60, accentColor: "#8B6F47" }} />
-                    <span className="text-[10px] font-bold font-mono flex-shrink-0" style={{ color: "#3D2B1F", minWidth: 28 }}>{shapeOpacity}%</span>
-                  </>
-                )}
-                {selectedObject && !isCanvasMultiSelectMode && selectedObjectType === "text" && (
-                  <>
-                    {/* badge removed */}
-                    <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="h-7 px-2 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}>
-                      <option value="serif">Serif</option>
-                      <option value="sans-serif">Sans-serif</option>
-                      <option value="'Playfair Display', serif">Playfair</option>
-                      <option value="monospace">Mono</option>
-                    </select>
-                    <div className="h-4 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-                    <div className="relative rounded-lg" style={{ background: textColor, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                      <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                    </div>
-                  </>
-                )}
-                {activeTool === "brush" && (
-                  <>
-                    <div className="flex items-center gap-1.5">
-                      <span className="hidden sm:inline text-[10px] font-bold uppercase text-[#A89B8F]">Warna</span>
-                      <div className="relative rounded-lg" style={{ background: brushColor, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                        <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                      </div>
-                    </div>
-                    <div className="h-4 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-                    <div className="flex items-center gap-1.5">
-                      <span className="hidden sm:inline text-[10px] font-bold uppercase text-[#A89B8F]">Ukuran</span>
-                      <input type="range" min="2" max="80" step="2" value={brushSize[0]} onChange={(e) => setBrushSize([Number(e.target.value)])} style={{ width: 70, accentColor: "#8B6F47" }} />
-                      <span className="text-xs font-bold font-mono" style={{ color: "#3D2B1F", minWidth: 22 }}>{brushSize[0]}</span>
-                    </div>
-                    <div className="h-4 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-                    <div className="flex items-center gap-1.5">
-                      <span className="hidden sm:inline text-[10px] font-bold uppercase text-[#A89B8F]">Opasitas</span>
-                      <input type="range" min="5" max="100" step="5" value={brushOpacity[0]} onChange={(e) => setBrushOpacity([Number(e.target.value)])} style={{ width: 60, accentColor: "#8B6F47" }} />
-                      <span className="text-xs font-bold font-mono" style={{ color: "#3D2B1F", minWidth: 30 }}>{brushOpacity[0]}%</span>
-                    </div>
-                  </>
-                )}
-                {activeTool === "eraser" && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="hidden sm:inline text-[10px] font-bold uppercase text-[#A89B8F]">Ukuran Hapus</span>
-                    <input type="range" min="2" max="80" step="2" value={brushSize[0]} onChange={(e) => setBrushSize([Number(e.target.value)])} style={{ width: 90, accentColor: "#8B6F47" }} />
-                    <span className="text-xs font-bold font-mono" style={{ color: "#3D2B1F", minWidth: 22 }}>{brushSize[0]}</span>
-                  </div>
-                )}
-                {activeTool === "fill" && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="hidden sm:inline text-[10px] font-bold uppercase text-[#A89B8F]">Warna Isi</span>
-                    <div className="relative rounded-lg" style={{ background: brushColor, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                      <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                    </div>
-                  </div>
-                )}
-                {activeTool === "shape" && !selectedObject && (
-                  <>
-                    <div className="flex items-center gap-1">
-                      {(["rect", "circle", "line", "star"] as ShapeType[]).map((t) => {
-                        const IconMap = { rect: Square, circle: Circle, line: Slash, star: Star };
-                        const Icon = IconMap[t];
-                        return (
-                          <button key={t} onClick={() => setShapeType(t)} className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer" style={{ background: shapeType === t ? "#8B6F47" : "transparent", color: shapeType === t ? "white" : "#7A6B5E" }}>
-                            <Icon style={{ width: 13, height: 13 }} />
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="h-4 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-                    {shapeType !== "line" && (
-                      <div className="relative rounded-lg" style={{ background: shapeFill, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                        <input type="color" value={shapeFill} onChange={(e) => setShapeFill(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                      </div>
-                    )}
-                    <div className="relative rounded-lg" style={{ background: shapeStroke, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                      <input type="color" value={shapeStroke} onChange={(e) => setShapeStroke(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                    </div>
-                  </>
-                )}
-                {activeTool === "text" && !selectedObject && (
-                  <>
-                    <select value={fontFamily} onChange={(e) => setFontFamily(e.target.value)} className="h-7 px-2 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: "rgba(212,184,139,0.3)", color: "#3D2B1F", background: "#FAF9F6" }}>
-                      <option value="serif">Serif</option>
-                      <option value="sans-serif">Sans-serif</option>
-                      <option value="'Playfair Display', serif">Playfair Display</option>
-                      <option value="monospace">Monospace</option>
-                    </select>
-                    <div className="h-4 w-px" style={{ background: "rgba(212,184,139,0.35)" }} />
-                    <div className="relative rounded-lg" style={{ background: textColor, width: 20, height: 20, border: "2px solid white", boxShadow: "0 0 0 1px rgba(139,111,71,0.4)" }}>
-                      <input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" />
-                    </div>
-                  </>
-                )}
-              </motion.div>
-            )}
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-              className="fixed bottom-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 transform-none sm:transform z-[101] flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-full shadow-2xl backdrop-blur-md overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-              style={{ background: "rgba(255,255,255,0.95)", border: "1px solid rgba(212,184,139,0.25)" }}
-            >
-              <div className="flex items-center gap-0.5 p-0.5 rounded-full flex-shrink-0" style={{ background: "rgba(139,111,71,0.06)" }}>
-                {([
-                  { tool: "select" as Tool, icon: MousePointer2, label: "Pilih" },
-                  { tool: "brush" as Tool, icon: Brush, label: "Kuas" },
-                  { tool: "eraser" as Tool, icon: Eraser, label: "Hapus" },
-                  { tool: "fill" as Tool, icon: PaintBucket, label: "Isi" },
-                  { tool: "shape" as Tool, icon: Square, label: "Bentuk" },
-                  { tool: "text" as Tool, icon: Type, label: "Teks" },
-                ] as const).map(({ tool, icon: Icon, label }) => {
-                  const isActive = activeTool === tool;
-                  return (
-                    <button key={tool} onClick={() => tool === "text" ? spawnTextObject() : setActiveTool(tool)} title={label}
-                      className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-full transition-all cursor-pointer"
-                      style={{ background: isActive ? "linear-gradient(135deg, #8B6F47 0%, #A0845E 100%)" : "transparent", color: isActive ? "#FFFFFF" : "#7A6B5E" }}>
-                      <Icon style={{ width: 14, height: 14 }} />
-                      <span className="text-[9px] font-semibold leading-none">{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-              <button
-                onClick={zoomOut} disabled={zoomLevel <= 50} title="Perkecil"
-                className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100 flex-shrink-0"
-                style={{ color: "#8B6F47" }}
-              ><ZoomOut style={{ width: 14, height: 14 }} /></button>
-              <button
-                onClick={resetZoom}
-                title={zoomLevel === 100 ? "Tampilan sesuai layar" : "Klik untuk kembali ke 100%"}
-                className="px-2 h-8 rounded-full text-[11px] font-bold font-mono cursor-pointer hover:bg-stone-100 transition-colors flex-shrink-0"
-                style={{
-                  color: zoomLevel !== 100 ? "#8B6F47" : "#A89B8F",
-                  background: zoomLevel !== 100 ? "rgba(139,111,71,0.08)" : "transparent",
-                  minWidth: 46,
-                }}
-              >{zoomLevel}%</button>
-              <button
-                onClick={zoomIn} disabled={zoomLevel >= 300} title="Perbesar"
-                className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100 flex-shrink-0"
-                style={{ color: "#8B6F47" }}
-              ><ZoomIn style={{ width: 14, height: 14 }} /></button>
-              <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-              {/* Background color picker for full mode */}
-              <div className="relative flex items-center gap-1.5 px-2 py-1.5 rounded-full cursor-pointer hover:bg-stone-100 transition-all flex-shrink-0" title="Warna latar kanvas">
-                <div
-                  ref={bgColorSwatchRefFull}
-                  className="w-4 h-4 rounded-full border"
-                  style={{ background: canvasBackground, borderColor: "rgba(0,0,0,0.1)" }}
-                />
-                <input
-                  type="color"
-                  ref={bgColorInputRefFull}
-                  defaultValue={canvasBackground}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                  title="Ubah warna latar kanvas"
-                  onInput={(e) => {
-                    const color = (e.target as HTMLInputElement).value;
-                    bgColorRef.current = color;
-                    if (containerRef.current) containerRef.current.style.background = color;
-                    if (bgColorSwatchRef.current) bgColorSwatchRef.current.style.background = color;
-                    if (bgColorSwatchRefFull.current) bgColorSwatchRefFull.current.style.background = color;
-                  }}
-                  onChange={(e) => {
-                    const color = e.target.value;
-                    bgColorRef.current = color;
-                    const fc = fabricCanvasRef.current;
-                    if (fc) {
-                      fc.setBackgroundColor(color, () => { fc.requestRenderAll(); });
-                    }
-                    setCanvasBackground(color);
-                    setCommittedBg(color);
-                  }}
-                />
-              </div>
-              <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-              <button onClick={undoAll} disabled={!canUndo} title="Undo (Ctrl+Z)" className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100 flex-shrink-0" style={{ color: "#8B6F47" }}><RotateCcw style={{ width: 14, height: 14 }} /></button>
-              <button onClick={redoAll} disabled={!canRedo} title="Redo (Ctrl+Y)" className="w-8 h-8 flex items-center justify-center rounded-full disabled:opacity-30 cursor-pointer hover:bg-stone-100 flex-shrink-0" style={{ color: "#8B6F47" }}><RotateCw style={{ width: 14, height: 14 }} /></button>
-              <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-
-              {activeTool === "select" && (
-                <>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleAIEnhanceClick}
-                    className="flex items-center justify-center w-8 h-8 rounded-full font-bold text-white shadow-lg transition-all hover:shadow-[0_0_15px_rgba(139,111,71,0.5)] group overflow-hidden relative cursor-pointer flex-shrink-0"
-                    style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}
-                  >
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.2)_0%,_transparent_70%)]" />
-                    <Sparkles className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
-                  </motion.button>
-                  <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-                </>
-              )}
-
-              <button onClick={toggleFloatingSidebar} title={showFloatingSidebar ? "Sembunyikan Panel" : "Tampilkan Panel"}
-                className="flex items-center gap-1.5 px-3 h-8 rounded-full font-semibold text-xs cursor-pointer transition-all flex-shrink-0"
-                style={{ background: showFloatingSidebar ? "rgba(139,111,71,0.14)" : "transparent", color: "#8B6F47" }}>
-                <Layers style={{ width: 13, height: 13 }} />
-                <span className="hidden sm:inline">Panel</span>
-              </button>
-              <div className="h-6 w-px flex-shrink-0" style={{ background: "rgba(212,184,139,0.35)" }} />
-              <button onClick={() => setIsFullMode(false)} title="Keluar Layar Penuh (Esc)"
-                className="flex items-center gap-1.5 px-3 h-8 rounded-full font-semibold text-xs cursor-pointer hover:opacity-90 flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, #3D2B1F, #8B6F47)", color: "white" }}>
-                <Minimize2 style={{ width: 13, height: 13 }} />
-              </button>
-            </motion.div>
-
-            {/* Floating sidebar — always mounted, slides via y so drag+close animates smoothly */}
-            <motion.div
-              drag="y"
-              dragControls={sidebarDragControls}
-              dragListener={false}
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0.12, bottom: 0.6 }}
-              animate={{ y: showFloatingSidebar ? "0%" : "150%", opacity: showFloatingSidebar ? 1 : 0 }}
-              transition={{ type: "spring", damping: 32, stiffness: 320, mass: 0.9 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 110 || info.velocity.y > 450) {
-                  closeFloatingSidebar();
-                } else if (info.offset.y < -60 || info.velocity.y < -350) {
-                  setIsSidebarExpanded(true);
-                } else if (info.offset.y > 30 && isSidebarExpanded) {
-                  setIsSidebarExpanded(false);
-                }
-              }}
-              className={`fixed inset-x-0 bottom-0 top-auto ${isSidebarExpanded ? "max-h-[92vh]" : "max-h-[60vh]"} rounded-t-[28px] rounded-b-none sm:top-6 sm:right-6 sm:left-auto sm:bottom-28 sm:max-h-none sm:rounded-[28px] z-[101] sm:w-[380px] sm:max-w-[90vw] shadow-2xl backdrop-blur-md overflow-hidden flex flex-col touch-none sm:touch-auto`}
-              style={{ background: "rgba(255,255,255,0.97)", border: "1px solid rgba(212,184,139,0.25)", transition: "max-height 0.3s ease-out", pointerEvents: showFloatingSidebar ? "auto" : "none" }}
-            >
-              <div
-                className="flex flex-col items-center pt-3 pb-1 sm:hidden flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
-                style={{ touchAction: "none" }}
-                onPointerDown={(e) => { if (window.innerWidth < 640) sidebarDragControls.start(e); }}
-              >
-                <div className="w-10 h-1.5 rounded-full mb-1" style={{ background: "rgba(139,111,71,0.35)" }} />
-                <span className="text-[10px] text-[#A89B8F] font-medium">Geser untuk menutup</span>
-              </div>
-              <div
-                className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 cursor-grab active:cursor-grabbing sm:cursor-default select-none"
-                style={{ borderColor: "rgba(139,111,71,0.1)" }}
-                onPointerDown={(e) => { if (window.innerWidth < 640) sidebarDragControls.start(e); }}
-              >
-                <p className="text-sm font-bold" style={{ color: "#3D2B1F", fontFamily: "'Playfair Display', serif" }}>Panel Desain</p>
-                <button onClick={closeFloatingSidebar} title="Tutup panel" className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-stone-100 cursor-pointer" style={{ color: "#A89B8F" }}>
-                  <X style={{ width: 14, height: 14 }} />
-                </button>
-              </div>
-              <div className="flex-1 min-h-0 overflow-hidden touch-auto">
-                {/* [OPT-6] Reuse SidebarTabs component in fullmode floating panel */}
-                <SidebarTabs
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  patterns={patterns}
-                  loading={loading}
-                  selectedPreset={sidebarPreset}
-                  setSelectedPreset={setSidebarPreset}
-                  customColor={sidebarCustomColor}
-                  onCustomColorCommit={handleSidebarCustomColorCommit}
-                  addItemToCanvas={addItemToCanvas}
-                  renderMiniPattern={renderMiniPattern}
-                  layers={layers}
-                  selectedLayerId={selectedLayerId}
-                  setSelectedLayerId={setSelectedLayerId}
-                  setSelectedObject={setSelectedObject}
-                  setSelectedObjectType={setSelectedObjectType}
-                  fabricCanvasRef={fabricCanvasRef}
-                  moveLayer={moveLayer}
-                  toggleLayerVisibility={toggleLayerVisibility}
-                  toggleLayerLock={toggleLayerLock}
-                  duplicateLayer={duplicateLayer}
-                  deleteSelectedLayer={deleteSelectedLayer}
-                  layerItemRefs={layerItemRefs}
-                  addUploadedImageToCanvas={addUploadedImageToCanvas}
-                  flipLayer={flipLayer}
-                  isMultiSelectMode={isMultiSelectMode}
-                  toggleMultiSelectMode={toggleMultiSelectMode}
-                  selectedPatternIds={selectedPatternIds}
-                  togglePatternSelection={togglePatternSelection}
-                  onAddSelectedPatterns={addSelectedPatternsToCanvas}
-                />
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Success Modal */}
       <AnimatePresence>
@@ -5611,54 +6201,7 @@ export function CustomBatikPage() {
         )}
       </AnimatePresence>
 
-      {/* AI Premium Modal */}
-      <AnimatePresence>
-        {showAIModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAIModal(false)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-8 text-center shadow-2xl" style={{ border: "1px solid rgba(212,184,139,0.3)" }}>
-              <button onClick={() => setShowAIModal(false)} className="absolute top-4 right-4 p-2 text-[#A89B8F] hover:bg-stone-100 rounded-full transition-colors"><X className="w-5 h-5" /></button>
 
-              <div className="relative w-20 h-20 mx-auto mb-6">
-                <div className="absolute inset-0 rounded-full animate-pulse blur-md bg-[#8B6F47]/20" />
-                <div className="relative w-full h-full rounded-full flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #8B6F47 0%, #3D2B1F 100%)" }}>
-                  <Sparkles className="w-8 h-8 text-white" />
-                </div>
-              </div>
-
-              <h3 className="text-2xl font-bold mb-1.5" style={{ fontFamily: "'Playfair Display', serif", color: "#3D2B1F" }}>
-                AI Smart Recommendation
-              </h3>
-              <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "rgba(196,157,101,0.1)", color: "#C49D65", border: "1px solid rgba(196,157,101,0.2)" }}>
-                Premium Feature
-              </div>
-
-              <p className="text-[#7A6B5E] mb-6 text-xs leading-relaxed max-w-xs mx-auto">
-                Dapatkan rekomendasi motif cerdas dan tata letak batik kustom otomatis yang dioptimalkan oleh kecerdasan buatan.
-              </p>
-
-              <div className="p-4 rounded-2xl mb-6 text-left flex items-start gap-3" style={{ background: "rgba(196,157,101,0.06)", border: "1px solid rgba(196,157,101,0.15)" }}>
-                <Clock className="w-4 h-4 text-[#C49D65] flex-shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-xs font-bold text-[#3D2B1F]">Segera Hadir</h4>
-                  <p className="text-[10.5px] text-[#8E7F72] leading-relaxed mt-0.5">
-                    Asisten cerdas AI kami sedang disempurnakan dan akan segera diluncurkan secara eksklusif untuk member Premium RekaBatik.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowAIModal(false)}
-                className="w-full py-3 rounded-xl font-bold transition-all text-xs cursor-pointer"
-                style={{ color: "#8B6F47", border: "1px solid rgba(139,111,71,0.2)", background: "rgba(139,111,71,0.02)" }}
-              >
-                Kembali
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Navigation Blocker Confirmation Modal */}
       {blocker.state === "blocked" && (

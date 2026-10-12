@@ -73,7 +73,7 @@ const plans: Plan[] = [
     features: [
       { label: "2 desain aktif", included: "2 desain" },
       { label: "Edit desain tersimpan", included: false },
-      { label: "Rekomendasi motif AI", included: false },
+
       { label: "Ekspor resolusi tinggi", included: false },
       { label: "Diskon pendaftaran HKI", included: false },
       { label: "Penyimpanan proyek", included: "Terbatas" },
@@ -91,7 +91,7 @@ const plans: Plan[] = [
     features: [
       { label: "12 desain aktif", included: "12 desain" },
       { label: "Edit desain tersimpan", included: true },
-      { label: "Rekomendasi motif AI", included: "Tanpa batas" },
+
       { label: "Ekspor resolusi tinggi", included: true },
       { label: "Diskon pendaftaran HKI", included: "Diskon standar" },
       { label: "Penyimpanan proyek", included: "12 slot" },
@@ -109,7 +109,7 @@ const plans: Plan[] = [
     features: [
       { label: "Desain tanpa batas", included: "Unlimited" },
       { label: "Edit desain tersimpan", included: true },
-      { label: "Rekomendasi motif AI", included: "Tanpa batas" },
+
       { label: "Ekspor resolusi tinggi", included: true },
       { label: "Diskon pendaftaran HKI", included: "Diskon eksklusif" },
       { label: "Penyimpanan proyek", included: "Unlimited" },
@@ -121,7 +121,7 @@ const plans: Plan[] = [
 const comparisonRows = [
   { label: "Jumlah desain", values: ["2 desain", "12 desain", "Unlimited"] },
   { label: "Edit desain tersimpan", values: [false, true, true] },
-  { label: "Rekomendasi motif AI", values: [false, "Tanpa batas", "Tanpa batas"] },
+
   { label: "Ekspor resolusi tinggi", values: [false, true, true] },
   { label: "Diskon pendaftaran HKI", values: [false, "Standar", "Eksklusif"] },
   { label: "Penyimpanan proyek", values: ["Terbatas", "12 slot", "Unlimited"] },
@@ -141,10 +141,7 @@ const faqs = [
     q: "Apakah Plan Premium dapat diperpanjang?",
     a: "Bisa. Perpanjangan dapat dilakukan kapan saja, termasuk sebelum masa aktif berakhir — masa aktif baru akan ditambahkan setelah masa aktif saat ini selesai.",
   },
-  {
-    q: "Apa itu fitur Rekomendasi Motif AI?",
-    a: "Fitur ini membantu menemukan kombinasi motif, warna, dan pola berdasarkan kekayaan referensi batik Indonesia, sebagai titik awal untuk desain Anda sendiri.",
-  },
+
   {
     q: "Apa itu Diskon Pendaftaran HKI?",
     a: "HKI (Hak Kekayaan Intelektual) melindungi desain batik Anda secara hukum. Pengguna Premium mendapat diskon biaya pendaftaran melalui mitra resmi kami.",
@@ -605,7 +602,7 @@ export function PricingPage() {
               style={{ color: C.creamSoft }}
             >
               Mulai gratis, lalu berlangganan saat proyek Anda butuh lebih
-              banyak ruang, revisi, dan dukungan AI.
+              banyak ruang, revisi, dan fitur eksklusif.
             </p>
           </Reveal>
 
